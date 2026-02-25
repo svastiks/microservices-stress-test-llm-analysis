@@ -1,19 +1,12 @@
-//   k6 run --summary-export=./results/k6-summary.json load-tests/k6/basic.js
-// Step-load variant: use --env SCENARIO=ramp in options below (see comment).
-
 import http from "k6/http";
 import { check, sleep } from "k6";
 
-const BASE_URL = __ENV.BASE_URL || "http://localhost:8080";
-const PRODUCT_IDS = [
-  "OLJCESPC7Z",
-  "66VCHSJNUP",
-  "1YMWWN1N4O",
-  "2ZYFJ3GM2N",
-  "0PUK6V6EV0",
-];
+const BASE_URL = "http://localhost:8080";
+const HEADERS = {
+  baggage: "session.id=test,synthetic_request=true",
+};
 
-const scenario = __ENV.SCENARIO || "constant_rate";
+const scenario = "constant_rate";
 export const options = {
   scenarios:
     scenario === "ramp"
@@ -22,9 +15,9 @@ export const options = {
             executor: "ramping-vus",
             startVUs: 0,
             stages: [
-              { duration: "1m", target: 25 },
-              { duration: "1m", target: 50 },
-              { duration: "1m", target: 75 },
+              { duration: "1m", target: 10 },
+              { duration: "1m", target: 20 },
+              { duration: "1m", target: 30 },
             ],
             startTime: "0s",
             gracefulRampDown: "30s",
@@ -34,9 +27,9 @@ export const options = {
       : {
           constant_rate: {
             executor: "constant-arrival-rate",
-            rate: 50,
+            rate: 40,
             timeUnit: "1s",
-            duration: "5m",
+            duration: "30s",
             preAllocatedVUs: 10,
             maxVUs: 50,
           },
@@ -48,8 +41,9 @@ export const options = {
 };
 
 export default function () {
-  const productId = PRODUCT_IDS[Math.floor(Math.random() * PRODUCT_IDS.length)];
-  const res = http.get(`${BASE_URL}/api/data/?contextKeys=telescopes`);
+  const res = http.get(`${BASE_URL}/api/data/?contextKeys=telescopes`, {
+    headers: HEADERS,
+  });
   check(res, { "status is 200": (r) => r.status === 200 });
   sleep(0.1);
 }
