@@ -1,0 +1,10 @@
+--- current_deployment.yaml
++++ proposed_deployment.yaml
+@@ -11,6 +11,7 @@
+       resources:
+         limits:
+           memory: 300M
++          memory: 512M
+     restart: unless-stopped
+     ports:
+       - "${AD_PORT}"
