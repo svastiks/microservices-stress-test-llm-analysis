@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 73.1,
+  "next_experiment": "Increase the load to a target of 150 requests per second and rerun the stress test after applying the CPU request change. This will help validate whether the adjustments lead to a more stable service performance under higher load conditions.",
+  "evidence": [
+    "observed.achieved_requests_per_second: 73.1",
+    "observed.error_rate: 1.0",
+    "observed.latency_ms.p95: 1138.0",
+    "config.hpa.max_replicas: 10",
+    "config.hpa.target_cpu_util_pct: 70"
+  ]
+}

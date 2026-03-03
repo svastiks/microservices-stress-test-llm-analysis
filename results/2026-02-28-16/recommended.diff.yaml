@@ -1,0 +1,17 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -1,8 +1,8 @@
+     resources:
+       requests:
+-        cpu: 50m
++        cpu: 100m  
+         memory: 64Mi
+       limits:
+-        cpu: 250m
++        cpu: 250m  
+         memory: 128Mi
+  hpa:
+-    min_replicas: 1
++    min_replicas: 1
+     max_replicas: 5
+     target_cpu_util_pct: 70

@@ -1,0 +1,6 @@
+{
+  "deployment": null,
+  "hpa": null,
+  "pods": null,
+  "top_stdout": ""
+}

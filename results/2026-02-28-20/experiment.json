@@ -1,0 +1,47 @@
+{
+  "experiment_id": "run-1",
+  "service": "stress-service",
+  "endpoint": "POST /login",
+  "config": {
+    "cpu_request_m": 50,
+    "cpu_limit_m": 250,
+    "mem_request_mib": 64,
+    "mem_limit_mib": 128,
+    "hpa": {
+      "min_replicas": 1,
+      "max_replicas": 5,
+      "target_cpu_util_pct": 70
+    }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate_fixed_count",
+    "target_request_count": 40500,
+    "target_requests_per_second": 450
+  },
+  "slo": {
+    "p95_latency_ms": 400,
+    "error_rate": 0.05
+  },
+  "observed": {
+    "total_requests": 38590,
+    "observed_duration_s": 90.1,
+    "achieved_requests_per_second": 428.3,
+    "latency_ms": {
+      "p95": 1130.0,
+      "p99": 0
+    },
+    "error_rate": 0.0,
+    "replicas": 1,
+    "cpu_util_pct": 0.0,
+    "mem_util_pct": 0.0,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.0,
+    "replicas_at_start": 1,
+    "replicas_at_end": 1,
+    "scaled_during_test": false
+  },
+  "failure": {
+    "failed": true,
+    "reason": "p95_slo_violation"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": 553.8,
+  "next_experiment": "Target requests per second should be increased to validate critical load thresholds. I recommend a target of 800 requests per second to validate performance under increased pressure.",
+  "evidence": [
+    "observed.latency_ms.p95: 1213ms",
+    "observed.error_rate: 0.1053",
+    "observed.cpu_util_pct: 0.0",
+    "observed.mem_util_pct: 0.0",
+    "observed.replicas: 1"
+  ]
+}

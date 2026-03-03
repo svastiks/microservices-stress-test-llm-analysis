@@ -1,0 +1,8 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -1,5 +1,5 @@
+ hpa:
+- min_replicas: 1
+- max_replicas: 5
++ min_replicas: 3
++ max_replicas: 10

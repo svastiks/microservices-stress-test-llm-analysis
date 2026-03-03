@@ -1,0 +1,6 @@
+--- current_deployment.yaml
++++ proposed_deployment.yaml
+@@ -11,7 +11,7 @@
+         limits:
+           memory: 300M
++          memory: 512M

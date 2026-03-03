@@ -1,0 +1,62 @@
+[
+  {
+    "t": 5,
+    "replicas": 1,
+    "cpu_m": 4,
+    "mem_mib": 81
+  },
+  {
+    "t": 16,
+    "replicas": 1,
+    "cpu_m": 132,
+    "mem_mib": 83
+  },
+  {
+    "t": 26,
+    "replicas": 1,
+    "cpu_m": 237,
+    "mem_mib": 88
+  },
+  {
+    "t": 36,
+    "replicas": 1,
+    "cpu_m": 237,
+    "mem_mib": 88
+  },
+  {
+    "t": 47,
+    "replicas": 1,
+    "cpu_m": 241,
+    "mem_mib": 91
+  },
+  {
+    "t": 57,
+    "replicas": 1,
+    "cpu_m": 247,
+    "mem_mib": 93
+  },
+  {
+    "t": 67,
+    "replicas": 3,
+    "cpu_m": 247,
+    "mem_mib": 93
+  },
+  {
+    "t": 77,
+    "replicas": 3,
+    "cpu_m": 251,
+    "mem_mib": 95
+  },
+  {
+    "t": 87,
+    "replicas": 3,
+    "cpu_m": 268,
+    "mem_mib": 172
+  },
+  {
+    "t": 92,
+    "replicas": 3,
+    "cpu_m": 268,
+    "mem_mib": 172
+  }
+]

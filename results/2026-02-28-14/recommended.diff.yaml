@@ -1,0 +1,23 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -1,6 +1,6 @@
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+   name: stress-service
+ spec:
+   replicas: 3
+-  resources:
+-    requests:
+-      cpu: 50m
+-      memory: 64Mi
+-    limits:
+-      cpu: 250m
+-      memory: 128Mi
++  resources:
++    requests:
++      cpu: 150m
++      memory: 128Mi
++    limits:
++      cpu: 500m
++      memory: 256Mi

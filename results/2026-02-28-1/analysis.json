@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "Consider increasing the target requests per second to 120 for the next stress-test run to observe performance at higher loads and identify potential thresholds not yet reached during this experiment, as well as to confirm system stability under prolonged heavier loads.",
+  "evidence": [
+    "achieved_requests_per_second: 99.2",
+    "observed.latency_ms.p95: 11ms",
+    "error_rate: 0.0"
+  ]
+}

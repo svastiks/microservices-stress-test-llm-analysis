@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": 116.4,
+  "next_experiment": "Run the same stress test after increasing the CPU request to 200m and the CPU limit to 700m. Monitor the error rates and latency to evaluate if the adjustments mitigate the SLO violations.",
+  "evidence": [
+    "observed.error_rate: 1.0",
+    "observed.latency_ms.p95: 564.0",
+    "achieved_requests_per_second: 116.4",
+    "config.cpu_request_m: 100",
+    "config.cpu_limit_m: 500"
+  ]
+}

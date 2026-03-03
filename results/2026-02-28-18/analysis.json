@@ -1,0 +1,9 @@
+{
+  "failure_archetype": "",
+  "lambda_crit_estimate": "",
+  "next_experiment": "",
+  "evidence": [],
+  "scaled_during_test": false,
+  "replicas_at_start": 1,
+  "replicas": 0
+}

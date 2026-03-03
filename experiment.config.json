@@ -1,0 +1,21 @@
+{
+  "experiment_id": "run-1",
+  "service": "stress-service",
+  "endpoint": "POST /login",
+  "config": {
+    "cpu_request_m": 100,
+    "cpu_limit_m": 500,
+    "mem_request_mib": 128,
+    "mem_limit_mib": 256,
+    "hpa": { "min_replicas": 1, "max_replicas": 5, "target_cpu_util_pct": 70 }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate_fixed_count",
+    "target_request_count": 40500,
+    "target_requests_per_second": 450
+  },
+  "slo": {
+    "p95_latency_ms": 400,
+    "error_rate": 0.05
+  }
+}

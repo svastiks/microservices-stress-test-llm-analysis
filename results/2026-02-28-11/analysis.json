@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 840,
+  "next_experiment": "Target 840 RPS to validate the system's capacity under increased load and to identify the critical load threshold where SLO violations may begin.",
+  "evidence": [
+    "observed.achieved_requests_per_second: 140.4",
+    "observed.cpu_util_pct: 0.0",
+    "observed.mem_util_pct: 0.0",
+    "observed.replicas: 2"
+  ]
+}

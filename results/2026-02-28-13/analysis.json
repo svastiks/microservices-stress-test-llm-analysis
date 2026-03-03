@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 840,
+  "next_experiment": "Increase workload target_requests_per_second to 840 to validate the critical load threshold.",
+  "evidence": [
+    "achieved_requests_per_second: 697.6",
+    "observed.latency_ms.p95: 58ms",
+    "cpu_util_pct: 0.0%",
+    "mem_util_pct: 0.0%",
+    "replicas: 2"
+  ]
+}

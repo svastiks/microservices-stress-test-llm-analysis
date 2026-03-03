@@ -1,0 +1,8 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -5,7 +5,7 @@
+     min_replicas: 2
+-    max_replicas: 10
+-    target_cpu_util_pct: 70
++    max_replicas: 15
++    target_cpu_util_pct: 50

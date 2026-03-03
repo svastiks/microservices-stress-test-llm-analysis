@@ -1,0 +1,459 @@
+{
+  "deployment": {
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+      "annotations": {
+        "deployment.kubernetes.io/revision": "2",
+        "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"stress-service\"},\"name\":\"stress-service\",\"namespace\":\"default\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"app\":\"stress-service\"}},\"template\":{\"metadata\":{\"labels\":{\"app\":\"stress-service\"}},\"spec\":{\"containers\":[{\"env\":[{\"name\":\"CPU_WORK_MS\",\"value\":\"0\"},{\"name\":\"MEMORY_MB\",\"value\":\"0\"},{\"name\":\"LOG_LEVEL\",\"value\":\"INFO\"}],\"image\":\"stress-service:latest\",\"imagePullPolicy\":\"IfNotPresent\",\"livenessProbe\":{\"httpGet\":{\"path\":\"/health\",\"port\":8000},\"initialDelaySeconds\":5,\"periodSeconds\":10},\"name\":\"app\",\"ports\":[{\"containerPort\":8000}],\"readinessProbe\":{\"httpGet\":{\"path\":\"/health\",\"port\":8000},\"initialDelaySeconds\":3,\"periodSeconds\":5},\"resources\":{\"limits\":{\"cpu\":\"250m\",\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}}}]}}}}\n"
+      },
+      "creationTimestamp": "2026-02-28T23:23:40Z",
+      "generation": 2,
+      "labels": {
+        "app": "stress-service"
+      },
+      "name": "stress-service",
+      "namespace": "default",
+      "resourceVersion": "7060",
+      "uid": "19ac4bdf-202a-409b-95f5-6e80067757b7"
+    },
+    "spec": {
+      "progressDeadlineSeconds": 600,
+      "replicas": 1,
+      "revisionHistoryLimit": 10,
+      "selector": {
+        "matchLabels": {
+          "app": "stress-service"
+        }
+      },
+      "strategy": {
+        "rollingUpdate": {
+          "maxSurge": "25%",
+          "maxUnavailable": "25%"
+        },
+        "type": "RollingUpdate"
+      },
+      "template": {
+        "metadata": {
+          "creationTimestamp": null,
+          "labels": {
+            "app": "stress-service"
+          }
+        },
+        "spec": {
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "CPU_WORK_MS",
+                  "value": "0"
+                },
+                {
+                  "name": "MEMORY_MB",
+                  "value": "0"
+                },
+                {
+                  "name": "LOG_LEVEL",
+                  "value": "INFO"
+                }
+              ],
+              "image": "stress-service:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "livenessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/health",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 5,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "name": "app",
+              "ports": [
+                {
+                  "containerPort": 8000,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/health",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 3,
+                "periodSeconds": 5,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "cpu": "250m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "64Mi"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File"
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "terminationGracePeriodSeconds": 30
+        }
+      }
+    },
+    "status": {
+      "conditions": [
+        {
+          "lastTransitionTime": "2026-02-28T23:23:40Z",
+          "lastUpdateTime": "2026-03-01T00:30:32Z",
+          "message": "ReplicaSet \"stress-service-7746c6f68d\" has successfully progressed.",
+          "reason": "NewReplicaSetAvailable",
+          "status": "True",
+          "type": "Progressing"
+        },
+        {
+          "lastTransitionTime": "2026-03-01T02:16:29Z",
+          "lastUpdateTime": "2026-03-01T02:16:29Z",
+          "message": "Deployment does not have minimum availability.",
+          "reason": "MinimumReplicasUnavailable",
+          "status": "False",
+          "type": "Available"
+        }
+      ],
+      "observedGeneration": 2,
+      "replicas": 1,
+      "unavailableReplicas": 1,
+      "updatedReplicas": 1
+    }
+  },
+  "hpa": {
+    "apiVersion": "autoscaling/v2",
+    "kind": "HorizontalPodAutoscaler",
+    "metadata": {
+      "annotations": {
+        "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"autoscaling/v2\",\"kind\":\"HorizontalPodAutoscaler\",\"metadata\":{\"annotations\":{},\"name\":\"stress-service-hpa\",\"namespace\":\"default\"},\"spec\":{\"maxReplicas\":5,\"metrics\":[{\"resource\":{\"name\":\"cpu\",\"target\":{\"averageUtilization\":70,\"type\":\"Utilization\"}},\"type\":\"Resource\"}],\"minReplicas\":1,\"scaleTargetRef\":{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"name\":\"stress-service\"}}}\n"
+      },
+      "creationTimestamp": "2026-02-28T23:23:46Z",
+      "name": "stress-service-hpa",
+      "namespace": "default",
+      "resourceVersion": "6631",
+      "uid": "b3503658-303c-44b9-990b-0d43607be45b"
+    },
+    "spec": {
+      "maxReplicas": 5,
+      "metrics": [
+        {
+          "resource": {
+            "name": "cpu",
+            "target": {
+              "averageUtilization": 70,
+              "type": "Utilization"
+            }
+          },
+          "type": "Resource"
+        }
+      ],
+      "minReplicas": 1,
+      "scaleTargetRef": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "stress-service"
+      }
+    },
+    "status": {
+      "conditions": [
+        {
+          "lastTransitionTime": "2026-03-01T02:11:13Z",
+          "message": "the HPA controller was able to get the target's current scale",
+          "reason": "SucceededGetScale",
+          "status": "True",
+          "type": "AbleToScale"
+        },
+        {
+          "lastTransitionTime": "2026-02-28T23:24:46Z",
+          "message": "the HPA was unable to compute the replica count: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server could not find the requested resource (get pods.metrics.k8s.io)",
+          "reason": "FailedGetResourceMetric",
+          "status": "False",
+          "type": "ScalingActive"
+        }
+      ],
+      "currentMetrics": [
+        {
+          "type": ""
+        }
+      ],
+      "currentReplicas": 1,
+      "desiredReplicas": 0
+    }
+  },
+  "pods": {
+    "apiVersion": "v1",
+    "items": [
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "creationTimestamp": "2026-03-01T00:30:26Z",
+          "generateName": "stress-service-7746c6f68d-",
+          "labels": {
+            "app": "stress-service",
+            "pod-template-hash": "7746c6f68d"
+          },
+          "name": "stress-service-7746c6f68d-q7bk9",
+          "namespace": "default",
+          "ownerReferences": [
+            {
+              "apiVersion": "apps/v1",
+              "blockOwnerDeletion": true,
+              "controller": true,
+              "kind": "ReplicaSet",
+              "name": "stress-service-7746c6f68d",
+              "uid": "050f582b-7cb7-465f-acf6-c98892dce04e"
+            }
+          ],
+          "resourceVersion": "7098",
+          "uid": "5847c14c-1747-4638-a2b3-b211986fcf21"
+        },
+        "spec": {
+          "containers": [
+            {
+              "env": [
+                {
+                  "name": "CPU_WORK_MS",
+                  "value": "0"
+                },
+                {
+                  "name": "MEMORY_MB",
+                  "value": "0"
+                },
+                {
+                  "name": "LOG_LEVEL",
+                  "value": "INFO"
+                }
+              ],
+              "image": "stress-service:latest",
+              "imagePullPolicy": "IfNotPresent",
+              "livenessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/health",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 5,
+                "periodSeconds": 10,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "name": "app",
+              "ports": [
+                {
+                  "containerPort": 8000,
+                  "protocol": "TCP"
+                }
+              ],
+              "readinessProbe": {
+                "failureThreshold": 3,
+                "httpGet": {
+                  "path": "/health",
+                  "port": 8000,
+                  "scheme": "HTTP"
+                },
+                "initialDelaySeconds": 3,
+                "periodSeconds": 5,
+                "successThreshold": 1,
+                "timeoutSeconds": 1
+              },
+              "resources": {
+                "limits": {
+                  "cpu": "250m",
+                  "memory": "128Mi"
+                },
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "64Mi"
+                }
+              },
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File",
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-b5dzw",
+                  "readOnly": true
+                }
+              ]
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "enableServiceLinks": true,
+          "nodeName": "docker-desktop",
+          "preemptionPolicy": "PreemptLowerPriority",
+          "priority": 0,
+          "restartPolicy": "Always",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "serviceAccount": "default",
+          "serviceAccountName": "default",
+          "terminationGracePeriodSeconds": 30,
+          "tolerations": [
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/not-ready",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            },
+            {
+              "effect": "NoExecute",
+              "key": "node.kubernetes.io/unreachable",
+              "operator": "Exists",
+              "tolerationSeconds": 300
+            }
+          ],
+          "volumes": [
+            {
+              "name": "kube-api-access-b5dzw",
+              "projected": {
+                "defaultMode": 420,
+                "sources": [
+                  {
+                    "serviceAccountToken": {
+                      "expirationSeconds": 3607,
+                      "path": "token"
+                    }
+                  },
+                  {
+                    "configMap": {
+                      "items": [
+                        {
+                          "key": "ca.crt",
+                          "path": "ca.crt"
+                        }
+                      ],
+                      "name": "kube-root-ca.crt"
+                    }
+                  },
+                  {
+                    "downwardAPI": {
+                      "items": [
+                        {
+                          "fieldRef": {
+                            "apiVersion": "v1",
+                            "fieldPath": "metadata.namespace"
+                          },
+                          "path": "namespace"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "status": {
+          "conditions": [
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-03-01T00:30:27Z",
+              "status": "True",
+              "type": "PodReadyToStartContainers"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-03-01T00:30:26Z",
+              "status": "True",
+              "type": "Initialized"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-03-01T02:16:28Z",
+              "message": "containers with unready status: [app]",
+              "reason": "ContainersNotReady",
+              "status": "False",
+              "type": "Ready"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-03-01T02:16:28Z",
+              "message": "containers with unready status: [app]",
+              "reason": "ContainersNotReady",
+              "status": "False",
+              "type": "ContainersReady"
+            },
+            {
+              "lastProbeTime": null,
+              "lastTransitionTime": "2026-03-01T00:30:26Z",
+              "status": "True",
+              "type": "PodScheduled"
+            }
+          ],
+          "containerStatuses": [
+            {
+              "containerID": "docker://c876620e2b038452baca60353b01fdb506505ed76bb3a272d5f8bb2857eef440",
+              "image": "stress-service:latest",
+              "imageID": "docker-pullable://stress-service@sha256:1f7c24933037f661a58250c60b092ecbb48eb93001fca8c74d10b5711c47f0d2",
+              "lastState": {
+                "terminated": {
+                  "containerID": "docker://ee25f08493986e2d0ae867954df536d6ff2e68fa3608a3b5c736fa05128ffb1e",
+                  "exitCode": 0,
+                  "finishedAt": "2026-03-01T02:16:45Z",
+                  "reason": "Completed",
+                  "startedAt": "2026-03-01T00:30:27Z"
+                }
+              },
+              "name": "app",
+              "ready": false,
+              "restartCount": 1,
+              "started": true,
+              "state": {
+                "running": {
+                  "startedAt": "2026-03-01T02:16:45Z"
+                }
+              },
+              "volumeMounts": [
+                {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "kube-api-access-b5dzw",
+                  "readOnly": true,
+                  "recursiveReadOnly": "Disabled"
+                }
+              ]
+            }
+          ],
+          "hostIP": "192.168.65.3",
+          "hostIPs": [
+            {
+              "ip": "192.168.65.3"
+            }
+          ],
+          "phase": "Running",
+          "podIP": "10.1.0.10",
+          "podIPs": [
+            {
+              "ip": "10.1.0.10"
+            }
+          ],
+          "qosClass": "Burstable",
+          "startTime": "2026-03-01T00:30:26Z"
+        }
+      }
+    ],
+    "kind": "List",
+    "metadata": {
+      "resourceVersion": ""
+    }
+  },
+  "top_stdout": ""
+}

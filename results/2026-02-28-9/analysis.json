@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 206,
+  "next_experiment": "Increase the target_requests_per_second to 240 to evaluate performance under higher load and confirm stability after resource adjustments.",
+  "evidence": [
+    "observed.latency_ms.p95: 240ms",
+    "observed.error_rate: 0.0",
+    "observed.cpu_util_pct: 0.0",
+    "observed.mem_util_pct: 0.0",
+    "observed.replicas: 2"
+  ]
+}

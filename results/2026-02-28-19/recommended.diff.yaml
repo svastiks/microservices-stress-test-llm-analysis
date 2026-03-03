@@ -1,0 +1,6 @@
+--- /path/to/original/deployment.yaml
++++ /path/to/original/deployment.yaml
+@@ -1,6 +1,6 @@
+   hpa:
+-    max_replicas: 5
++    max_replicas: 10

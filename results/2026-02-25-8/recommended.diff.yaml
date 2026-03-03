@@ -1,0 +1,11 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -1,6 +1,6 @@
+ resources:
+-   requests:
+-     cpu: 100m
++   requests:
++     cpu: 200m
+    limits:
+-     cpu: 500m
++     cpu: 700m

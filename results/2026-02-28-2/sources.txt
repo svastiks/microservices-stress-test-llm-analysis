@@ -1,0 +1,8 @@
+# Experiment JSON field sources (audit)
+experiment_id, service, endpoint <- experiment.config.json
+config <- experiment.config.json (if K8S=0); kubectl get deployment + kubectl get hpa (if K8S=1)
+workload, slo <- experiment.config.json
+observed.total_requests, observed_duration_s, achieved_requests_per_second <- k6-run-summary.json (metrics.http_reqs, rate)
+observed.latency_ms.p95, p99 <- k6-run-summary.json metrics.http_req_duration
+observed.error_rate <- k6-run-summary.json metrics.http_req_failed.value
+failure.failed, failure.reason <- derived from k6 thresholds vs SLO in from_k6_summary()

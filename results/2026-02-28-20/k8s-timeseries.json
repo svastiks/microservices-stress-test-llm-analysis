@@ -1,0 +1,62 @@
+[
+  {
+    "t": 5,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 15,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 25,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 35,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 45,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 55,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 65,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 75,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 85,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  },
+  {
+    "t": 90,
+    "replicas": 1,
+    "cpu_m": 0,
+    "mem_mib": 0
+  }
+]

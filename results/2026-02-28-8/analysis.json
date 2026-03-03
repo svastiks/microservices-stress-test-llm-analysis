@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 162,
+  "next_experiment": "To validate the actual capacity of the service, conduct a new test with the target_requests_per_second increased to at least 200 (about 20% higher than the current target).",
+  "evidence": [
+    "observed.cpu_util_pct: 0.0%",
+    "observed.mem_util_pct: 0.0%",
+    "observed.replicas: 2",
+    "observed.latency_ms.p95: 148ms",
+    "observed.error_rate: 0.0%"
+  ]
+}

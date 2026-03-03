@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 500,
+  "next_experiment": "Increase the target_requests_per_second to 600 to find the critical load threshold where SLO violations occur.",
+  "evidence": [
+    "observed.cpu_util_pct: 0.0%",
+    "observed.mem_util_pct: 0.0%",
+    "observed.latency_ms.p95: 271.0ms",
+    "observed.error_rate: 0.0%",
+    "observed.replicas: 2"
+  ]
+}

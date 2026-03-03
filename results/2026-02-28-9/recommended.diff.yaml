@@ -1,0 +1,12 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -1,5 +1,5 @@
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+- replicas: 2
++ replicas: 1

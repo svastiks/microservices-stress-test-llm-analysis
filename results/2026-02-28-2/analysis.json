@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": 100,
+  "next_experiment": "Increase target_requests_per_second to 120 and observe the response metrics.",
+  "evidence": [
+    "achieved_requests_per_second: 99.1",
+    "observed.latency_ms.p95: 9.0ms",
+    "error_rate: 0.0"
+  ]
+}

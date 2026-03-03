@@ -1,0 +1,13 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -1,10 +1,10 @@
+-  replicas: 2
++  replicas: 1
+-    cpu_request_m: 100
++    cpu_request_m: 50
+-    cpu_limit_m: 500
++    cpu_limit_m: 300
+-    mem_request_mib: 128
++    mem_request_mib: 64
+-    mem_limit_mib: 256
++    mem_limit_mib: 128

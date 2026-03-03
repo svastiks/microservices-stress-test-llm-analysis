@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 330.1,
+  "next_experiment": "Target 900 requests per second to validate critical load threshold.",
+  "evidence": [
+    "observed.achieved_requests_per_second: 330.1",
+    "observed.latency_ms.p95: 14478ms",
+    "observed.error_rate: 0.7622",
+    "observed.cpu_util_pct: 0%"
+  ]
+}

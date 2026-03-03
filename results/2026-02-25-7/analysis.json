@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 98,
+  "next_experiment": "Conduct a follow-up experiment with the modified HPA settings, maintaining an HPA with a target CPU utilization of 50% and a maximum of 15 replicas. Rerun the test with the same workload aiming for 100 requests per second to validate if the system can handle the load without violating the error rate SLO.",
+  "evidence": [
+    "observed.total_requests: 2969",
+    "observed.achieved_requests_per_second: 98.6",
+    "observed.error_rate: 1.0",
+    "observed.latency_ms.p95: 30.0"
+  ]
+}

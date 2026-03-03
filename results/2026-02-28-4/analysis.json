@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "Increase the target requests per second to 120 and monitor for SLO violations.",
+  "evidence": [
+    "observed.latency_ms.p95: 8.0 ms",
+    "observed.error_rate: 0.0%",
+    "observed.cpu_util_pct: 0.0%",
+    "observed.mem_util_pct: 0.0%"
+  ]
+}

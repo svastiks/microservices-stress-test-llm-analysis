@@ -1,0 +1,16 @@
+{
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": 428.3,
+  "next_experiment": "target 550 requests per second to validate new replica settings and find critical load thresholds",
+  "evidence": [
+    "observed.latency_ms.p95: 1130ms",
+    "observed.achieved_requests_per_second: 428.3",
+    "observed.replicas: 1",
+    "observed.cpu_util_pct: 0%",
+    "observed.mem_util_pct: 0%"
+  ],
+  "scaled_during_test": false,
+  "replicas_at_start": 1,
+  "replicas": 1,
+  "replicas_at_end": 1
+}

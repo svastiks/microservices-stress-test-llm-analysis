@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Increase load significantly for the next experiment to validate the system's response to higher levels, aiming for a target of 600 RPS to test for scaling capabilities and assess \u03bbcrit.",
+  "evidence": [
+    "observed.achieved_requests_per_second: 25.8",
+    "observed.latency_ms.p95: 30002ms",
+    "observed.cpu_util_pct: 0.0",
+    "observed.mem_util_pct: 0.0",
+    "observed.replicas: 1"
+  ]
+}

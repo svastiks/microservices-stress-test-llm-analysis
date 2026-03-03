@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 25,
+  "next_experiment": "Target at least 20% higher than the current workload of 700 RPS; I recommend setting the next experiment to target 840 RPS to validate scalability and to see if scaling adjustments improve performance.",
+  "evidence": [
+    "observed.latency_ms.p95: 30002ms",
+    "observed.error_rate: 1.0",
+    "observed.cpu_util_pct: 0.0",
+    "observed.mem_util_pct: 0.0",
+    "observed.replicas: 1"
+  ]
+}

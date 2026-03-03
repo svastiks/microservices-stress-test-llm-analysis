@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "Increase the load to maximum capacity (3000 requests) while maintaining the same configuration, and observe if the HPA scales appropriately at the new target CPU utilization set at 50%. Measure the latency and error rates during this stress test.",
+  "evidence": [
+    "observed.cpu_util_pct: 0.0%",
+    "observed.mem_util_pct: 0.0%",
+    "achieved_requests_per_second: 99.1",
+    "observed.latency_ms.p95: 9.0 ms",
+    "error_rate: 0.0"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 381,
+  "next_experiment": "Increase target requests per second to 600 RPS to validate if resource requests increase improve stability.",
+  "evidence": [
+    "observed.latency_ms.p95: 1869ms",
+    "observed.error_rate: 0.1203",
+    "observed.cpu_util_pct: 57.7%",
+    "observed.replicas_at_start: 1",
+    "observed.replicas_at_end: 3"
+  ],
+  "scaled_during_test": true,
+  "replicas_at_start": 1,
+  "replicas": 3,
+  "replicas_at_end": 3
+}

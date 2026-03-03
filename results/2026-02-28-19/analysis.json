@@ -1,0 +1,14 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 428,
+  "next_experiment": "target at least 600 requests per second to validate the current capacity and identify the point of failure.",
+  "evidence": [
+    "observed.latency_ms.p95: 971ms",
+    "observed.achieved_requests_per_second: 428.8",
+    "observed.cpu_util_pct: 0%",
+    "observed.mem_util_pct: 0%"
+  ],
+  "scaled_during_test": false,
+  "replicas_at_start": 1,
+  "replicas": 1
+}

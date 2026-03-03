@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 168,
+  "next_experiment": "To validate the service's performance under increased load, increase the target_requests_per_second to 168 and rerun the test.",
+  "evidence": [
+    "observed.latency_ms.p95: 98.0ms",
+    "observed.error_rate: 0.0%",
+    "observed.cpu_util_pct: 0.0%",
+    "observed.mem_util_pct: 0.0%"
+  ]
+}
