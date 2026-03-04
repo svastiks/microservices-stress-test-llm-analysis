@@ -1,1 +1,0 @@
-No HTTP-level failures occurred during the test, as all requests returned a status code of 200. However, there were 24 dropped iterations, which indicates that the load might have been too high for the available resources leading to potential bottlenecks. To fix this, consider increasing the memory limits to accommodate higher loads and prevent dropped iterations.
