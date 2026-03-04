@@ -9,6 +9,9 @@ const HEADERS = {
 };
 
 const scenario = "constant_rate";
+const rps = parseInt(__ENV.RPS || "50", 10);
+const duration = __ENV.DURATION || "90s";
+const maxVUs = Math.min(500, Math.max(rps + 50, 50));
 export const options = {
   scenarios:
     scenario === "ramp"
@@ -29,11 +32,11 @@ export const options = {
       : {
           constant_rate: {
             executor: "constant-arrival-rate",
-            rate: 450,
+            rate: rps,
             timeUnit: "1s",
-            duration: "90s",
-            preAllocatedVUs: 450,
-            maxVUs: 500,
+            duration: duration,
+            preAllocatedVUs: Math.min(maxVUs, rps + 25),
+            maxVUs: maxVUs,
           },
         },
   thresholds: {
@@ -54,3 +57,4 @@ export default function () {
   });
   sleep(0.1);
 }
+
