@@ -1,0 +1,38 @@
+services:
+  stress-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - CPU_WORK_MS=${CPU_WORK_MS:-0}
+      - MEMORY_MB=${MEMORY_MB:-0}
+      - DOWNSTREAM_URL=http://mock-dependency:8080
+      - DOWNSTREAM_ERROR_RATE=${DOWNSTREAM_ERROR_RATE:-0}
+      - DOWNSTREAM_LATENCY_MS=${DOWNSTREAM_LATENCY_MS:-0}
+      - MONGODB_URI=${MONGODB_URI:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - mock-dependency
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+          cpus: "0.1"
+
+  mock-dependency:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    ports:
+      - "8080:8080"
+    environment:
+      - LATENCY_MS=${LATENCY_MS:-0}
+      - ERROR_RATE=${ERROR_RATE:-0}
+    deploy:
+      resources:
+        limits:
+          memory: 128M

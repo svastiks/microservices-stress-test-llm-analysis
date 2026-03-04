@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-dependency
+  labels:
+    app: mock-dependency
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-dependency
+  template:
+    metadata:
+      labels:
+        app: mock-dependency
+    spec:
+      containers:
+        - name: mock
+          image: mock-dependency:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: LATENCY_MS
+              value: "0"
+            - name: ERROR_RATE
+              value: "0"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-dependency
+spec:
+  selector:
+    app: mock-dependency
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

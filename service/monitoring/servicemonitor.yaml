@@ -1,0 +1,17 @@
+# Scrape /metrics from stress-service for kube-prometheus-stack.
+# Apply after deploying stress-service; ensure Prometheus Operator is installed.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: stress-service
+  namespace: default
+  labels:
+    app: stress-service
+spec:
+  selector:
+    matchLabels:
+      app: stress-service
+  endpoints:
+    - port: "80"
+      path: /metrics
+      interval: 15s
