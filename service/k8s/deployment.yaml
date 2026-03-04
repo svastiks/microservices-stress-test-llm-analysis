@@ -6,7 +6,7 @@ metadata:
   labels:
     app: stress-service
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: stress-service

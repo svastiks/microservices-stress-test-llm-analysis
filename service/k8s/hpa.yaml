@@ -1,5 +1,4 @@
-# Cost-effective: scale from 1 when needed, cap max to limit cost spikes
-# Fast scale-up so scaling is visible within ~90s load test (HPA sync ~15s + pod startup)
+# Baseline 2 replicas so medium/high load doesn't crush a single pod; fast scale-up for 90s tests
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -9,15 +8,15 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: stress-service
-  minReplicas: 1
-  maxReplicas: 10
+  minReplicas: 2
+  maxReplicas: 20
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 0
       selectPolicy: Max
       policies:
         - type: Pods
-          value: 2
+          value: 4
           periodSeconds: 15
     scaleDown:
       stabilizationWindowSeconds: 60
