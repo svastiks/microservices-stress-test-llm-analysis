@@ -19,9 +19,9 @@ FAILURE ARCHETYPE RULES:
 FAILURE ARCHETYPE DEFINITIONS (use only when failure.failed == true and evidence supports):
 - CPU_THROTTLING: SLO violated AND cpu_util_pct near 100%, cpu_util_to_limit > 0.9, high latency, no OOM
 - MEMORY_PRESSURE_OOM: SLO violated AND oom_kills > 0, mem_util_pct high, container restarts
-- AUTOSCALER_LAG: SLO violated AND replicas < max_replicas during high load AND (achieved_rps << target_rps or latency spiked) AND cpu_util high enough that scaling would have helped (not when cpu_util_pct is 0)
-- DEPENDENCY_SATURATION: SLO violated AND high latency/errors despite adequate CPU/mem (no throttling, no OOM), downstream timeouts
-- UNKNOWN: failure.failed true but insufficient or conflicting evidence
+- AUTOSCALER_LAG: SLO violated AND replicas < max_replicas during high load AND (achieved_rps << target_rps or latency spiked) AND cpu_util_pct is meaningfully elevated (e.g. ≥ 50%) so that additional replicas would plausibly reduce load per pod. Do NOT use AUTOSCALER_LAG when cpu_util_pct is very low (e.g. < 20%) even if SLOs are violated.
+- DEPENDENCY_SATURATION: SLO violated AND high latency/errors despite adequate CPU/mem (no throttling, no OOM), downstream timeouts or latency spikes.
+- UNKNOWN: failure.failed true but insufficient or conflicting evidence (for example, SLO violation with both cpu_util_pct and mem_util_pct low and no clear downstream symptoms).
 
 LAMBDA_CRIT ESTIMATION:
 - If failure.failed == true: estimate lambda_crit as achieved_requests_per_second (or slightly below if SLO violated)
@@ -55,6 +55,7 @@ YAML_FIX RULES:
   - When editing, preserve the original indentation and formatting style around the edited fields; never re-indent surrounding blocks.
 - When failure_archetype is NONE and over-provisioned: propose a minimal scale-down diff. When well-sized: use the empty string "".
 - When failure_archetype is set: address that bottleneck with specific numeric changes (e.g., replicas, CPU/memory requests/limits, HPA thresholds). NO backticks or markdown wrapping.
+- When cpu_util_pct and mem_util_pct are both low (e.g. < 30%) and replicas are well below max_replicas, do NOT recommend increasing minReplicas or maxReplicas; instead, either suggest scale-down or classify as UNKNOWN if the cause of latency is unclear from the metrics.
 
 COST-AND-SCALE OPTIMIZATION:
 - Balance performance and cost: recommend the smallest configuration change likely to satisfy the SLO, rather than large jumps.
