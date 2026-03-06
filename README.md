@@ -57,7 +57,7 @@ minikube delete
 
 # 1) Start local Kubernetes
 
-minikube start --cpus=4 --memory=8192mb
+minikube start --cpus=4 --memory=7680mb
 minikube addons enable metrics-server # needed for HPA
 
 # 2) Build Docker images

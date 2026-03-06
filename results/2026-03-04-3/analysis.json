@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 461.7,
+  "next_experiment": "To validate the adjustments and find the critical load limit, conduct another load test with a target of 600 requests per second for a duration of 90 seconds. This should allow assessment of the new configuration's behavior under sustained load.",
+  "evidence": [
+    "observed.latency_ms.p95: 823ms",
+    "observed.cpu_util_pct: 9.1%",
+    "observed.achieved_requests_per_second: 461.7",
+    "observed.replicas: 7"
+  ]
+}

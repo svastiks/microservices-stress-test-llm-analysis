@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 119.88,
+  "next_experiment": "Run a validation test with an increased load target of 120 requests per second to validate lambda_crit estimation.",
+  "evidence": [
+    "observed.latency_ms.p95: 42ms",
+    "observed.cpu_util_pct: 5.3%",
+    "observed.mem_util_pct: 16.3%",
+    "observed.achieved_requests_per_second: 99.9"
+  ]
+}

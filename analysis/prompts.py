@@ -56,6 +56,7 @@ YAML_FIX RULES:
 - When failure_archetype is NONE and over-provisioned: propose a minimal scale-down diff. When well-sized: use the empty string "".
 - When failure_archetype is set: address that bottleneck with specific numeric changes (e.g., replicas, CPU/memory requests/limits, HPA thresholds). NO backticks or markdown wrapping.
 - When cpu_util_pct and mem_util_pct are both low (e.g. < 30%) and replicas are well below max_replicas, do NOT recommend increasing minReplicas or maxReplicas; instead, either suggest scale-down or classify as UNKNOWN if the cause of latency is unclear from the metrics.
+- When failure_archetype is UNKNOWN, yaml_fix MUST be the empty string "" (no YAML change). In this case, focus the report on investigation steps (e.g., profiling, dependency latency metrics, database/query performance) rather than autoscaler or resource tuning.
 
 COST-AND-SCALE OPTIMIZATION:
 - Balance performance and cost: recommend the smallest configuration change likely to satisfy the SLO, rather than large jumps.

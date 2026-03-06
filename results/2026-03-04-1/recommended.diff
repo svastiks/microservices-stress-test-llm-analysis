@@ -1,0 +1,13 @@
+--- /path/to/deployment.yaml
++++ /path/to/deployment.yaml
+@@ -10,7 +10,7 @@
+   replicas: 5
+   selector:
+     matchLabels:
+       app: stress-service
+-  replicas: 5
++  replicas: 4
+   template:
+     metadata:
+       labels:
+         app: stress-service

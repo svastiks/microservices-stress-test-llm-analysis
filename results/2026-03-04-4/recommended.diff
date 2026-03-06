@@ -1,0 +1,36 @@
+--- deployment.yaml
++++ deployment.yaml
+@@ -26,7 +26,7 @@
+       name: stress-service-hpa
+ spec:
+   scaleTargetRef:
+     apiVersion: apps/v1
+     kind: Deployment
+     name: stress-service
+-  minReplicas: 7
++  minReplicas: 7
+   maxReplicas: 30
++  maxReplicas: 40
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0
+       selectPolicy: Max
+       policies:
+         - type: Pods
+           value: 4
+           periodSeconds: 15
+     scaleDown:
+       stabilizationWindowSeconds: 60
+   metrics:
+     - type: Resource
+       resource:
+         name: cpu
+         target:
+           type: Utilization
+           averageUtilization: 50
+     - type: Resource
+       resource:
+         name: memory
+         target:
+           type: Utilization
+           averageUtilization: 70

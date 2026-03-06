@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 457.7,
+  "next_experiment": "Increase the target requests per second to 550 to find safe lambda_crit.",
+  "evidence": [
+    "observed.latency_ms.p95: 1023ms",
+    "observed.cpu_util_pct: 9.3%",
+    "observed.mem_util_pct: 19.2%",
+    "observed.replicas_max: 7",
+    "observed.achieved_requests_per_second: 457.7"
+  ]
+}

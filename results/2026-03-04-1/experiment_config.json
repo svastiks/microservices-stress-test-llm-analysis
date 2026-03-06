@@ -1,0 +1,1 @@
+{"experiment_id": "medium", "workload": {"mode": "constant_arrival_rate", "target_requests_per_second": 100, "duration_s": 90}, "slo": {"p95_latency_ms": 500, "error_rate": 0.01}}
