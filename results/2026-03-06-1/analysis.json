@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 24.6,
+  "next_experiment": "Perform a follow-up test with a target of 30 requests per second to validate the adjustments made to the autoscaler and monitor if the response latencies and error rates improve.",
+  "evidence": [
+    "observed.latency_ms.p95: 1978ms",
+    "observed.error_rate: 0.9625",
+    "observed.cpu_util_pct: 7.0%",
+    "observed.mem_util_pct: 16.1%"
+  ]
+}

@@ -1,0 +1,6 @@
+# **Failure Summary**: SLO violations occurred, specifically p95 latency exceeded 500ms, with a measured p95 of 1802ms.
+# **Scaling**: Scaled during test: no (replicas stayed at 7). Increasing replicas may improve performance under load.
+# **Root Cause Analysis**: The bottleneck is likely due to insufficient replicas (7), resulting in high latency given the load. CPU utilization is low (12.2%), which indicates that the application is under-provisioned in terms of pod count rather than resource limits. 
+# **Evidence**: ["observed.latency_ms.p95: 1802ms", "observed.cpu_util_pct: 12.2%", "observed.replicas: 7", "observed.achieved_requests_per_second: 405.7"]
+# **Recommended Fix**: Increase minReplicas to handle the load effectively, ensuring better latency performance and fulfilling the SLO.
+# **Next Experiment**: Rerun the test with a target requests per second of 600 to validate changes, as it is 20% higher than the previous achieved requests per second, which should help assess the critical load threshold.

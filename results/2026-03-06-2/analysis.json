@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 405.7,
+  "next_experiment": "Run the test with a target requests per second of 600 to validate changes and assess the critical load threshold.",
+  "evidence": [
+    "observed.latency_ms.p95: 1802ms",
+    "observed.cpu_util_pct: 12.2%",
+    "observed.replicas: 7",
+    "observed.achieved_requests_per_second: 405.7"
+  ]
+}

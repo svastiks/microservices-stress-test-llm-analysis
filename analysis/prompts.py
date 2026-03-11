@@ -15,13 +15,32 @@ Given an experiment JSON (config, workload, observed metrics, failure status) an
 FAILURE ARCHETYPE RULES:
 - When failure.failed is false: set failure_archetype to NONE. Do not assign a bottleneck when the test passed.
 - Only assign a non-NONE archetype when failure.failed is true AND the evidence clearly points to that cause.
+- Hard constraint: If you violate any MUST/MUST NOT rule below, your answer is invalid. Prefer UNKNOWN over guessing.
 
 FAILURE ARCHETYPE DEFINITIONS (use only when failure.failed == true and evidence supports):
 - CPU_THROTTLING: SLO violated AND cpu_util_pct near 100%, cpu_util_to_limit > 0.9, high latency, no OOM
 - MEMORY_PRESSURE_OOM: SLO violated AND oom_kills > 0, mem_util_pct high, container restarts
-- AUTOSCALER_LAG: SLO violated AND replicas < max_replicas during high load AND (achieved_rps << target_rps or latency spiked) AND cpu_util_pct is meaningfully elevated (e.g. ≥ 50%) so that additional replicas would plausibly reduce load per pod. Do NOT use AUTOSCALER_LAG when cpu_util_pct is very low (e.g. < 20%) even if SLOs are violated.
-- DEPENDENCY_SATURATION: SLO violated AND high latency/errors despite adequate CPU/mem (no throttling, no OOM), downstream timeouts or latency spikes.
-- UNKNOWN: failure.failed true but insufficient or conflicting evidence (for example, SLO violation with both cpu_util_pct and mem_util_pct low and no clear downstream symptoms).
+- AUTOSCALER_LAG:
+  - Use only when ALL are true:
+    - SLO violated AND replicas < config.hpa.max_replicas (or observed.replicas_max < config.hpa.max_replicas), AND
+    - there is evidence the service was compute-bound per pod (cpu_util_pct >= 50 OR cpu_util_to_limit >= 0.7), AND
+    - scaling would plausibly help (replicas stuck due to HPA reaction/limits rather than a non-CPU bottleneck).
+  - MUST NOT use AUTOSCALER_LAG when cpu_util_pct < 20 (even if replicas stayed at min and latency is high). That indicates the HPA's CPU signal did not fire; this is not "lag".
+- DEPENDENCY_SATURATION:
+  - Use when SLO violated AND (cpu_util_pct < 30 AND mem_util_pct < 30 AND oom_kills == 0) AND latency is high.
+  - This covers "high latency with low CPU/memory" which is typically waiting on I/O (downstream, queueing, locks) or other non-CPU constraints.
+- UNKNOWN:
+  - Use when failure.failed true but metrics are insufficient/conflicting to pick a single cause.
+  - MUST use UNKNOWN (not AUTOSCALER_LAG) when cpu_util_pct < 20 and mem_util_pct < 30 and you cannot cite any downstream/error evidence.
+
+DIAGNOSIS PROCEDURE (follow in order):
+1) If failure.failed is false → failure_archetype=NONE.
+2) If oom_kills > 0 → MEMORY_PRESSURE_OOM.
+3) If cpu_util_to_limit > 0.9 or cpu_util_pct near 100% → CPU_THROTTLING.
+4) If cpu_util_pct < 20 AND mem_util_pct < 30:
+   - If latency high → DEPENDENCY_SATURATION (or UNKNOWN if you cannot justify dependency/I/O plausibly).
+   - Never AUTOSCALER_LAG.
+5) Consider AUTOSCALER_LAG only if cpu_util_pct >= 50 (or cpu_util_to_limit >= 0.7) AND replicas clearly should/ could have increased.
 
 LAMBDA_CRIT ESTIMATION:
 - If failure.failed == true: estimate lambda_crit as achieved_requests_per_second (or slightly below if SLO violated)

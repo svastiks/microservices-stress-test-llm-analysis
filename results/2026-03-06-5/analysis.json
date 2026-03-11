@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 19.9,
+  "next_experiment": "Run an experiment at a higher load target of 25 requests per second to validate the impact of the increased minimum replicas and check if latency improves. Adjust the load progressively until lambda_crit is identified.",
+  "evidence": [
+    "observed.latency_ms.p95: 33247ms",
+    "observed.error_rate: 0.9613",
+    "observed.cpu_util_pct: 26.1%",
+    "observed.mem_util_pct: 20.0%"
+  ]
+}

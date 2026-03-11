@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 30,
+  "next_experiment": "Run a test with a target of 30 requests per second to better identify load thresholds and fine-tune performance metrics for future scaling strategies.",
+  "evidence": [
+    "observed.latency_ms.p95: 6ms",
+    "observed.cpu_util_pct: 1.2%",
+    "observed.mem_util_pct: 16.1%",
+    "observed.error_rate: 0.0"
+  ]
+}

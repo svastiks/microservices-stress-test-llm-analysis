@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Run a validation test with a higher target requests per second of 600 to identify potential lambda_crit and assess service response under increased load conditions.",
+  "evidence": [
+    "observed.latency_ms.p95: 30001ms",
+    "observed.cpu_util_pct: 5.0%",
+    "observed.mem_util_pct: 15.3%",
+    "observed.error_rate: 0.9698"
+  ]
+}

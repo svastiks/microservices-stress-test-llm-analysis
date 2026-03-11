@@ -1,0 +1,23 @@
+--- a/deployment.yaml
++++ b/deployment.yaml
+@@ -22,7 +22,7 @@
+             cpu: "100m"
+-            memory: "128Mi"
++            memory: "64Mi"
+             limits:
+-              cpu: "500m"
++              cpu: "300m"
+               memory: "256Mi"
+                
+@@ -31,7 +31,7 @@
+             averageUtilization: 50
+-    - type: Resource
++    - type: Resource
+       resource:
+         name: memory
+         target:
+           type: Utilization
+           averageUtilization: 70
+-          
+-          # Propose changes to scale down memory utilization
++          averageUtilization: 50

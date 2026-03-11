@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 599.28,
+  "next_experiment": "To validate the current configuration, conduct a follow-up stress test with a target RPS of 600 (20% above the current achieved RPS) to explore potential lambda_crits.",
+  "evidence": [
+    "observed.latency_ms.p95: 11ms",
+    "observed.cpu_util_pct: 11.8%",
+    "observed.mem_util_pct: 18.8%"
+  ]
+}
