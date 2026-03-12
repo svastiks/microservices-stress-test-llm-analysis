@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 16.6,
+  "next_experiment": "Increase target_requests_per_second from 500 to 600 to stress-test the upper limits of the service's capability.",
+  "evidence": [
+    "observed.latency_ms.p95: 30003ms",
+    "observed.cpu_util_pct: 5.5%",
+    "observed.error_rate: 1.0"
+  ]
+}

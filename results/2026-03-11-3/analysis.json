@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "Validate performance at a higher load of 120 requests per second to further assess the system's capacity and identify the critical load threshold.",
+  "evidence": [
+    "observed.latency_ms.p95: 20ms",
+    "observed.error_rate: 0.0",
+    "observed.replicas: 11",
+    "observed.cpu_util_pct: 2.4%",
+    "observed.mem_util_pct: 14.5%"
+  ]
+}

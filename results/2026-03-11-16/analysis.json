@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 445.0,
+  "next_experiment": "Increase the target_requests_per_second to 600 to validate critical load threshold and further investigate latency issues under higher load.",
+  "evidence": [
+    "observed.latency_ms.p95: 1400ms",
+    "observed.cpu_util_pct: 7.4%",
+    "observed.mem_util_pct: 18.0%"
+  ]
+}

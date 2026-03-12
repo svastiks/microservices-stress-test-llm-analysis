@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "To further validate the service\u2019s performance limits, consider increasing the load to 120 requests/sec and observe how it handles the increased demand.",
+  "evidence": [
+    "observed.latency_ms.p95: 11ms",
+    "observed.cpu_util_pct: 2.9%",
+    "observed.mem_util_pct: 15.5%",
+    "observed.replicas: 10"
+  ]
+}

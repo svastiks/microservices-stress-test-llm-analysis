@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "Conduct a higher load test with a target rate of 120 requests per second to determine if the application can handle increased workloads without hitting performance bottlenecks.",
+  "evidence": [
+    "observed.cpu_util_pct: 3.2%",
+    "observed.mem_util_pct: 15.9%",
+    "observed.replicas_max: 10"
+  ]
+}

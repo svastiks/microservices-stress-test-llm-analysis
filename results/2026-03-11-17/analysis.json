@@ -1,0 +1,26 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Increase target_requests_per_second to 600 and assess performance under load.",
+  "evidence": [
+    "observed.latency_ms.p95: 45.0ms",
+    "observed.error_rate: 0.0",
+    "observed.cpu_util_pct: 5.4%",
+    "observed.mem_util_pct: 14.8%",
+    "observed.replicas: 9",
+    "observed.replicas_max: 9"
+  ],
+  "observed_summary": {
+    "achieved_requests_per_second": 492.3,
+    "error_rate": 0.0,
+    "latency_ms_p95": 45.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 5.4,
+    "mem_util_pct": 14.8,
+    "replicas": 9,
+    "replicas_max": 9,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.05,
+    "total_requests": 44355
+  }
+}

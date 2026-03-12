@@ -1,0 +1,12 @@
+{
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": 491.0,
+  "next_experiment": "Conduct a load test targeting 600 requests per second to verify if the HPA can scale appropriately and to measure if the service meets the SLO with the new settings.",
+  "evidence": [
+    "observed.cpu_util_pct: 28.9%",
+    "observed.mem_util_pct: 36.0%",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2",
+    "observed.latency_ms.p95: 186.0"
+  ]
+}

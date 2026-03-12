@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 492.8,
+  "next_experiment": "Test with a target_requests_per_second of 600 to observe system behavior under increased load while monitoring latency and resource utilization.",
+  "evidence": [
+    "observed.latency_ms.p95: 640ms",
+    "observed.cpu_util_pct: 7.8%",
+    "observed.mem_util_pct: 16.8%",
+    "observed.oom_kills: 0"
+  ]
+}

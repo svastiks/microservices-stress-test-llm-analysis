@@ -1,0 +1,36 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -6,7 +6,7 @@
+   replicas: 3
+   selector:
+     matchLabels:
+       app: stress-service
+-  replicas: 6
++  replicas: 3
+   template:
+     metadata:
+       labels:
+         app: stress-service
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -10,7 +10,7 @@
+   minReplicas: 3
+   maxReplicas: 10
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0
+       selectPolicy: Max
+   metrics:
+-    - type: Resource
++    - type: Resource
+       resource:
+         name: cpu
+         target:
+           type: Utilization
+           averageUtilization: 20
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70

@@ -1,0 +1,47 @@
+{
+  "experiment_id": "medium-20260311T025513Z-6ef38a9e",
+  "service": "stress-service",
+  "endpoint": "POST /login",
+  "config": {
+    "cpu_request_m": 100,
+    "cpu_limit_m": 500,
+    "mem_request_mib": 128,
+    "mem_limit_mib": 256,
+    "hpa": {
+      "min_replicas": 3,
+      "max_replicas": 15,
+      "target_cpu_util_pct": 10
+    }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate",
+    "target_requests_per_second": 100,
+    "duration_s": 90
+  },
+  "slo": {
+    "p95_latency_ms": 500,
+    "error_rate": 0.01
+  },
+  "observed": {
+    "total_requests": 9001,
+    "observed_duration_s": 90.1,
+    "achieved_requests_per_second": 99.9,
+    "latency_ms": {
+      "p95": 55.0,
+      "p99": 0
+    },
+    "error_rate": 0.0,
+    "replicas": 10,
+    "replicas_max": 10,
+    "cpu_util_pct": 3.2,
+    "mem_util_pct": 15.9,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.03
+  },
+  "failure": {
+    "failed": false,
+    "reason": ""
+  },
+  "start_ts": 1773197623.175596,
+  "end_ts": 1773197713.656467
+}

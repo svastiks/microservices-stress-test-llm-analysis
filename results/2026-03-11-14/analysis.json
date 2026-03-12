@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Run a follow-up test with an increased target load of 600 requests per second to further explore capacity limits and refine lambda_crit estimation.",
+  "evidence": [
+    "observed.latency_ms.p95: 195ms",
+    "observed.cpu_util_pct: 7.8%",
+    "observed.replicas: 8"
+  ]
+}

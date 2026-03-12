@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 120.0,
+  "next_experiment": "Validate the service performance and load handling at a target of 120 requests per second to find lambda_crit.",
+  "evidence": [
+    "observed.latency_ms.p95: 6ms",
+    "observed.cpu_util_pct: 3.2%",
+    "observed.mem_util_pct: 16.2%"
+  ]
+}

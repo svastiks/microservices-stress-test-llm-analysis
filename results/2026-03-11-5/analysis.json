@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "Consider stress-testing with an increased load of 120 requests per second to better determine the lambda_crit and assess system stability under higher throughput.",
+  "evidence": [
+    "observed.latency_ms.p95: 20ms",
+    "observed.cpu_util_pct: 3.6%",
+    "observed.mem_util_pct: 15.6%",
+    "observed.replicas: 8"
+  ]
+}

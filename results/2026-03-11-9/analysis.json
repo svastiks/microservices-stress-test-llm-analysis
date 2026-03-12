@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 583.2,
+  "next_experiment": "To validate the estimates further, conduct a secondary test with a target RPS of 400 (20% lower than the previous target), or explore load profiles that represent average user behavior. This could help identify lambda_crit more precisely and determine the optimal configuration thresholds.",
+  "evidence": [
+    "observed.latency_ms.p95: 491.0ms",
+    "observed.error_rate: 0.0",
+    "observed.cpu_util_pct: 23.0",
+    "observed.mem_util_pct: 44.2"
+  ]
+}

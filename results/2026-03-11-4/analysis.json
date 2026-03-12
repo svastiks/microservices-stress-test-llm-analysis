@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 120,
+  "next_experiment": "To validate the new configuration, run a stress test with an increased target of 120 requests per second to assess whether the new replica count can handle this load while maintaining SLO.",
+  "evidence": [
+    "observed.latency_ms.p95: 40ms",
+    "observed.cpu_util_pct: 4.6%",
+    "observed.mem_util_pct: 15.6%"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 596.52,
+  "next_experiment": "- Increase the target requests per second to 600 to explore capacity further and validate lambda_crit.",
+  "evidence": [
+    "observed.latency_ms.p95: 67.0ms",
+    "observed.cpu_util_pct: 6.0%",
+    "observed.mem_util_pct: 17.3%"
+  ]
+}

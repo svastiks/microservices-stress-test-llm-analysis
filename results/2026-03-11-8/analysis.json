@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 591,
+  "next_experiment": "Conduct tests with a target of 600 requests per second to explore the capacity limits further and validate the size of the scale-down.",
+  "evidence": [
+    "observed.cpu_util_pct: 8.3%",
+    "observed.mem_util_pct: 21.5%",
+    "observed.latency_ms.p95: 24ms",
+    "observed.error_rate: 0.0%"
+  ]
+}

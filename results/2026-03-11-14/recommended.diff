@@ -1,0 +1,12 @@
+
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -8,7 +8,7 @@
+     kind: Deployment
+     name: stress-service
+   minReplicas: 2
+-  maxReplicas: 8
++  maxReplicas: 4
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0

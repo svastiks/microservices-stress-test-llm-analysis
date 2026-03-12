@@ -1,0 +1,11 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 591,
+  "next_experiment": "Increase the target requests per second to 600 to better identify critical load thresholds while monitoring SLO compliance.",
+  "evidence": [
+    "observed.latency_ms.p95: 395.0ms",
+    "observed.cpu_util_pct: 9.1%",
+    "observed.mem_util_pct: 9.6%",
+    "observed.replicas: 6"
+  ]
+}

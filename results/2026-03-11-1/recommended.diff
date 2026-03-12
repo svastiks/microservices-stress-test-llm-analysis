@@ -1,0 +1,9 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -12,7 +12,7 @@
+   replicas: 3
+   selector:
+     matchLabels:
+       app: stress-service
+-  replicas: 7
++  replicas: 3

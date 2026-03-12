@@ -1,0 +1,10 @@
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -11,7 +11,7 @@
+     - type: Resource
+       resource:
+         name: cpu
+         target:
+           type: Utilization
+-          averageUtilization: 10
++          averageUtilization: 20

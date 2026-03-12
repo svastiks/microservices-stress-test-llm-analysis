@@ -1,0 +1,16 @@
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -5,10 +5,10 @@
+   minReplicas: 3
+-  maxReplicas: 15
++  maxReplicas: 10
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0
+       selectPolicy: Max
+       policies:
+         - type: Pods
+           value: 4
+           periodSeconds: 15
+     scaleDown:
+       stabilizationWindowSeconds: 60

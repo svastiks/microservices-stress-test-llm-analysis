@@ -1,0 +1,6 @@
+# **Failure Summary**: SLO violations occurred, specifically a p95 latency violation (640ms vs. 500ms target).
+# **Scaling**: Scaled during test: yes (3 → 10). The scaling was appropriate as the load was attempting to utilize the upper range of available replicas.
+# **Root Cause Analysis**: The system is exhibiting symptoms of dependency saturation since both CPU and memory utilization are low (cpu_util_pct: 7.8%, mem_util_pct: 16.8%) while latency is high. This suggests we are waiting on some I/O operations or other external dependencies.
+# **Evidence**: ["observed.latency_ms.p95: 640ms", "observed.cpu_util_pct: 7.8%", "observed.mem_util_pct: 16.8%", "observed.oom_kills: 0"]
+# **Recommended Fix**: While scaling down is not appropriate in this scenario, we need to better understand dependencies or lower the maxReplicas threshold in the HPA to avoid over-scaling for low requests.
+# **Next Experiment**: A suitable next step is to test with a target_requests_per_second of around 600 to examine whether increasing the load reveals further insights into critical thresholds and system behavior.

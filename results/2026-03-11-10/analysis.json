@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 578.4,
+  "next_experiment": "Conduct a test with an increased target of 600 requests per second over a duration of 90 seconds to evaluate if the system can handle the load without exceeding SLO limits.",
+  "evidence": [
+    "observed.latency_ms.p95: 300ms",
+    "observed.cpu_util_pct: 19.5%",
+    "observed.mem_util_pct: 47.2%"
+  ]
+}

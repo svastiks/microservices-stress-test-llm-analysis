@@ -1,0 +1,80 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -9,7 +9,7 @@
+   
+   replicas: 3
+   selector:
+     matchLabels:
+       app: stress-service
+-  template:
++  template:
+     metadata:
+       labels:
+         app: stress-service
+     spec:
+       containers:
+         - name: app
+           image: stress-service:latest
+           imagePullPolicy: IfNotPresent
+           ports:
+             - containerPort: 8000
+           env:
+             - name: CPU_WORK_MS
+               value: "0"
+             - name: MEMORY_MB
+               value: "0"
+             - name: LOG_LEVEL
+               value: "INFO"
+           resources:
+-            requests:
+-              cpu: "100m"
+-              memory: "128Mi"
+-            limits:
+-              cpu: "500m"
+-              memory: "256Mi"
++            requests:
++              cpu: "100m"
++              memory: "128Mi"
++            limits:
++              cpu: "300m"
++              memory: "192Mi"
+           livenessProbe:
+             httpGet:
+               path: /health
+               port: 8000
+             initialDelaySeconds: 5
+             periodSeconds: 10
+           readinessProbe:
+             httpGet:
+               path: /health
+               port: 8000
+             initialDelaySeconds: 3
+             periodSeconds: 5
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -10,7 +10,7 @@
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0
+       selectPolicy: Max
+       policies:
+         - type: Pods
+           value: 4
+           periodSeconds: 15
+     scaleDown:
+       stabilizationWindowSeconds: 60
+-  metrics:
++  metrics:
+     - type: Resource
+       resource:
+         name: cpu
+         target:
+           type: Utilization
+-          averageUtilization: 10
++          averageUtilization: 20
+     - type: Resource
+       resource:
+         name: memory
+         target:
+           type: Utilization
+           averageUtilization: 70

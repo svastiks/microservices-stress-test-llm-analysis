@@ -1,0 +1,10 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 119.88,
+  "next_experiment": "Consider running a load test targeting 120 RPS to validate the upper limits of your scaling after adjustments.",
+  "evidence": [
+    "observed.cpu_util_pct: 2.1%",
+    "observed.mem_util_pct: 13.3%",
+    "observed.latency_ms.p95: 7.0ms"
+  ]
+}
