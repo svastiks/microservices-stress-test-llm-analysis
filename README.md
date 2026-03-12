@@ -55,6 +55,11 @@ kubectl get svc -n monitoring
 
 minikube delete
 
+minikube start --driver=docker \
+ --cpus=4 --memory=7680mb \
+ --kubernetes-version=v1.30.0 \
+ -v=3 --alsologtostderr
+
 # 1) Start local Kubernetes
 
 minikube start --cpus=4 --memory=7680mb
