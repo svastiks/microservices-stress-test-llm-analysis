@@ -59,7 +59,7 @@ def run_verification(run_1_dir: Path, run_2_dir: Path) -> dict:
 
 
 def write_verification_output(result: dict, run_1_dir: Path, run_2_dir: Path) -> Path:
-    """Write verification/llm-result-verification.md and run_2_ref.txt; return verification dir."""
+    """Write verification/llm-result-verification.md and return verification dir."""
     verification_dir = run_1_dir / "verification"
     verification_dir.mkdir(parents=True, exist_ok=True)
     md_lines = [
@@ -83,5 +83,4 @@ def write_verification_output(result: dict, run_1_dir: Path, run_2_dir: Path) ->
             ["## Alternative recommended diff", "", "```diff", alt, "```", ""]
         )
     (verification_dir / "llm-result-verification.md").write_text("\n".join(md_lines))
-    (verification_dir / "run_2_ref.txt").write_text(run_2_dir.name)
     return verification_dir
