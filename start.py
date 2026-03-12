@@ -4,7 +4,9 @@ import os
 import subprocess
 import time
 from pathlib import Path
+from analysis.apply_diff import apply_recommended_diff
 from analysis.results import main as analysis_main
+from analysis.verify import run_verification, write_verification_output
 
 REPO_ROOT = Path(__file__).resolve().parent
 RESULTS_DIR = REPO_ROOT / "results"
@@ -32,10 +34,8 @@ def get_profile(profile: str) -> dict:
     return data.get(profile, {})
 
 
-def run_k6(profile_config: dict, script_name: str) -> None:
-    """
-    Run k6 load test.
-    """
+def run_k6(profile_config: dict, script_name: str) -> int:
+    """Run k6 load test. Returns k6 exit code (0 = pass, 99 = thresholds crossed)."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["RPS"] = str(profile_config.get("RPS", 50))
@@ -51,9 +51,9 @@ def run_k6(profile_config: dict, script_name: str) -> None:
         script,
     ]
     result = subprocess.run(cmd, cwd=REPO_ROOT, env=env)
-    # k6 uses exit code 99 when thresholds fail but summary is still written.
     if result.returncode not in (0, 99):
         raise subprocess.CalledProcessError(result.returncode, cmd)
+    return result.returncode
 
 
 if __name__ == "__main__":
@@ -64,6 +64,12 @@ if __name__ == "__main__":
         choices=["login", "signup"],
         default="login",
         help="Which k6 script to run (login or signup)",
+    )
+    p.add_argument(
+        "mode",
+        nargs="?",
+        choices=["verify"],
+        help="Append 'verify' to auto-apply recommended.diff, re-run, and compare artifacts.",
     )
     args = p.parse_args()
     profile_config = get_profile(args.profile)
@@ -96,15 +102,84 @@ if __name__ == "__main__":
         )
 
         start_ts = time.time()
-        run_k6(profile_config, args.script)
+        k6_exit = run_k6(profile_config, args.script)
         end_ts = time.time()
-        run_meta = {"start_ts": start_ts, "end_ts": end_ts}
+        run_meta = {
+            "start_ts": start_ts,
+            "end_ts": end_ts,
+            "profile": args.profile,
+            "script": args.script,
+        }
+        run_meta["k6_thresholds_crossed"] = k6_exit == 99
         if profile_config:
             run_meta["experiment_id"] = profile_config.get("experiment_id")
             run_meta["workload"] = profile_config.get("workload")
             run_meta["slo"] = profile_config.get("slo")
         (RESULTS_DIR / "run_meta.json").write_text(json.dumps(run_meta))
-        analysis_main()
+        run_1_dir = analysis_main()
+        if run_1_dir is not None:
+            if args.mode == "verify":
+                verification_dir = run_1_dir / "verification"
+                verification_md = verification_dir / "llm-result-verification.md"
+                if verification_md.exists():
+                    print(
+                        f"Verification already exists at {verification_md}; skipping."
+                    )
+                else:
+                    recommended_diff = (
+                        (run_1_dir / "recommended.diff").read_text().strip()
+                    )
+                    if not recommended_diff:
+                        print("recommended.diff is empty; skipping verify flow.")
+                    else:
+                        try:
+                            print("Applying recommended diff...")
+                            apply_recommended_diff(run_1_dir, REPO_ROOT)
+                            print("Diff applied. Starting run 2 with same config...")
+                        except Exception as e:
+                            print(f"Diff apply or rollout failed: {e}")
+                            verification_dir.mkdir(parents=True, exist_ok=True)
+                            verification_md.write_text(
+                                f"# Verification skipped\n\nDiff apply or rollout failed: {e}\n"
+                            )
+                            print(f"Verification note written to {verification_dir}")
+                        else:
+                            cfg_path = run_1_dir / "experiment_config.json"
+                            if cfg_path.exists():
+                                cfg = json.loads(cfg_path.read_text())
+                                profile = cfg.get("profile", args.profile)
+                                script = cfg.get("script", args.script)
+                            else:
+                                profile, script = args.profile, args.script
+                            profile_config_2 = get_profile(profile)
+                            start_ts = time.time()
+                            k6_exit_2 = run_k6(profile_config_2, script)
+                            end_ts = time.time()
+                            run_meta_2 = {
+                                "start_ts": start_ts,
+                                "end_ts": end_ts,
+                                "profile": profile,
+                                "script": script,
+                            }
+                            run_meta_2["k6_thresholds_crossed"] = k6_exit_2 == 99
+                            if profile_config_2:
+                                run_meta_2["experiment_id"] = profile_config_2.get(
+                                    "experiment_id"
+                                )
+                                run_meta_2["workload"] = profile_config_2.get(
+                                    "workload"
+                                )
+                                run_meta_2["slo"] = profile_config_2.get("slo")
+                            (RESULTS_DIR / "run_meta.json").write_text(
+                                json.dumps(run_meta_2)
+                            )
+                            run_2_dir = analysis_main()
+                            if run_2_dir is not None:
+                                result = run_verification(run_1_dir, run_2_dir)
+                                write_verification_output(result, run_1_dir, run_2_dir)
+                                print(
+                                    f"Verification written to {run_1_dir / 'verification'}"
+                                )
     finally:
         for proc in port_forwards:
             try:
@@ -112,4 +187,3 @@ if __name__ == "__main__":
                 proc.wait(timeout=5)
             except Exception:
                 pass
-

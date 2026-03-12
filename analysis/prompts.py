@@ -2,10 +2,11 @@ import json
 
 SYSTEM_PROMPT = """You are an expert in microservice performance analysis and Kubernetes autoscaling. Your task is to analyze stress-test results and identify failure archetypes, estimate critical load thresholds (lambda_crit), and produce actionable diagnoses.
 
-Given an experiment JSON (config, workload, observed metrics, failure status) and optional deployment YAML, respond with exactly this JSON structure (all fields required):
+Given an experiment JSON (config, workload, observed metrics, failure status) and the current Deployment/HPA YAML, respond with exactly this JSON structure (all fields required):
 {
   "report": "structured markdown analysis",
-  "yaml_fix": "unified diff patch against deployment YAML (empty string \"\" if no change)",
+  "deployment_yaml_new": "full contents of the updated service/k8s/deployment.yaml, or empty string \"\" if no change is needed",
+  "hpa_yaml_new": "full contents of the updated service/k8s/hpa.yaml, or empty string \"\" if no change is needed",
   "failure_archetype": "one of: NONE | CPU_THROTTLING | MEMORY_PRESSURE_OOM | AUTOSCALER_LAG | DEPENDENCY_SATURATION | UNKNOWN",
   "lambda_crit_estimate": "number (requests/sec) or null if cannot estimate",
   "next_experiment": "markdown string describing suggested next test",
@@ -15,6 +16,9 @@ Given an experiment JSON (config, workload, observed metrics, failure status) an
 FAILURE ARCHETYPE RULES:
 - When failure.failed is false: set failure_archetype to NONE. Do not assign a bottleneck when the test passed.
 - Only assign a non-NONE archetype when failure.failed is true AND the evidence clearly points to that cause.
+- Distinguish *why* failure.failed is true:
+  - If failure.reason == "k6_thresholds_crossed": this is a k6 threshold failure (e.g. p95 < 400ms), which may be stricter than the experiment SLO. You MUST NOT claim the experiment SLO was violated unless observed.latency_ms.p95 > slo.p95_latency_ms or observed.error_rate > slo.error_rate.
+  - If failure.reason ends with "_slo_violation": this is an experiment SLO violation.
 - Hard constraint: If you violate any MUST/MUST NOT rule below, your answer is invalid. Prefer UNKNOWN over guessing.
 
 FAILURE ARCHETYPE DEFINITIONS (use only when failure.failed == true and evidence supports):
@@ -25,6 +29,7 @@ FAILURE ARCHETYPE DEFINITIONS (use only when failure.failed == true and evidence
     - SLO violated AND replicas < config.hpa.max_replicas (or observed.replicas_max < config.hpa.max_replicas), AND
     - there is evidence the service was compute-bound per pod (cpu_util_pct >= 50 OR cpu_util_to_limit >= 0.7), AND
     - scaling would plausibly help (replicas stuck due to HPA reaction/limits rather than a non-CPU bottleneck).
+  - Hard MUST NOT: If cpu_util_pct < 50 AND cpu_util_to_limit < 0.7, you MUST NOT output AUTOSCALER_LAG.
   - MUST NOT use AUTOSCALER_LAG when cpu_util_pct < 20 (even if replicas stayed at min and latency is high). That indicates the HPA's CPU signal did not fire; this is not "lag".
 - DEPENDENCY_SATURATION:
   - Use when SLO violated AND (cpu_util_pct < 30 AND mem_util_pct < 30 AND oom_kills == 0) AND latency is high.
@@ -64,18 +69,19 @@ NEXT EXPERIMENT RULES:
 - When suggesting target RPS to find/validate lambda_crit, align with lambda_crit_estimate.
 
 YAML_FIX RULES:
-- Unified diff format: --- / +++ headers, @@ hunks, -/+ lines. Target ONLY the Kubernetes deployment/HPA YAML (resources, replicas, HPA fields).
-- Produce a MINIMAL, SIGNAL-ONLY diff:
-  - Include hunks ONLY where at least one numeric, boolean, or enum config value actually changes (or a field is added/removed).
-  - Do NOT emit hunks that only change comments, indentation, or whitespace. Whitespace-only changes are forbidden.
-  - Do NOT emit no-op hunks where the before and after values are identical (e.g., maxReplicas 5 → 5, or two visually identical lines).
-  - Do NOT emit any @@ hunk that contains only context lines (lines starting with a single space). Every hunk MUST contain at least one '-' line and at least one '+' line.
-  - For each hunk, include at most 1 unchanged context line above and below the edits; do NOT restate large unchanged sections of the file.
-  - When editing, preserve the original indentation and formatting style around the edited fields; never re-indent surrounding blocks.
-- When failure_archetype is NONE and over-provisioned: propose a minimal scale-down diff. When well-sized: use the empty string "".
-- When failure_archetype is set: address that bottleneck with specific numeric changes (e.g., replicas, CPU/memory requests/limits, HPA thresholds). NO backticks or markdown wrapping.
-- When cpu_util_pct and mem_util_pct are both low (e.g. < 30%) and replicas are well below max_replicas, do NOT recommend increasing minReplicas or maxReplicas; instead, either suggest scale-down or classify as UNKNOWN if the cause of latency is unclear from the metrics.
-- When failure_archetype is UNKNOWN, yaml_fix MUST be the empty string "" (no YAML change). In this case, focus the report on investigation steps (e.g., profiling, dependency latency metrics, database/query performance) rather than autoscaler or resource tuning.
+- Return full-file YAMLs, not diffs:
+  - deployment_yaml_new: If you recommend ANY change to service/k8s/deployment.yaml, return the ENTIRE updated file contents as a single YAML document. If no change is needed, return the empty string "".
+  - hpa_yaml_new: If you recommend ANY change to service/k8s/hpa.yaml, return the ENTIRE updated file contents as a single YAML document. If no change is needed, return the empty string "".
+- Schema/field correctness:
+  - Do NOT invent keys that do not exist in Kubernetes YAML for these resources.
+  - HPA uses maxReplicas/minReplicas (camelCase) and autoscaling/v2 fields under spec.metrics.
+- Location correctness:
+  - Only change Deployment replicas at spec.replicas (top-level under the Deployment's spec). Only change container resources under spec.template.spec.containers[].resources. Only change HPA under spec.minReplicas, spec.maxReplicas, spec.behavior, spec.metrics.
+- When failure_archetype is NONE and over-provisioned: you MUST return full deployment_yaml_new and/or hpa_yaml_new with the scale-down changes (e.g. fewer replicas, lower HPA min/max). Empty strings only when no change is needed (well-sized).
+- When failure_archetype is set: address that bottleneck with specific numeric changes in the returned full YAML(s). No backticks or markdown inside the YAML strings.
+- When cpu_util_pct and mem_util_pct are both low (e.g. < 30%) and replicas well below max_replicas, do NOT recommend increasing minReplicas or maxReplicas; suggest scale-down or UNKNOWN.
+- When failure_archetype is UNKNOWN, set both deployment_yaml_new and hpa_yaml_new to "".
+- Hard stop: If you cannot produce valid full YAML(s), set both to "".
 
 COST-AND-SCALE OPTIMIZATION:
 - Balance performance and cost: recommend the smallest configuration change likely to satisfy the SLO, rather than large jumps.
@@ -85,6 +91,7 @@ COST-AND-SCALE OPTIMIZATION:
 
 EVIDENCE ARRAY:
 - List specific metric values that support the diagnosis. Format: ["observed.latency_ms.p95: 740ms", "observed.cpu_util_pct: 92%"]
+- If observed.replicas or observed.replicas_max exist in the experiment JSON, you MUST include both in evidence (even for DEPENDENCY_SATURATION).
 
 Be precise and evidence-driven. Map config × load → failure archetype."""
 
@@ -96,12 +103,77 @@ def build_user_prompt(experiment_json: dict, current_yaml: str = "") -> str:
         "Analyze this stress-test experiment record:\n```json\n",
         exp_str,
         "\n```\n\n",
-        "Focus on: failure_archetype (NONE when failure.failed is false), lambda_crit estimate, evidence from observed.*, YAML diff (scale UP when failing, scale DOWN when over-provisioned while staying cost-effective), and a concrete next experiment.\n\n",
+        "Focus on: failure_archetype (NONE when failure.failed is false), lambda_crit estimate, evidence from observed.*, concrete Kubernetes config changes, and a concrete next experiment.\n\n",
     ]
     if current_yaml.strip():
         parts.append(
-            "Current Kubernetes deployment YAML. Propose changes as unified diff in yaml_fix:\n```yaml\n"
+            "Current Kubernetes deployment + HPA YAML (each file prefixed with '# FILE: <relative-path>'). If you change a file, return the ENTIRE updated YAML in deployment_yaml_new and/or hpa_yaml_new. If no change for a file, use empty string for that field.\n```yaml\n"
         )
         parts.append(current_yaml)
         parts.append("\n```")
+    return "".join(parts)
+
+
+VERIFICATION_SYSTEM_PROMPT = """You are verifying whether a recommended Kubernetes/config diff actually fixed the issues from a stress test.
+
+You are given:
+1. Run 1 artifacts: report, analysis, the recommended diff that was applied, and key metrics (k6 summary, experiment).
+2. Run 2 artifacts: same (after re-running the same test with the applied diff).
+
+Decide whether the applied diff **worked**:
+- GOOD: Run 2 shows improvement (SLOs met, fewer/no failures, or run 2's report has no or minimal further recommendation). The fix addressed the root cause and was cost-effective.
+- BAD: Run 2 is worse or unchanged (same failures, or new issues). The diff was insufficient, wrong, or introduced regressions.
+
+IMPORTANT: Distinguish k6 threshold failures from experiment SLO failures.
+- If failure.reason == "k6_thresholds_crossed", that indicates k6's internal threshold(s) were crossed, which may be stricter than the experiment's SLO.
+- Do NOT claim an SLO regression unless run 2 actually violates the experiment SLO (p95 > slo.p95_latency_ms OR error_rate > slo.error_rate).
+
+Respond with exactly this JSON structure (all fields required):
+{
+  "verdict": "GOOD" or "BAD",
+  "reasoning": "2-4 sentences explaining why the fix worked or did not.",
+  "run1_summary": "One sentence: run 1 outcome (e.g. SLO violations, archetype).",
+  "run2_summary": "One sentence: run 2 outcome after applying the diff.",
+  "alternative_diff": "Unified diff string for a better fix, or empty string \"\" if verdict is GOOD or no YAML change is needed."
+}
+
+Rules:
+- If verdict is GOOD, alternative_diff must be \"\".
+- If verdict is BAD, provide alternative_diff only when a different YAML change would likely help; otherwise use \"\" and explain in reasoning.
+- alternative_diff must be valid unified diff (---/+++, @@ hunks, -/+ lines) targeting deployment/HPA YAML, or empty string.
+- Be evidence-based: cite metrics from run 1 vs run 2 (latency, error rate, replicas, utilization)."""
+
+
+def build_verification_user_prompt(run1_artifacts: dict, run2_artifacts: dict) -> str:
+    """Build user prompt for verification LLM from run1 and run2 artifact dicts."""
+    parts = [
+        "Compare these two stress-test runs. Run 1 produced a recommended diff that was applied; Run 2 is the same test after applying that diff.\n\n",
+        "## Run 1 (before fix)\n\n",
+        "### Report\n",
+        run1_artifacts.get("report", ""),
+        "\n\n",
+        "### Analysis\n",
+        run1_artifacts.get("analysis_json", "{}"),
+        "\n\n",
+        "### Applied recommended diff\n```diff\n",
+        run1_artifacts.get("recommended_diff", ""),
+        "\n```\n\n",
+        "### Key metrics (k6 / experiment)\n",
+        run1_artifacts.get("metrics_summary", ""),
+        "\n\n",
+        "## Run 2 (after fix)\n\n",
+        "### Report\n",
+        run2_artifacts.get("report", ""),
+        "\n\n",
+        "### Analysis\n",
+        run2_artifacts.get("analysis_json", "{}"),
+        "\n\n",
+        "### Recommended diff from run 2 (if any)\n```diff\n",
+        run2_artifacts.get("recommended_diff", ""),
+        "\n```\n\n",
+        "### Key metrics\n",
+        run2_artifacts.get("metrics_summary", ""),
+        "\n\n",
+        "Decide: verdict (GOOD/BAD), reasoning, run1_summary, run2_summary, and alternative_diff if BAD.",
+    ]
     return "".join(parts)

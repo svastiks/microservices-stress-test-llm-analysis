@@ -136,13 +136,20 @@ def build_experiment_payload(
     exp = experiment_config or {}
     slo = exp.get("slo") or {}
     observed_k6, failure = from_k6_summary(summary, slo)
+    if exp.get("k6_thresholds_crossed"):
+        failure["failed"] = True
+        failure["reason"] = failure.get("reason") or "k6_thresholds_crossed"
 
     config = get_config_from_yaml(deployment_yaml_path, hpa_yaml_path)
     if exp.get("config"):
         config = {**config, **exp["config"]}
 
     label = exp.get("experiment_id", "run")
-    run_suffix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+    run_suffix = (
+        datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        + "-"
+        + uuid.uuid4().hex[:8]
+    )
 
     payload: dict[str, Any] = {
         "experiment_id": f"{label}-{run_suffix}",
