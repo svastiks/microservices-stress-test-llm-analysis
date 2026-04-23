@@ -5,7 +5,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() {
   cat <<'EOF'
-Setup local Kubernetes + monitoring for stress testing.
+Setup local Kubernetes + monitoring for the demo stress-service (custom FastAPI app).
+
+This script:
+- Starts minikube
+- Builds and loads stress-service + mock-dependency images
+- Deploys Deployment + HPA for stress-service
+- Installs kube-prometheus-stack + ServiceMonitor
+- Optionally runs a single experiment via start.py
 EOF
 }
 

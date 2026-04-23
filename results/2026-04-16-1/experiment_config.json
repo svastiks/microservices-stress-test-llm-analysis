@@ -1,0 +1,1 @@
+{"experiment_id": "medium", "workload": {"mode": "constant_arrival_rate", "target_requests_per_second": 100, "duration_s": 60}, "slo": {"p95_latency_ms": 500, "error_rate": 0.01}, "analysis_goal": "failure", "mode": "squeeze", "profile": "medium", "script": "login", "k6_thresholds_crossed": true, "prometheus": true, "k8s_namespace": "default", "k8s_deployment": "stress-service"}

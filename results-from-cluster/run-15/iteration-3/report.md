@@ -1,0 +1,5 @@
+- SLO compliance achieved with p95 latency at 6ms vs. target of 500ms.
+- Request rate maintained at 25 RPS with no errors recorded.
+- Low CPU and memory utilization indicates over-provisioning.
+- Recommended reductions of CPU and memory requests and limits by 20% for cost efficiency.
+- Next step: re-run the same workload to validate the changes after applying a leaner configuration.

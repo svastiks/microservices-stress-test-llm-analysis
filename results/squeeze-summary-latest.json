@@ -1,0 +1,55 @@
+{
+  "stopped_reason": "empty_recommended_diff",
+  "best_pass_dir": "<REPO_ROOT>/results/2026-04-16-16",
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "<REPO_ROOT>/results/2026-04-16-13",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 8.0,
+      "error_rate": 0.0,
+      "replicas": 1,
+      "cpu_request_m": 4,
+      "mem_request_mib": 25,
+      "cost_score": 0.0284
+    },
+    {
+      "run_dir": "<REPO_ROOT>/results/2026-04-16-14",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 6.0,
+      "error_rate": 0.0,
+      "replicas": 1,
+      "cpu_request_m": 4,
+      "mem_request_mib": 20,
+      "cost_score": 0.0235
+    },
+    {
+      "run_dir": "<REPO_ROOT>/results/2026-04-16-15",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 6.0,
+      "error_rate": 0.0,
+      "replicas": 1,
+      "cpu_request_m": 3,
+      "mem_request_mib": 15,
+      "cost_score": 0.0176
+    },
+    {
+      "run_dir": "<REPO_ROOT>/results/2026-04-16-16",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 11.0,
+      "error_rate": 0.0,
+      "replicas": 1,
+      "cpu_request_m": 2,
+      "mem_request_mib": 12,
+      "cost_score": 0.0137
+    }
+  ]
+}

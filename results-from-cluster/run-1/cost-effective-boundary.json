@@ -1,0 +1,19 @@
+{
+  "stopped_reason": "first_run_failed",
+  "best_pass_dir": null,
+  "first_fail_dir": "/app/results/run-1/iteration-1",
+  "rows": [
+    {
+      "run_dir": "/app/results/run-1/iteration-1",
+      "status": "FAIL",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 0,
+      "error_rate": 1.0,
+      "replicas": 1,
+      "cpu_request_m": 100,
+      "mem_request_mib": 50,
+      "cost_score": 0.1488
+    }
+  ]
+}

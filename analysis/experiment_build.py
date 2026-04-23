@@ -43,6 +43,7 @@ def get_config_from_yaml(deployment_path: Path, hpa_path: Path) -> dict:
         "cpu_limit_m": 0,
         "mem_request_mib": 0,
         "mem_limit_mib": 0,
+        "deployment_replicas": 0,
         "hpa": {"min_replicas": 0, "max_replicas": 0, "target_cpu_util_pct": 0},
     }
     if deployment_path.exists():
@@ -51,6 +52,8 @@ def get_config_from_yaml(deployment_path: Path, hpa_path: Path) -> dict:
         for doc in docs:
             if doc and doc.get("kind") == "Deployment":
                 spec = doc.get("spec", {}) or {}
+                if spec.get("replicas") is not None:
+                    config["deployment_replicas"] = int(spec["replicas"])
                 template = spec.get("template", {}) or {}
                 containers = (template.get("spec") or {}).get("containers") or []
                 if containers:
@@ -115,6 +118,42 @@ def from_k6_summary(summary: dict, slo: dict | None = None) -> tuple[dict, dict]
     return observed, failure
 
 
+def _cost_from_config(config: dict, observed: dict) -> dict:
+    """Compute simple cost metrics from replicas and per-pod resources."""
+    hpa = config.get("hpa") or {}
+    replicas_observed = int(observed.get("replicas") or observed.get("replicas_max") or 0)
+    dep_rep = int(config.get("deployment_replicas") or 0)
+    min_r = int(hpa.get("min_replicas") or 0)
+    # Prefer live observation; else static deployment spec; else HPA floor — never HPA max (that inflated cost).
+    replicas_effective = replicas_observed or dep_rep or min_r or 1
+    replicas_effective = max(1, replicas_effective)
+
+    cpu_request_m = int(config.get("cpu_request_m") or 0)
+    mem_request_mib = int(config.get("mem_request_mib") or 0)
+    cpu_limit_m = int(config.get("cpu_limit_m") or 0)
+    mem_limit_mib = int(config.get("mem_limit_mib") or 0)
+
+    provisioned_request_cpu_m = replicas_effective * cpu_request_m
+    provisioned_request_mem_mib = replicas_effective * mem_request_mib
+    provisioned_limit_cpu_m = replicas_effective * cpu_limit_m
+    provisioned_limit_mem_mib = replicas_effective * mem_limit_mib
+
+    # Unit-normalized score based on requests (preferred for right-sizing).
+    cost_score = round(
+        replicas_effective * ((cpu_request_m / 1000.0) + (mem_request_mib / 1024.0)),
+        4,
+    )
+
+    return {
+        "replicas_effective": replicas_effective,
+        "provisioned_request_cpu_m": provisioned_request_cpu_m,
+        "provisioned_request_mem_mib": provisioned_request_mem_mib,
+        "provisioned_limit_cpu_m": provisioned_limit_cpu_m,
+        "provisioned_limit_mem_mib": provisioned_limit_mem_mib,
+        "cost_score": cost_score,
+    }
+
+
 def build_experiment_payload(
     run_dir: Path,
     k6_summary_path: Path,
@@ -153,6 +192,8 @@ def build_experiment_payload(
 
     payload: dict[str, Any] = {
         "experiment_id": f"{label}-{run_suffix}",
+        "mode": exp.get("mode"),
+        "analysis_goal": exp.get("analysis_goal"),
         "service": exp.get("service", "stress-service"),
         "endpoint": exp.get("endpoint", "POST /login"),
         "config": config,
@@ -178,4 +219,5 @@ def build_experiment_payload(
         except (ValueError, OSError):
             pass
 
+    payload["cost"] = _cost_from_config(payload.get("config") or {}, payload.get("observed") or {})
     return payload

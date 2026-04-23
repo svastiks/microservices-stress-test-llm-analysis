@@ -1,0 +1,14 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -29,8 +29,8 @@
+               value: "INFO"
+           resources:
+             requests:
+-              cpu: "27m"
+-              memory: "47Mi"
++              cpu: "17m"
++              memory: "37Mi"
+             limits:
+               cpu: "270m"
+               memory: "180Mi"
+

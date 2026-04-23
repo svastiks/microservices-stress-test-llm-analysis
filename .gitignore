@@ -2,3 +2,7 @@ __pycache__
 .env
 *.orig
 *.rej
+/extra/
+
+# Full upstream clone (nested .git); use extra/robot-shop-msa or CHART_PATH override.
+/robot-shop/

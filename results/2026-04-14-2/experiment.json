@@ -1,0 +1,54 @@
+{
+  "experiment_id": "medium-20260415T010110Z-05b5b33d",
+  "mode": null,
+  "service": "robot-shop-web",
+  "endpoint": "POST /api/user/login",
+  "config": {
+    "cpu_request_m": 100,
+    "cpu_limit_m": 500,
+    "mem_request_mib": 128,
+    "mem_limit_mib": 256,
+    "hpa": {
+      "min_replicas": 2,
+      "max_replicas": 4,
+      "target_cpu_util_pct": 20
+    }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate",
+    "target_requests_per_second": 100,
+    "duration_s": 90
+  },
+  "slo": {
+    "p95_latency_ms": 500,
+    "error_rate": 0.01
+  },
+  "observed": {
+    "total_requests": 9001,
+    "observed_duration_s": 90.1,
+    "achieved_requests_per_second": 99.9,
+    "latency_ms": {
+      "p95": 6.0,
+      "p99": 0
+    },
+    "error_rate": 0.0
+  },
+  "failure": {
+    "failed": false,
+    "reason": ""
+  },
+  "cost": {
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 400,
+    "provisioned_request_mem_mib": 512,
+    "provisioned_limit_cpu_m": 2000,
+    "provisioned_limit_mem_mib": 1024,
+    "cost_score": 0.9
+  },
+  "start_ts": 1776214780.382947,
+  "end_ts": 1776214870.739308,
+  "prometheus": false,
+  "base_url": "http://localhost:8080",
+  "k8s_namespace": "default",
+  "k8s_deployment": "stress-service"
+}

@@ -1,0 +1,48 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -5,7 +5,7 @@
+   labels:
+     app: stress-service
+ spec:
+-  replicas: 4
++  replicas: 3
+   selector:
+     matchLabels:
+       app: stress-service
+@@ -29,8 +29,8 @@
+               value: "INFO"
+           resources:
+             requests:
+-              cpu: "100m"
+-              memory: "128Mi"
++              cpu: "75m"
++              memory: "96Mi"
+             limits:
+               cpu: "500m"
+               memory: "256Mi"
+
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -8,14 +8,14 @@
+     kind: Deployment
+     name: stress-service
+   minReplicas: 2
+-  maxReplicas: 4
++  maxReplicas: 3
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0
+       selectPolicy: Max
+       policies:
+         - type: Pods
+-          value: 4
++          value: 3
+           periodSeconds: 15
+     scaleDown:
+       stabilizationWindowSeconds: 60
+@@ -31,4 +31,4 @@
+         name: memory
+         target:
+           type: Utilization
+-          averageUtilization: 70
++          averageUtilization: 70

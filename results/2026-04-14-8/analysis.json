@@ -1,0 +1,32 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 30,
+    "provisioned_request_mem_mib": 52,
+    "provisioned_limit_cpu_m": 400,
+    "provisioned_limit_mem_mib": 240,
+    "cost_score": 0.0808
+  },
+  "failure_archetype": "",
+  "lambda_crit_estimate": null,
+  "next_experiment": "",
+  "optimization_headroom": null,
+  "over_provisioned": null,
+  "evidence": [],
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 12.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": null,
+    "mem_util_pct": null,
+    "replicas": null,
+    "replicas_max": null,
+    "oom_kills": null,
+    "cpu_util_to_limit": null,
+    "total_requests": 2250
+  }
+}

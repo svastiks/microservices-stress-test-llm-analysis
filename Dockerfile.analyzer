@@ -1,0 +1,36 @@
+# Analyzer runner: Python (LLM + experiment glue) + k6 + kubectl for in-cluster squeeze jobs.
+# Build: docker build -f Dockerfile.analyzer -t microservices-stress-analyzer:latest .
+#
+# k6: copied from official multi-arch grafana/k6 image (avoids dl.k6.io apt gaps on arm64).
+# kubectl: Debian arch from dpkg (arm64/amd64).
+
+ARG K6_VERSION=0.55.0
+ARG PYTHON_VERSION=3.12-slim-bookworm
+
+FROM grafana/k6:${K6_VERSION} AS k6bin
+
+FROM python:${PYTHON_VERSION}
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && ARCH="$(dpkg --print-architecture)" \
+    && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl \
+    && chmod +x /usr/local/bin/kubectl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=k6bin /usr/bin/k6 /usr/local/bin/k6
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY start.py experiments.json ./
+COPY analysis ./analysis
+COPY load-tests ./load-tests
+COPY k8s/spark ./k8s/spark
+
+CMD ["python3", "start.py", "--help"]

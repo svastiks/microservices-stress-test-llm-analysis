@@ -1,0 +1,19 @@
+{
+  "stopped_reason": "unknown",
+  "best_pass_dir": "/app/results/run-12/iteration-1",
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "/app/results/run-12/iteration-1",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 17.0,
+      "error_rate": 0.0,
+      "replicas": 1,
+      "cpu_request_m": 100,
+      "mem_request_mib": 50,
+      "cost_score": 0.1488
+    }
+  ]
+}

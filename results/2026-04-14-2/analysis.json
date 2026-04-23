@@ -1,0 +1,36 @@
+{
+  "mode": null,
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 400,
+    "provisioned_request_mem_mib": 512,
+    "provisioned_limit_cpu_m": 2000,
+    "provisioned_limit_mem_mib": 1024,
+    "cost_score": 0.9
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 119.88,
+  "next_experiment": "Conduct a load test with a target of 120 requests per second to validate system performance under higher load, which is 20% above current load.",
+  "optimization_headroom": null,
+  "over_provisioned": null,
+  "evidence": [
+    "observed.latency_ms.p95: 6.0ms",
+    "achieved_requests_per_second: 99.9",
+    "observed.error_rate: 0.0",
+    "observed.replicas: 4"
+  ],
+  "observed_summary": {
+    "achieved_requests_per_second": 99.9,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": null,
+    "mem_util_pct": null,
+    "replicas": null,
+    "replicas_max": null,
+    "oom_kills": null,
+    "cpu_util_to_limit": null,
+    "total_requests": 9001
+  }
+}

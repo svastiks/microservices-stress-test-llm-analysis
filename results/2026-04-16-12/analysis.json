@@ -1,0 +1,35 @@
+{
+  "mode": null,
+  "analysis_goal": "efficiency",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 5,
+    "provisioned_request_mem_mib": 25,
+    "provisioned_limit_cpu_m": 220,
+    "provisioned_limit_mem_mib": 145,
+    "cost_score": 0.0294
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "For squeeze mode, always suggest rerunning same fixed workload after change, unless SLO failed",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "Observed p95 latency at 7 ms while SLO is 500 ms",
+    "Current requested CPU is 5 m with low utilization habits"
+  ],
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 7.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": null,
+    "mem_util_pct": null,
+    "replicas": null,
+    "replicas_max": null,
+    "oom_kills": null,
+    "cpu_util_to_limit": null,
+    "total_requests": 1500
+  }
+}

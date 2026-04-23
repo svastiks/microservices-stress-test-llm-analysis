@@ -1,0 +1,25 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -1,5 +1,3 @@
+-# FILE: service/k8s/deployment.yaml
+-
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+@@ -31,11 +29,11 @@
+               value: "INFO"
+           resources:
+             requests:
+-              cpu: "30m"
+-              memory: "52Mi"
++              cpu: "27m"
++              memory: "47Mi"
+             limits:
+-              cpu: "300m"
+-              memory: "200Mi"
++              cpu: "270m"
++              memory: "180Mi"
+           livenessProbe:
+             httpGet:
+               path: /health
+

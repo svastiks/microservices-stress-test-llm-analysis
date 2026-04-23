@@ -1,0 +1,6 @@
+- SLO compliance achieved: P95 latency is 7ms vs target 500ms.
+- Observed CPU utilization is low (0%) and memory utilization is also low (0%).
+- Current provisioned resources (100m CPU, 50Mi memory) are over-provisioned based on observed usage.
+- Cost efficiency is suboptimal with a cost score of 0.1488; there's room for resource reductions.
+- Recommended changes for deployment to reduce resource usage conservatively: decrease CPU requests/limits by 25%.
+- Next action: re-run the same workload after applying the updated YAML.

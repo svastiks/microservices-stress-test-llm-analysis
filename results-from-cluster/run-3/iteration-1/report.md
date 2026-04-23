@@ -1,0 +1,5 @@
+- The SLO for error rate was violated with 1.0 observed error rate.
+- Total requests were 1501, with an achieved RPS of 25.0, meeting the workload target.
+- Observed CPU and memory utilization was 0.0%, indicating significant over-provisioning.
+- Given the failure, no optimization will be applied to resource requests/limits or replicas.
+- Next action: rerun the same workload after analyzing further metrics.

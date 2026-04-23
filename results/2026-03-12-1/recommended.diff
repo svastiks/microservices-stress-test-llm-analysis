@@ -1,0 +1,25 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -5,7 +5,7 @@
+   labels:
+     app: stress-service
+ spec:
+-  replicas: 2
++  replicas: 4
+   selector:
+     matchLabels:
+       app: stress-service
+@@ -57,4 +57,4 @@
+   ports:
+     - port: 80
+       targetPort: 8000
+-  type: ClusterIP
++  type: ClusterIP
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -31,4 +31,4 @@
+         name: memory
+         target:
+           type: Utilization
+-          averageUtilization: 70
++          averageUtilization: 70

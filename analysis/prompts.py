@@ -5,8 +5,8 @@ SYSTEM_PROMPT = """You are an expert in microservice performance analysis and Ku
 Given an experiment JSON (config, workload, observed metrics, failure status) and the current Deployment/HPA YAML, respond with exactly this JSON structure (all fields required):
 {
   "report": "structured markdown analysis",
-  "deployment_yaml_new": "full contents of the updated service/k8s/deployment.yaml, or empty string \"\" if no change is needed",
-  "hpa_yaml_new": "full contents of the updated service/k8s/hpa.yaml, or empty string \"\" if no change is needed",
+  "deployment_yaml_new": "full contents of the updated deployment YAML, or empty string \"\" if no change is needed",
+  "hpa_yaml_new": "full contents of the updated HPA YAML, or empty string \"\" if no change is needed",
   "failure_archetype": "one of: NONE | CPU_THROTTLING | MEMORY_PRESSURE_OOM | AUTOSCALER_LAG | DEPENDENCY_SATURATION | UNKNOWN",
   "lambda_crit_estimate": "number (requests/sec) or null if cannot estimate",
   "next_experiment": "markdown string describing suggested next test",
@@ -70,8 +70,8 @@ NEXT EXPERIMENT RULES:
 
 YAML_FIX RULES:
 - Return full-file YAMLs, not diffs:
-  - deployment_yaml_new: If you recommend ANY change to service/k8s/deployment.yaml, return the ENTIRE updated file contents as a single YAML document. If no change is needed, return the empty string "".
-  - hpa_yaml_new: If you recommend ANY change to service/k8s/hpa.yaml, return the ENTIRE updated file contents as a single YAML document. If no change is needed, return the empty string "".
+  - deployment_yaml_new: If you recommend ANY change to the current deployment YAML, return the ENTIRE updated file contents as a single YAML document. If no change is needed, return the empty string "".
+  - hpa_yaml_new: If you recommend ANY change to the current HPA YAML, return the ENTIRE updated file contents as a single YAML document. If no change is needed, return the empty string "".
 - Schema/field correctness:
   - Do NOT invent keys that do not exist in Kubernetes YAML for these resources.
   - HPA uses maxReplicas/minReplicas (camelCase) and autoscaling/v2 fields under spec.metrics.
@@ -95,15 +95,57 @@ EVIDENCE ARRAY:
 
 Be precise and evidence-driven. Map config × load → failure archetype."""
 
+EFFICIENCY_SYSTEM_PROMPT = """You are an expert in Kubernetes performance and cost optimization.
 
-def build_user_prompt(experiment_json: dict, current_yaml: str = "") -> str:
+Goal: for a fixed workload, identify optimization headroom and recommend conservative resource reductions while preserving SLO compliance.
+
+Given an experiment JSON and current Deployment/HPA YAML, return exactly this JSON:
+{
+  "report": "structured markdown analysis",
+  "deployment_yaml_new": "full updated deployment YAML or empty string",
+  "hpa_yaml_new": "full updated HPA YAML or empty string",
+  "failure_archetype": "NONE | CPU_THROTTLING | MEMORY_PRESSURE_OOM | AUTOSCALER_LAG | DEPENDENCY_SATURATION | UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "For squeeze mode, always suggest rerunning same fixed workload after change, unless SLO failed",
+  "optimization_headroom": "NONE | LOW | MEDIUM | HIGH",
+  "over_provisioned": true,
+  "evidence": ["metric citations"]
+}
+
+Rules:
+- If failure.failed is true, do NOT optimize down further; return empty deployment_yaml_new and hpa_yaml_new.
+- If failure.failed is false and utilization is low, recommend a modest reduction (typically 10-25%) in replicas and/or resource requests/limits.
+- Keep changes conservative: avoid >25% reduction in one step unless clearly over-provisioned.
+- Always reference cost fields (cost.cost_score, provisioned_request_cpu_m, provisioned_request_mem_mib) when discussing headroom.
+- Return full-file YAMLs only when making a change.
+- LATENCY SLACK (no Prometheus / missing cpu_util_pct): If observed.latency_ms.p95 is missing or is less than 50% of slo.p95_latency_ms and failure.failed is false, treat headroom as at least MEDIUM: set optimization_headroom to MEDIUM or HIGH, over_provisioned true, and you MUST return full YAML with a modest reduction (lower spec.replicas and/or cpu+mem requests+limits and/or lower HPA minReplicas/maxReplicas), unless already at a clearly minimal config (e.g. 1 replica, <=100m CPU request, <=128Mi mem request).
+- Do NOT suggest raising target RPS or changing the fixed workload; next_experiment must say to re-run the same workload after applying the leaner YAML.
+- lambda_crit_estimate must always be null for this mode.
+- Keep report.md simple and short: 5-8 bullet lines max, plain language, include only SLO result, cost trend, key optimization, and next action.
+"""
+
+
+def build_user_prompt(
+    experiment_json: dict, current_yaml: str = "", mode: str = "failure"
+) -> str:
     """Build prompt from experiment.json (and optional deployment YAML)."""
     exp_str = json.dumps(experiment_json, indent=2)
+    if mode == "squeeze":
+        focus = (
+            "Focus on: optimization_headroom, over_provisioning signals, cost-aware right-sizing, "
+            "and conservative YAML scale-down changes for this same fixed workload. "
+            "Ignore lambda_crit and higher-RPS exploration."
+        )
+    else:
+        focus = (
+            "Focus on: failure_archetype (NONE when failure.failed is false), lambda_crit estimate, "
+            "evidence from observed.*, concrete Kubernetes config changes, and a concrete next experiment."
+        )
     parts = [
         "Analyze this stress-test experiment record:\n```json\n",
         exp_str,
         "\n```\n\n",
-        "Focus on: failure_archetype (NONE when failure.failed is false), lambda_crit estimate, evidence from observed.*, concrete Kubernetes config changes, and a concrete next experiment.\n\n",
+        f"{focus}\n\n",
     ]
     if current_yaml.strip():
         parts.append(

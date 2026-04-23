@@ -1,0 +1,39 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -5,7 +5,7 @@
+   labels:
+     app: stress-service
+ spec:
+-  replicas: 2
++  replicas: 1
+   selector:
+     matchLabels:
+       app: stress-service
+@@ -29,11 +29,11 @@
+               value: "INFO"
+           resources:
+             requests:
+-              cpu: "45m"
+-              memory: "80Mi"
++              cpu: "40m"
++              memory: "70Mi"
+             limits:
+-              cpu: "500m"
+-              memory: "256Mi"
++              cpu: "400m"
++              memory: "240Mi"
+           livenessProbe:
+             httpGet:
+               path: /health
+
+--- service/k8s/hpa.yaml
++++ service/k8s/hpa.yaml
+@@ -7,7 +7,7 @@
+     apiVersion: apps/v1
+     kind: Deployment
+     name: stress-service
+-  minReplicas: 2
++  minReplicas: 1
+   maxReplicas: 2
+   behavior:
+     scaleUp:

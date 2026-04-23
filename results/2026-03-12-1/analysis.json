@@ -1,0 +1,25 @@
+{
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": 600,
+  "next_experiment": "Conduct a load test at 400 requests per second to verify if the adjusted configuration can handle this effectively without hitting latency issues.",
+  "evidence": [
+    "observed.latency_ms.p95: 296ms",
+    "observed.cpu_util_pct: 9.5%",
+    "observed.mem_util_pct: 18.2%",
+    "observed.replicas_max: 6",
+    "observed.replicas: 6"
+  ],
+  "observed_summary": {
+    "achieved_requests_per_second": 497.4,
+    "error_rate": 0.0,
+    "latency_ms_p95": 296.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 9.5,
+    "mem_util_pct": 18.2,
+    "replicas": 6,
+    "replicas_max": 6,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.1,
+    "total_requests": 44817
+  }
+}

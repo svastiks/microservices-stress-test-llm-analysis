@@ -1,0 +1,65 @@
+{
+  "experiment_id": "low-20260423T035723Z-330fce17",
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "service": "robot-shop-web",
+  "endpoint": "POST /api/user/login",
+  "config": {
+    "cpu_request_m": 50,
+    "cpu_limit_m": 90,
+    "mem_request_mib": 25,
+    "mem_limit_mib": 50,
+    "deployment_replicas": 1,
+    "hpa": {
+      "min_replicas": 1,
+      "max_replicas": 2,
+      "target_cpu_util_pct": 60
+    }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate",
+    "target_requests_per_second": 25,
+    "duration_s": 60
+  },
+  "slo": {
+    "p95_latency_ms": 500,
+    "error_rate": 0.01
+  },
+  "observed": {
+    "total_requests": 1501,
+    "observed_duration_s": 60.1,
+    "achieved_requests_per_second": 25.0,
+    "latency_ms": {
+      "p95": 63.0,
+      "p99": 0
+    },
+    "error_rate": 0.0,
+    "replicas": 0,
+    "replicas_max": 0,
+    "cpu_util_pct": 0.0,
+    "mem_util_pct": 0.0,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.0
+  },
+  "failure": {
+    "failed": false,
+    "reason": ""
+  },
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 50,
+    "provisioned_request_mem_mib": 25,
+    "provisioned_limit_cpu_m": 90,
+    "provisioned_limit_mem_mib": 50,
+    "cost_score": 0.0744
+  },
+  "start_ts": 1776916581.4542334,
+  "end_ts": 1776916643.525591,
+  "prometheus": true,
+  "base_url": "http://web.svastik.svc.cluster.local:8080",
+  "k8s_namespace": "svastik",
+  "k8s_deployment": "web",
+  "deployment_yaml": "k8s/spark/robot-shop-web-deployment.yaml",
+  "hpa_yaml": "k8s/spark/robot-shop-web-hpa.yaml",
+  "prometheus_url": "http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090"
+}

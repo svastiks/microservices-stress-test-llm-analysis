@@ -1,0 +1,18 @@
+--- service/k8s/deployment.yaml
++++ service/k8s/deployment.yaml
+@@ -29,11 +29,11 @@
+               value: "INFO"
+           resources:
+             requests:
+-              cpu: "13m"  # Reduced from 15m
+-              memory: "30Mi"  # Reduced from 33Mi
++              cpu: "10m"  # Reduced from 13m
++              memory: "25Mi"  # Reduced from 30Mi
+             limits:
+-              cpu: "220m"  # Reduced from 243m
+-              memory: "145Mi"  # Reduced from 162Mi
++              cpu: "220m"  # Remains unchanged
++              memory: "145Mi"  # Remains unchanged
+           livenessProbe:
+             httpGet:
+               path: /health

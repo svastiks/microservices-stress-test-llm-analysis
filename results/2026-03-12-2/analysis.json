@@ -1,0 +1,25 @@
+{
+  "failure_archetype": "DEPENDENCY_SATURATION",
+  "lambda_crit_estimate": 486.0,
+  "next_experiment": "Conduct a load test with an increased target request rate of 600 requests per second to further investigate the lambda_crit threshold and assess the behavior under sustained load while observing latency and system metrics closely.",
+  "evidence": [
+    "observed.latency_ms.p95: 612.0",
+    "observed.cpu_util_pct: 12.6",
+    "observed.mem_util_pct: 18.1",
+    "observed.replicas: 6",
+    "observed.replicas_max: 6"
+  ],
+  "observed_summary": {
+    "achieved_requests_per_second": 486.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 612.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 12.6,
+    "mem_util_pct": 18.1,
+    "replicas": 6,
+    "replicas_max": 6,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.13,
+    "total_requests": 43794
+  }
+}

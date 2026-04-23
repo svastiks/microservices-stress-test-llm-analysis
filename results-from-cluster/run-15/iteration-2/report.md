@@ -1,0 +1,5 @@
+- The observed p95 latency was 6ms, well below the SLO of 500ms, indicating SLO compliance.
+- Cost score is low (0.1191), suggesting there's room for optimization.
+- Current CPU and memory utilization for requests is at 0%, demonstrating over-provisioning.
+- A conservative reduction of 20% in CPU requests and limits is recommended.
+- Next step: re-run the same fixed workload after applying the leaner configuration.

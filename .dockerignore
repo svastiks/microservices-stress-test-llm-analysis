@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+results
+*.diff
+node_modules
+.DS_Store
+# Large vendored demos not needed inside the analyzer image
+extra

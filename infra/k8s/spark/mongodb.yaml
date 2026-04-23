@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: analyzer-mongodb
+  namespace: svastik
+type: Opaque
+stringData:
+  MONGO_INITDB_ROOT_USERNAME: analyzer
+  MONGO_INITDB_ROOT_PASSWORD: change-me
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: analyzer-mongodb-pvc
+  namespace: svastik
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analyzer-mongodb
+  namespace: svastik
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analyzer-mongodb
+  template:
+    metadata:
+      labels:
+        app: analyzer-mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: analyzer-mongodb
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: analyzer-mongodb
+                  key: MONGO_INITDB_ROOT_PASSWORD
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: analyzer-mongodb-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analyzer-mongodb
+  namespace: svastik
+spec:
+  selector:
+    app: analyzer-mongodb
+  ports:
+    - name: mongo
+      port: 27017
+      targetPort: 27017

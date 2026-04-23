@@ -1,0 +1,38 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 6,
+    "provisioned_request_mem_mib": 6,
+    "provisioned_limit_cpu_m": 11,
+    "provisioned_limit_mem_mib": 11,
+    "cost_score": 0.0119
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Rerun the same fixed workload after applying the leaner YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "0% observed CPU utilization",
+    "0% observed memory utilization",
+    "SLO p95 latency significantly lower than target",
+    "observed.replicas: 0",
+    "observed.replicas_max: 0"
+  ],
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 7.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 0.0,
+    "mem_util_pct": 0.0,
+    "replicas": 0,
+    "replicas_max": 0,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.0,
+    "total_requests": 1500
+  }
+}

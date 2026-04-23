@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: stress-analyzer-run
+  namespace: svastik
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: stress-analyzer
+    spec:
+      serviceAccountName: stress-analyzer
+      restartPolicy: Never
+      tolerations:
+        - operator: Exists
+      volumes:
+        - name: analyzer-results
+          persistentVolumeClaim:
+            claimName: analyzer-results-pvc
+      containers:
+        - name: runner
+          # Build and publish your own image that contains this repository + python deps + k6.
+          # Build locally: docker build -f Dockerfile.analyzer -t microservices-stress-analyzer:latest .
+          image: microservices-stress-analyzer:latest
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: analyzer-results
+              mountPath: /app/results
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: llm-api
+                  key: OPENAI_API_KEY
+            - name: PROMETHEUS_URL
+              value: http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090
+          command:
+            - python3
+            - start.py
+            - --profile
+            - low
+            - --script
+            - robotshop_login
+            - --squeeze
+            - --until-violation
+            - --efficiency
+            - --k8s-namespace
+            - svastik
+            - --k8s-deployment
+            - web
+            - --sut-service
+            - web
+            - --sut-service-port
+            - "8080"
+            - --deployment-yaml
+            - k8s/spark/robot-shop-web-deployment.yaml
+            - --hpa-yaml
+            - k8s/spark/robot-shop-web-hpa.yaml
+            - --prometheus-url
+            - http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090

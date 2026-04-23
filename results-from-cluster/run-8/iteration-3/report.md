@@ -1,0 +1,6 @@
+- SLO p95 latency achieved: 5ms vs. 500ms target
+- Observed error rate: 0.0% vs. 1.0% target
+- Cost score is low at 0.1012, indicating room for efficiency
+- CPU and Memory utilization are both at 0%, suggesting significant over-provisioning
+- Recommended changes: reduce CPU and Memory requests/limits by 10-25%
+- Next action: Rerun the same fixed workload after applying changes.
