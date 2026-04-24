@@ -10,7 +10,7 @@ set -euo pipefail
 NAMESPACE="${NAMESPACE:-svastik}"
 JOB_NAME="${JOB_NAME:-stress-analyzer-run}"
 SA_NAME="${SA_NAME:-stress-analyzer}"
-JOB_YAML_PATH="${JOB_YAML_PATH:-k8s/spark/analyzer-job.yaml}"
+JOB_YAML_PATH="${JOB_YAML_PATH:-infra/k8s/spark/analyzer-job.yaml}"
 
 jsonpath() {
   local resource="$1"

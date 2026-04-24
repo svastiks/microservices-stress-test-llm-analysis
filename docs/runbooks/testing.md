@@ -5,13 +5,13 @@ This repo now supports **two practical paths**:
 1. **Kubernetes `stress-service` path**  
    This is the **fully closed-loop** path: k6 + Prometheus + YAML apply + verify/squeeze.
 2. **Robot Shop on Docker path**  
-   This is useful for exercising the **LLM + k6 + efficiency analysis** path, but it is **not a true closed-loop config validation** because Docker is not updated from `service/k8s/*.yaml`.
+   This is useful for exercising the **LLM + k6 + efficiency analysis** path, but it is **not a true closed-loop config validation** because Docker is not updated from `apps/service/k8s/*.yaml`.
 
 Built-in profiles now use **60 seconds** by default:
 
-- `low` → **25 RPS**
-- `medium` → **100 RPS**
-- `high` → **500 RPS**
+- `low` -> **25 RPS**
+- `medium` -> **100 RPS**
+- `high` -> **500 RPS**
 
 ---
 
@@ -28,12 +28,12 @@ Use this when you want:
 Prep:
 
 1. Apply:
-   - `service/k8s/deployment.yaml`
-   - `service/k8s/hpa.yaml`
+   - `apps/service/k8s/deployment.yaml`
+   - `apps/service/k8s/hpa.yaml`
 2. Confirm the service is healthy:
    - `kubectl get deploy,po,hpa`
 3. Optional for clearer scaling demos:
-   - set `CPU_WORK_MS` in `service/k8s/deployment.yaml` to something like `50` to `100`
+   - set `CPU_WORK_MS` in `apps/service/k8s/deployment.yaml` to something like `50` to `100`
 
 #### B. Robot Shop on Docker (analysis / dry-run squeeze)
 
@@ -44,7 +44,7 @@ Use this when Robot Shop containers are already running locally and you want k6 
 Important:
 
 - `--robot-shop` targets `http://localhost:8080`
-- it uses `load-tests/k6/robotshop_login.js`
+- it uses `benchmarks/load-tests/k6/robotshop_login.js`
 - it sets the endpoint to `POST /api/user/login`
 - `verify` is **not supported** here
 - `squeeze` works, but when `BASE_URL` is set the code **skips `kubectl apply`**, so the repo YAML changes while the Docker app keeps running unchanged
@@ -200,8 +200,8 @@ Contains the compact LLM outcome:
 
 The LLM’s proposed YAML reduction or adjustment for:
 
-- `service/k8s/deployment.yaml`
-- `service/k8s/hpa.yaml`
+- `apps/service/k8s/deployment.yaml`
+- `apps/service/k8s/hpa.yaml`
 
 ---
 

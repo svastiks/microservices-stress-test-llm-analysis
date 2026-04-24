@@ -54,8 +54,8 @@ spec:
             - --sut-service-port
             - "8080"
             - --deployment-yaml
-            - k8s/spark/robot-shop-web-deployment.yaml
+            - infra/k8s/spark/robot-shop-web-deployment.yaml
             - --hpa-yaml
-            - k8s/spark/robot-shop-web-hpa.yaml
+            - infra/k8s/spark/robot-shop-web-hpa.yaml
             - --prometheus-url
             - http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090

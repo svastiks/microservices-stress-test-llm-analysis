@@ -1,5 +1,5 @@
 # Optional overrides for kube-prometheus-stack (Helm) on a local cluster (e.g. minikube).
-# Example: helm install prometheus prometheus-community/kube-prometheus-stack -f service/monitoring/helm-values.yaml -n monitoring --create-namespace
+# Example: helm install prometheus prometheus-community/kube-prometheus-stack -f apps/service/monitoring/helm-values.yaml -n monitoring --create-namespace
 prometheus:
   prometheusSpec:
     serviceMonitorSelectorNilUsesHelmValues: false

@@ -25,11 +25,11 @@ helm upgrade --install robot-shop "${CHART_PATH}" \
   --set loadtest.enabled=false
 
 echo "[deploy] applying optimizer-managed web deployment + hpa..."
-kubectl apply -f "./k8s/spark/robot-shop-web-deployment.yaml"
-kubectl apply -f "./k8s/spark/robot-shop-web-hpa.yaml"
+kubectl apply -f "./infra/k8s/spark/robot-shop-web-deployment.yaml"
+kubectl apply -f "./infra/k8s/spark/robot-shop-web-hpa.yaml"
 
 echo "[deploy] applying analyzer RBAC..."
-kubectl apply -f "./k8s/spark/analyzer-rbac.yaml"
+kubectl apply -f "./infra/k8s/spark/analyzer-rbac.yaml"
 
 echo "[deploy] waiting for web rollout..."
 kubectl -n "${NAMESPACE}" rollout status deployment/web --timeout=300s

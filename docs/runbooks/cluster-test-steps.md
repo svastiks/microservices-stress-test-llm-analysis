@@ -52,7 +52,7 @@ export SQUEEZE_MAX_ITERATIONS=2
 ## 5) Ensure analyzer prerequisites
 
 ```bash
-kubectl apply -f k8s/spark/analyzer-rbac.yaml
+kubectl apply -f infra/k8s/spark/analyzer-rbac.yaml
 kubectl -n svastik create secret generic llm-api \
   --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -

@@ -74,8 +74,8 @@ minikube addons enable metrics-server
 
 if [[ "$SKIP_BUILD" != "1" ]]; then
   log "Building Docker images"
-  docker build -t stress-service:latest -f service/Dockerfile service/
-  docker build -t mock-dependency:latest -f service/Dockerfile.mock service/
+  docker build -t stress-service:latest -f apps/service/Dockerfile apps/service/
+  docker build -t mock-dependency:latest -f apps/service/Dockerfile.mock apps/service/
 else
   log "Skipping Docker image builds"
 fi
@@ -90,9 +90,9 @@ fi
 
 if [[ "$SKIP_DEPLOY" != "1" ]]; then
   log "Deploying app + mock dependency + HPA"
-  kubectl apply -f service/k8s/mock-dependency.yaml
-  kubectl apply -f service/k8s/deployment.yaml
-  kubectl apply -f service/k8s/hpa.yaml
+  kubectl apply -f apps/service/k8s/mock-dependency.yaml
+  kubectl apply -f apps/service/k8s/deployment.yaml
+  kubectl apply -f apps/service/k8s/hpa.yaml
 else
   log "Skipping app/hpa deploy"
 fi
@@ -107,11 +107,11 @@ if [[ "$SKIP_MONITORING" != "1" ]]; then
   else
     helm install kps prometheus-community/kube-prometheus-stack \
       -n monitoring --create-namespace \
-      -f service/monitoring/helm-values.yaml
+      -f apps/service/monitoring/helm-values.yaml
   fi
 
   log "Registering ServiceMonitor"
-  kubectl apply -f service/monitoring/servicemonitor.yaml
+  kubectl apply -f apps/service/monitoring/servicemonitor.yaml
 else
   log "Skipping monitoring install + ServiceMonitor"
 fi

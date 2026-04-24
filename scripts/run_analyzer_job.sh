@@ -3,13 +3,13 @@ set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-svastik}"
 JOB_NAME="${JOB_NAME:-stress-analyzer-run}"
-JOB_YAML="${JOB_YAML:-./k8s/spark/analyzer-job.yaml}"
+JOB_YAML="${JOB_YAML:-./infra/k8s/spark/analyzer-job.yaml}"
 ANALYZER_IMAGE="${ANALYZER_IMAGE:-}"
 ANALYZER_IMAGE_PULL_POLICY="${ANALYZER_IMAGE_PULL_POLICY:-Always}"
 IMAGE_PULL_SECRET="${IMAGE_PULL_SECRET:-}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-stress-analyzer}"
 OPENAI_SECRET_NAME="${OPENAI_SECRET_NAME:-llm-api}"
-RESULTS_PVC_YAML="${RESULTS_PVC_YAML:-./k8s/spark/analyzer-results-pvc.yaml}"
+RESULTS_PVC_YAML="${RESULTS_PVC_YAML:-./infra/k8s/spark/analyzer-results-pvc.yaml}"
 SQUEEZE_UNTIL_VIOLATION="${SQUEEZE_UNTIL_VIOLATION:-false}"
 SQUEEZE_MAX_ITERATIONS="${SQUEEZE_MAX_ITERATIONS:-5}"
 SUT_BASE_URL="${SUT_BASE_URL:-http://web.${NAMESPACE}.svc.cluster.local:8080}"
@@ -30,7 +30,7 @@ fi
 
 if ! kubectl -n "${NAMESPACE}" get serviceaccount "${SERVICE_ACCOUNT}" >/dev/null 2>&1; then
   echo "[analyzer] missing serviceaccount '${SERVICE_ACCOUNT}' in namespace '${NAMESPACE}'" >&2
-  echo "[analyzer] run: kubectl apply -f k8s/spark/analyzer-rbac.yaml" >&2
+  echo "[analyzer] run: kubectl apply -f infra/k8s/spark/analyzer-rbac.yaml" >&2
   exit 1
 fi
 
@@ -100,9 +100,9 @@ kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
               \"--base-url\",
               \"${SUT_BASE_URL}\",
               \"--deployment-yaml\",
-              \"k8s/spark/robot-shop-web-deployment.yaml\",
+              \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
               \"--hpa-yaml\",
-              \"k8s/spark/robot-shop-web-hpa.yaml\",
+              \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
               \"--prometheus-url\",
               \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\"
             ]

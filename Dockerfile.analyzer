@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY start.py experiments.json ./
 COPY analysis ./analysis
-COPY load-tests ./load-tests
-COPY k8s/spark ./k8s/spark
+COPY benchmarks/load-tests ./benchmarks/load-tests
+COPY infra/k8s/spark ./infra/k8s/spark
 
 CMD ["python3", "start.py", "--help"]

@@ -46,8 +46,12 @@ def run_k6(profile_config: dict, script_name: str, base_url: str | None = None) 
     env["DURATION"] = str(profile_config.get("DURATION", "60s"))
     if profile_config.get("RPS", 0) > 200:
         env["maxVUs"] = str(profile_config["RPS"] + 100)
-    script_path = REPO_ROOT / "load-tests" / "k6" / f"{script_name}.js"
-    script = str(script_path) if script_path.exists() else "load-tests/k6/basic.js"
+    script_path = REPO_ROOT / "benchmarks" / "load-tests" / "k6" / f"{script_name}.js"
+    script = (
+        str(script_path)
+        if script_path.exists()
+        else "benchmarks/load-tests/k6/basic.js"
+    )
     cmd = [
         "k6",
         "run",
@@ -268,12 +272,12 @@ if __name__ == "__main__":
     )
     p.add_argument(
         "--deployment-yaml",
-        default="service/k8s/deployment.yaml",
+        default="apps/service/k8s/deployment.yaml",
         help="Deployment YAML path to analyze/update/apply.",
     )
     p.add_argument(
         "--hpa-yaml",
-        default="service/k8s/hpa.yaml",
+        default="apps/service/k8s/hpa.yaml",
         help="HPA YAML path to analyze/update/apply.",
     )
     p.add_argument(

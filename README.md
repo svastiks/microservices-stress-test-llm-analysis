@@ -1,105 +1,94 @@
-# microservices-stress-test-llm-analysis
+# Efficiency Mapping: Cost-Optimal Microservice Configuration via Iterative LLM-Guided Stress Testing
 
-Run k6 load test, then get an LLM report + suggested YAML fix per run.
+Run **k6** against a service-under-test, pull **Prometheus** (or run without metrics), then get an **LLM** report plus a suggested **Kubernetes / resource** change per iteration. Optional modes **verify** (apply once, re-run, compare) and **squeeze** (iterative scale-down until failure or a stop condition).
 
-**Setup**
+**Layout:** the stress-test app is under **`apps/service/`**, k6 scripts under **`benchmarks/load-tests/k6/`**, and the cluster / analyzer manifests under **`infra/k8s/spark/`**. Commands and `start.py` defaults use these paths from the repo root.
 
-- Install [k6](https://k6.io/docs/get-started/installation/) (e.g. `brew install k6`)
+---
+
+## Repository layout
+
+| Area | Path |
+| --- | --- |
+| Stress service (app, Dockerfiles, manifests, ServiceMonitor) | `apps/service/` |
+| k6 scripts | `benchmarks/load-tests/k6/` |
+| Cluster stack (Robot Shop on K8s, MongoDB, analyzer Job/RBAC/PVC, web HPA) | `infra/k8s/spark/` |
+| LLM + experiment plumbing | `analysis/` |
+| Automation (`deploy_spark_stack.sh`, analyzer image, `run_analyzer_job.sh`, …) | `scripts/` |
+| Runbooks (local vs cluster end-to-end) | `docs/runbooks/` |
+
+**Outputs**
+
+- Local / generic runs: `results/` (dated folders, `run-*`, reports, diffs).
+- Cluster pipeline exports: `results-from-cluster/` (when you copy analyzer output there).
+
+**Experiments** — RPS, duration, and profiles: `experiments.json`.
+
+---
+
+## Setup
+
+- [k6](https://k6.io/docs/get-started/installation/) (e.g. `brew install k6`)
 - `pip install -r requirements.txt`
-- Set `OPENAI_API_KEY` (e.g. in `.env` and `source .env`)
+- `OPENAI_API_KEY` (e.g. `.env` and `source .env`)
 
-**Run**
+---
+
+## Quick run (repo root)
 
 ```bash
 python3 start.py
 ```
 
-This runs `load-tests/k6/basic.js`, exports the summary, then calls the analysis. Output goes under `results/YYYY-MM-DD-N/` (where N is the run index):
+Defaults: `benchmarks/load-tests/k6/login.js`, Prometheus port-forward when not using `--no-prometheus`, analysis writes under `results/YYYY-MM-DD-N/` (or `run-*` flows when using those modes).
 
-- `k6-run-summary.json`
-- `report.md`
-- `recommended.diff.yaml` (when the model suggests a fix)
+Useful flags (see `python3 start.py --help`):
 
-**K8s Commands**
+- `--profile low|medium|high` — RPS / duration from `experiments.json` (defaults include 60s workloads).
+- `--script login|signup|robotshop_login`
+- `--robot-shop` — shortcut for Robot Shop web on `localhost:8080` + `robotshop_login` script; pair with `--no-prometheus` for pure Docker.
+- `--verify` / `--squeeze` / `--until-violation` — closed-loop against the YAML paths below (not with `--base-url` / `--robot-shop` for **verify**).
+- `--efficiency` — squeeze-style cost / scale-down oriented LLM prompt.
+- `--deployment-yaml` / `--hpa-yaml` — default `apps/service/k8s/deployment.yaml` and `apps/service/k8s/hpa.yaml`.
+
+Typical artifacts per run: `k6-run-summary.json`, `report.md`, `recommended.diff` (or variant), optional verification markdown.
+
+---
+
+## Kubernetes: stress-service (local e.g. minikube)
+
+Manifests and monitoring values live under **`apps/service/`**.
 
 ```bash
-# Watch stress-service pods (live)
-kubectl get pods -l app=stress-service -w
+docker build -t stress-service:latest -f apps/service/Dockerfile apps/service/
+docker build -t mock-dependency:latest -f apps/service/Dockerfile.mock apps/service/
 
-# Deploy / update app and HPA
-kubectl apply -f service/k8s/deployment.yaml
-kubectl apply -f service/k8s/hpa.yaml
+kubectl apply -f apps/service/k8s/mock-dependency.yaml
+kubectl apply -f apps/service/k8s/deployment.yaml
+kubectl apply -f apps/service/k8s/hpa.yaml
 
-# Check deployment, pods, HPA
-kubectl get deploy,po,hpa | grep stress-service
-kubectl get hpa
+helm install kps prometheus-community/kube-prometheus-stack \
+  -n monitoring --create-namespace \
+  -f apps/service/monitoring/helm-values.yaml
 
-# Port-forwards (run in separate terminals if running without start.py)
-
-# Prometheus → http://localhost:9090 (open in browser to view dashboard and run queries for live metrics)
-kubectl -n monitoring port-forward svc/kps-kube-prometheus-stack-prometheus 9090:9090
-
-# stress-service → http://localhost:8000
-kubectl port-forward svc/stress-service 8000:80
-
-# Sanity checks
-kubectl get pods
-kubectl get svc
-kubectl get pods -n monitoring
-kubectl get svc -n monitoring
+kubectl apply -f apps/service/monitoring/servicemonitor.yaml
 ```
 
-**ENVIRONMENT SETUP**
+Port-forwards and `kubectl get …` workflows are unchanged in spirit; see **`docs/runbooks/testing.md`** for the full **local K8s vs Robot Shop Docker** split, verify/squeeze behavior, and caveats.
 
-# 0) (Optional) Reset minikube if things are broken
+---
 
-minikube delete
+## Cluster: Robot Shop + analyzer (closed loop on a real cluster)
 
-minikube start --driver=docker \
- --cpus=4 --memory=7680mb \
- --kubernetes-version=v1.30.0 \
- -v=3 --alsologtostderr
+For kubeconfig, image build/push, Helm deploy, analyzer Job, and pulling results into **`results-from-cluster/`**, use:
 
-# 1) Start local Kubernetes
+**`docs/runbooks/cluster-test-steps.md`**
 
-minikube start --cpus=4 --memory=7680mb
-minikube addons enable metrics-server # needed for HPA
+Supporting pieces: `scripts/deploy_spark_stack.sh`, `Dockerfile.analyzer`, manifests under **`infra/k8s/spark/`**. Robot Shop Helm chart path is configurable (`CHART_PATH`; often `extra/robot-shop-msa/...` locally — `extra/` is gitignored; see runbook).
 
-# 2) Build Docker images
+---
 
-docker build -t stress-service:latest -f service/Dockerfile service/
-docker build -t mock-dependency:latest -f service/Dockerfile.mock service/
+## Further reading
 
-# 3) Load images into minikube
-
-minikube image load stress-service:latest
-minikube image load mock-dependency:latest
-
-# 4) Deploy app + mock dependency + HPA
-
-kubectl apply -f service/k8s/mock-dependency.yaml
-kubectl apply -f service/k8s/deployment.yaml
-kubectl apply -f service/k8s/hpa.yaml
-
-# 5) Install Prometheus stack (metrics + Prometheus UI/API)
-
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo update
-helm install kps prometheus-community/kube-prometheus-stack \
- -n monitoring --create-namespace \
- -f service/monitoring/helm-values.yaml
-
-# 6) Register ServiceMonitor so Prometheus scrapes stress-service
-
-kubectl apply -f service/monitoring/servicemonitor.yaml
-
-# 7) Sanity-check cluster + monitoring
-
-kubectl get pods
-kubectl get svc
-kubectl get pods -n monitoring
-kubectl get svc -n monitoring
-
-# 8) Run an experiment (from repo root)
-
-python start.py --profile low --script login
+- **`docs/runbooks/testing.md`** — profiles, `--robot-shop`, Prometheus, verify/squeeze.
+- **`docs/runbooks/cluster-test-steps.md`** — production-style cluster test from zero to artifacts.
