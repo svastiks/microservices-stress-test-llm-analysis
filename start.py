@@ -577,12 +577,17 @@ if __name__ == "__main__":
                 if first_diff and first_hint == "UP":
                     up_recovery_active = True
                     print(
-                        "[squeeze] Iteration 1 FAIL with UP hint; entering scale-up recovery loop."
+                        "[squeeze] Iteration 1 FAIL with UP hint, "
+                        f"cost={((exp_1.get('cost') or {}).get('cost_score'))}; "
+                        "entering scale-up recovery loop."
                     )
                 else:
                     first_fail_dir = run_1_dir
                     stopped_reason = "first_run_failed"
-                    print("[squeeze] Iteration 1 already failed; stopping.")
+                    print(
+                        "[squeeze] Iteration 1 already failed, "
+                        f"cost={((exp_1.get('cost') or {}).get('cost_score'))}; stopping."
+                    )
             # up_demo expects under-provisioned start (FAIL then UP). If iter 1 PASS, HPA likely
             # scaled out — do not run DOWN squeeze or we destroy the demo narrative.
             up_demo_skip_down_squeeze = args.profile == "up_demo" and status_1 == "PASS"
@@ -700,10 +705,15 @@ if __name__ == "__main__":
                     if not up_recovery_active:
                         first_fail_dir = next_run_dir
                         stopped_reason = "first_fail"
-                        print(f"[squeeze] Iteration {current_iteration} FAIL; stopping.")
+                        print(
+                            f"[squeeze] Iteration {current_iteration} FAIL, "
+                            f"cost={((exp.get('cost') or {}).get('cost_score'))}; stopping."
+                        )
                     else:
                         print(
-                            f"[squeeze] Iteration {current_iteration} still FAIL in recovery mode; continuing."
+                            f"[squeeze] Iteration {current_iteration} still FAIL, "
+                            f"cost={((exp.get('cost') or {}).get('cost_score'))}, "
+                            "in recovery mode; continuing."
                         )
                 _write_squeeze_summary(
                     squeeze_rows,
