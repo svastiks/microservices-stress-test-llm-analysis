@@ -1,0 +1,5 @@
+- The service exceeded the p95 SLO latency of 500ms with a p95 observed latency of 5403ms.
+- The error rate also significantly exceeded the acceptable threshold, reaching 33.76%.
+- Provisioned resources show signs of over-provisioning, as CPU and memory utilization are around 43.6%.
+- However, since the SLO was violated, we need to increase resources to recover headroom and ensure compliance.
+- The next action is to re-run the same fixed workload after the adjustments.

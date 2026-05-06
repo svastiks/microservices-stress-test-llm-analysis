@@ -1,0 +1,5 @@
+- The SLO was not met due to a p95 latency violation (1574ms vs. 500ms).
+- High error rate observed at 10.92%, indicating potential issues under load.
+- Current resource configuration is lacking headroom as it hit the max replicas under high load.
+- Consider increasing CPU and memory resources to accommodate spikes while protecting against future SLO violations.
+- Next action: Rerun the same workload after applying the adjusted YAML configurations.

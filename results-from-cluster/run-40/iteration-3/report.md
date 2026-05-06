@@ -1,0 +1,5 @@
+- SLO was violated (p95 latency exceeded 500ms) during testing.
+- Observed latency was significantly higher (1467ms at p95).
+- Utilization metrics are trustworthy, indicating real CPU usage at 77.8%.
+- Current CPU request (75m) and limit (150m) settings appear inadequate given the load.
+- Next action: Consider scaling resources to meet SLO for future tests, as the current configuration failed to maintain performance under load.

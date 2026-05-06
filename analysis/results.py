@@ -1,19 +1,27 @@
 import json
+import math
 from datetime import date
 from pathlib import Path
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 from .api import analyze_with_llm
 from .experiment_build import build_experiment_payload, get_config_from_yaml
 from .prompts import EFFICIENCY_SYSTEM_PROMPT, SYSTEM_PROMPT, build_user_prompt
+from .scaling_policy import attach_scaling_hint
 
 SUMMARY_PATH = REPO_ROOT / "results" / "k6-summary.json"
 RUN_META_PATH = REPO_ROOT / "results" / "run_meta.json"
 RESULTS_DIR = REPO_ROOT / "results"
-DEFAULT_DEPLOYMENT_YAML = REPO_ROOT / "service" / "k8s" / "deployment.yaml"
-DEFAULT_HPA_YAML = REPO_ROOT / "service" / "k8s" / "hpa.yaml"
+DEFAULT_DEPLOYMENT_YAML = REPO_ROOT / "apps" / "service" / "k8s" / "deployment.yaml"
+DEFAULT_HPA_YAML = REPO_ROOT / "apps" / "service" / "k8s" / "hpa.yaml"
 DEFAULT_PROMETHEUS_URL = "http://localhost:9090"
+
+
+def _log(msg: str) -> None:
+    print(f"[analysis] {msg}")
 
 
 def _observed_summary_from_experiment(experiment: dict) -> dict:
@@ -51,6 +59,14 @@ def _postprocess_llm_result(result: dict, experiment: dict) -> dict:
     """
     Apply deterministic safety checks so the output cannot contradict the input metrics.
     """
+    if (
+        experiment.get("scaling_hint") == "UNKNOWN"
+        and experiment.get("analysis_goal") == "efficiency"
+    ):
+        result["deployment_yaml_new"] = ""
+        result["hpa_yaml_new"] = ""
+        result["optimization_headroom"] = result.get("optimization_headroom") or "NONE"
+
     observed = experiment.get("observed") or {}
     failure = experiment.get("failure") or {}
     slo = experiment.get("slo") or {}
@@ -109,6 +125,121 @@ def _postprocess_llm_result(result: dict, experiment: dict) -> dict:
 
     # If NONE, YAML changes are optional (scale-down). But if model returned YAML, keep it.
     return result
+
+
+def _bound(v: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, v))
+
+
+def _compute_step_pct(experiment: dict) -> float:
+    """
+    Deterministic step size for faster convergence.
+    - DOWN: step_pct = bound(0.10 + 0.25 * slack, 0.10, 0.30)
+      where slack = max(0, (60 - max(cpu_util_pct, mem_util_pct)) / 60)
+    - UP: step_pct = bound(0.15 + 0.08 * min(severity, 3.0), 0.15, 0.40)
+      where severity = max(err_pressure, lat_pressure, throughput_pressure)
+    """
+    observed = experiment.get("observed") or {}
+    slo = experiment.get("slo") or {}
+    scaling_hint = experiment.get("scaling_hint")
+    cpu = float(observed.get("cpu_util_pct") or 0.0)
+    mem = float(observed.get("mem_util_pct") or 0.0)
+
+    if scaling_hint == "DOWN":
+        # Aim around ~60% utilization; larger slack -> larger cut.
+        slack = max(0.0, (60.0 - max(cpu, mem)) / 60.0)
+        return round(_bound(0.10 + (0.25 * slack), 0.10, 0.30), 3)
+
+    if scaling_hint == "UP":
+        err = float(observed.get("error_rate") or 0.0)
+        p95 = float((observed.get("latency_ms") or {}).get("p95") or 0.0)
+        slo_err = float(slo.get("error_rate") or 0.01)
+        slo_p95 = float(slo.get("p95_latency_ms") or 500.0)
+        achieved = float(observed.get("achieved_requests_per_second_target_window") or 0.0)
+        target = float((experiment.get("workload") or {}).get("target_requests_per_second") or 0.0)
+
+        err_pressure = max(0.0, (err / max(slo_err, 1e-6)) - 1.0)
+        lat_pressure = max(0.0, (p95 / max(slo_p95, 1e-6)) - 1.0)
+        throughput_pressure = max(0.0, (target / max(achieved, 1e-6)) - 1.0) if target > 0 else 0.0
+        severity = max(err_pressure, lat_pressure, throughput_pressure)
+        return round(_bound(0.15 + (0.08 * min(severity, 3.0)), 0.15, 0.40), 3)
+
+    return 0.0
+
+
+def _scale_millicpu(val: str | int | float | None, factor: float, *, floor: int = 50) -> str:
+    base = int(str(val).replace("m", "") or 0) if val is not None else 0
+    out = max(floor, int(math.ceil(base * factor)))
+    return f"{out}m"
+
+
+def _scale_mib(val: str | int | float | None, factor: float, *, floor: int = 32) -> str:
+    s = str(val or "0")
+    base = int(s.replace("Mi", "") or 0)
+    out = max(floor, int(math.ceil(base * factor)))
+    return f"{out}Mi"
+
+
+def _maybe_apply_deterministic_efficiency_yaml(
+    result: dict, experiment: dict, deployment_yaml_path: Path, hpa_yaml_path: Path
+) -> None:
+    # Deterministic UP/DOWN movement path for fewer iterations.
+    if experiment.get("analysis_goal") != "efficiency":
+        return
+    tel = ((experiment.get("observed") or {}).get("telemetry") or {})
+    if not tel.get("utilization_trustworthy"):
+        return
+    hint = experiment.get("scaling_hint")
+    # In squeeze mode, HOLD should not stall goal-seeking:
+    # - PASS path keeps moving DOWN until first FAIL
+    # - FAIL path keeps moving UP until first PASS
+    if hint == "HOLD":
+        failed = bool(((experiment.get("failure") or {}).get("failed")))
+        hint = "UP" if failed else "DOWN"
+    if hint not in {"UP", "DOWN"}:
+        return
+
+    step = _compute_step_pct(experiment)
+    if step <= 0:
+        return
+    factor = (1.0 + step) if hint == "UP" else (1.0 - step)
+
+    if deployment_yaml_path.exists():
+        dep_doc = yaml.safe_load(deployment_yaml_path.read_text())
+        if dep_doc and dep_doc.get("kind") == "Deployment":
+            spec = dep_doc.setdefault("spec", {})
+            tmpl = (spec.setdefault("template", {}).setdefault("spec", {}))
+            containers = tmpl.get("containers") or []
+            if containers:
+                c0 = containers[0]
+                res = c0.setdefault("resources", {})
+                req = res.setdefault("requests", {})
+                lim = res.setdefault("limits", {})
+                req["cpu"] = _scale_millicpu(req.get("cpu", "100m"), factor)
+                lim["cpu"] = _scale_millicpu(lim.get("cpu", "200m"), factor)
+                req["memory"] = _scale_mib(req.get("memory", "50Mi"), factor)
+                lim["memory"] = _scale_mib(lim.get("memory", "100Mi"), factor)
+            result["deployment_yaml_new"] = yaml.safe_dump(dep_doc, sort_keys=False)
+
+    if hpa_yaml_path.exists():
+        hpa_doc = yaml.safe_load(hpa_yaml_path.read_text())
+        if hpa_doc and hpa_doc.get("kind") == "HorizontalPodAutoscaler":
+            spec = hpa_doc.setdefault("spec", {})
+            min_r = int(spec.get("minReplicas") or 1)
+            max_r = int(spec.get("maxReplicas") or max(min_r, 2))
+            delta = max(1, int(math.ceil(max_r * step * 0.5)))
+            if hint == "UP":
+                new_max = max_r + delta
+                spec["maxReplicas"] = new_max
+                obs = experiment.get("observed") or {}
+                obs_rep = int(obs.get("replicas") or 0)
+                obs_max = int(obs.get("replicas_max") or 0)
+                floor = max(min_r, obs_rep, obs_max, min_r + 1)
+                spec["minReplicas"] = min(new_max, floor)
+            else:
+                spec["maxReplicas"] = max(min_r + 1, max_r - delta)
+                spec["minReplicas"] = max(1, min_r - (1 if min_r > 1 else 0))
+            result["hpa_yaml_new"] = yaml.safe_dump(hpa_doc, sort_keys=False)
 
 
 def load_summary() -> tuple[dict, Path, dict | None]:
@@ -216,7 +347,8 @@ def load_summary() -> tuple[dict, Path, dict | None]:
         or "analysis_goal" in meta
         or "deployment_yaml" in meta
         or "hpa_yaml" in meta
-        or "prometheus_url" in meta
+                or "prometheus_url" in meta
+                or "up_recovery" in meta
     ):
         cfg = {
             "experiment_id": meta.get("experiment_id"),
@@ -251,6 +383,8 @@ def load_summary() -> tuple[dict, Path, dict | None]:
             cfg["hpa_yaml"] = meta["hpa_yaml"]
         if "prometheus_url" in meta:
             cfg["prometheus_url"] = meta["prometheus_url"]
+        if meta.get("up_recovery"):
+            cfg["up_recovery"] = True
         (run_dir / "experiment_config.json").write_text(json.dumps(cfg))
 
     return data, run_dir, meta
@@ -294,6 +428,10 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
                 pass
 
     deployment_yaml_path, hpa_yaml_path = _resolve_yaml_paths(meta)
+    _log(
+        f"run_analysis_start run_dir={run_dir} deployment_yaml={deployment_yaml_path} "
+        f"hpa_yaml={hpa_yaml_path}"
+    )
     k6_path = run_dir / "k6-run-summary.json"
     config = get_config_from_yaml(deployment_yaml_path, hpa_yaml_path)
 
@@ -314,6 +452,7 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
         or "deployment_yaml" in meta
         or "hpa_yaml" in meta
         or "prometheus_url" in meta
+        or "up_recovery" in meta
     ):
         experiment_config = {
             "experiment_id": meta.get("experiment_id"),
@@ -348,6 +487,8 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             experiment_config["hpa_yaml"] = meta["hpa_yaml"]
         if "prometheus_url" in meta:
             experiment_config["prometheus_url"] = meta["prometheus_url"]
+        if meta.get("up_recovery"):
+            experiment_config["up_recovery"] = True
     if experiment_config is None:
         config_path = run_dir / "experiment_config.json"
         if config_path.exists():
@@ -372,6 +513,8 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
         ):
             if experiment_config.get(k) is not None:
                 meta[k] = experiment_config[k]
+        if "up_recovery" in experiment_config:
+            meta["up_recovery"] = bool(experiment_config["up_recovery"])
 
     observed_override = None
     start_ts = None
@@ -383,6 +526,11 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
         if use_prom and start_ts is not None and end_ts is not None:
             from .prometheus_collect import get_prometheus_observed
 
+            hpa_cfg = config.get("hpa") or {}
+            _log(
+                f"prometheus_collect_start namespace={meta.get('k8s_namespace')} "
+                f"deployment={meta.get('k8s_deployment')} url={meta.get('prometheus_url')}"
+            )
             observed_override = get_prometheus_observed(
                 start_ts=float(start_ts),
                 end_ts=float(end_ts),
@@ -391,6 +539,17 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
                 prometheus_url=meta.get("prometheus_url") or DEFAULT_PROMETHEUS_URL,
                 cpu_limit_m=config.get("cpu_limit_m") or 500,
                 mem_limit_mib=config.get("mem_limit_mib") or 256,
+                deployment_replicas=int(config.get("deployment_replicas") or 0),
+                hpa_min_replicas=int(hpa_cfg.get("min_replicas") or 0),
+            )
+            telem = (observed_override or {}).get("telemetry") or {}
+            _log(
+                "prometheus_collect_done "
+                f"cpu_util_pct={(observed_override or {}).get('cpu_util_pct')} "
+                f"mem_util_pct={(observed_override or {}).get('mem_util_pct')} "
+                f"cpu_series_matched={telem.get('cpu_series_matched')} "
+                f"mem_series_matched={telem.get('mem_series_matched')} "
+                f"utilization_trustworthy={telem.get('utilization_trustworthy')}"
             )
     exp_data = build_experiment_payload(
         run_dir,
@@ -414,10 +573,16 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             "deployment_yaml",
             "hpa_yaml",
             "prometheus_url",
+            "up_recovery",
         ):
             if k in meta:
                 exp_data[k] = meta[k]
+    attach_scaling_hint(exp_data)
     (run_dir / "experiment.json").write_text(json.dumps(exp_data, indent=2))
+    _log(
+        f"experiment_written scaling_hint={exp_data.get('scaling_hint')} "
+        f"failure_reason={(exp_data.get('failure') or {}).get('reason')}"
+    )
 
     analysis_goal = (meta or {}).get("analysis_goal", "failure")
     mode_flag = (meta or {}).get("mode")
@@ -426,8 +591,20 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
     yaml_str = load_current_yaml(deployment_yaml_path, hpa_yaml_path)
     user_prompt = build_user_prompt(exp_data, yaml_str, mode=user_mode)
     system_prompt = EFFICIENCY_SYSTEM_PROMPT if use_efficiency else SYSTEM_PROMPT
+    _log(
+        f"llm_analyze_start mode={user_mode} analysis_goal={analysis_goal} "
+        f"user_prompt_chars={len(user_prompt)}"
+    )
     result = analyze_with_llm(system_prompt, user_prompt)
     result = _postprocess_llm_result(result, exp_data)
+    _maybe_apply_deterministic_efficiency_yaml(
+        result, exp_data, deployment_yaml_path, hpa_yaml_path
+    )
+    _log(
+        f"llm_analyze_done failure_archetype={result.get('failure_archetype')} "
+        f"has_deployment_yaml_new={bool((result.get('deployment_yaml_new') or '').strip())} "
+        f"has_hpa_yaml_new={bool((result.get('hpa_yaml_new') or '').strip())}"
+    )
     return result, run_dir, deployment_yaml_path, hpa_yaml_path
 
 
@@ -479,6 +656,10 @@ def write_outputs(
     (run_dir / "recommended.diff").write_text(
         "\n".join(diff_parts) if diff_parts else ""
     )
+    _log(
+        f"outputs_written run_dir={run_dir} diff_nonempty={bool(diff_parts)} "
+        f"report_chars={len(report)}"
+    )
 
     experiment = {}
     exp_path = run_dir / "experiment.json"
@@ -499,6 +680,9 @@ def write_outputs(
         "optimization_headroom": result.get("optimization_headroom"),
         "over_provisioned": result.get("over_provisioned"),
         "evidence": result.get("evidence", []),
+        "scaling_hint": experiment.get("scaling_hint"),
+        "scaling_rationale": experiment.get("scaling_rationale"),
+        "up_recovery": experiment.get("up_recovery"),
         "observed_summary": _observed_summary_from_experiment(experiment)
         if experiment
         else {},

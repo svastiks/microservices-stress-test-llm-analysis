@@ -1,0 +1,5 @@
+- SLO achieved (p95 latency: 123ms is within the target of 500ms).
+- Utilization metrics are unreliable (utilization_trustworthy is false), limiting optimization confidence.
+- Current cost score is low (0.1488), indicating potential for cost savings.
+- Cannot confirm over-provisioning due to missing metrics; no changes recommended.
+- Next action: rerun the same fixed workload to collect more reliable metrics.

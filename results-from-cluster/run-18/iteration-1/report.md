@@ -1,0 +1,5 @@
+- The SLO latency target was 500ms and we achieved a p95 latency of 18ms, well within the limits.
+- The observed error rate was 0.0%, meeting the SLO of 0.01.
+- Resource utilization metrics are missing, thus we cannot infer over- or under-provisioning. 
+- Given the current deployment is minimal at 1 replica with minimal resource requests, no changes can be made to scale down.
+- Next action: Rerun the same fixed workload after applying the leaner YAML.

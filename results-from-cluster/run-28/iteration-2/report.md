@@ -1,0 +1,6 @@
+- The SLO was violated (p95 latency of 38,939ms against a target of 500ms).
+- A significant error rate of 42.53% was observed during the test.
+- The current configuration is under-provisioned given it hit the max replicas.
+- CPU utilization is at 32%, but memory usage is sufficient.
+- Recommend increasing replicas from 1 to 2 and CPU limit from 250m to 325m to recover headroom.
+- The next step is to rerun the same fixed workload after applying the changes.

@@ -38,6 +38,15 @@ spec:
       containers:
         - name: mongodb
           image: mongo:7
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              ephemeral-storage: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+              ephemeral-storage: 2Gi
           ports:
             - containerPort: 27017
           env:

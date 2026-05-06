@@ -24,6 +24,15 @@ spec:
           # Build locally: docker build -f Dockerfile.analyzer -t microservices-stress-analyzer:latest .
           image: microservices-stress-analyzer:latest
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+              ephemeral-storage: 1Gi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+              ephemeral-storage: 4Gi
           volumeMounts:
             - name: analyzer-results
               mountPath: /app/results

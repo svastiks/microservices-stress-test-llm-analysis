@@ -1,0 +1,5 @@
+- The p95 latency of 1770ms violates the SLO of 500ms.
+- There is a rising error rate of 6.94%, indicating SLO failure.
+- Despite resource utilization being low (CPU 24.1%, Mem 25.6%), the service is suffering from latency issues.
+- Given the hold scaling hint, no changes to resources or replicas are recommended at this time.
+- Recommend rerunning the same fixed workload after addressing the latency concern through application optimization.

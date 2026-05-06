@@ -1,0 +1,5 @@
+- The SLO was achieved with a p95 latency of 5 ms, well below the 500 ms target.
+- Utilization is trustworthy, with CPU at 57.7%.
+- Current provisioned resources (270m CPU, 135Mi memory) indicate over-provisioning opportunities.
+- Cost score of 0.4018 suggests there is headroom for optimization.
+- Suggested next action is to implement a conservative scale-down and re-run the same workload.

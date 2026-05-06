@@ -1,0 +1,5 @@
+- SLO passed (p95 latency is 6 ms vs target of 500 ms).
+- CPU utilization is at 72.8%, which is a bit elevated.
+- Memory usage is at 100.3%, indicating potential over-provisioning or need for reduction.
+- Cost score is reasonable at 0.2184, suggesting some cost efficiency could be improved.
+- Next action: recommend maintaining core settings while carefully managing resources. Rerun the same workload after applying leaner YAML.

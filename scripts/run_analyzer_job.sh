@@ -12,11 +12,17 @@ OPENAI_SECRET_NAME="${OPENAI_SECRET_NAME:-llm-api}"
 RESULTS_PVC_YAML="${RESULTS_PVC_YAML:-./infra/k8s/spark/analyzer-results-pvc.yaml}"
 SQUEEZE_UNTIL_VIOLATION="${SQUEEZE_UNTIL_VIOLATION:-false}"
 SQUEEZE_MAX_ITERATIONS="${SQUEEZE_MAX_ITERATIONS:-5}"
+SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS:-30}"
 SUT_BASE_URL="${SUT_BASE_URL:-http://web.${NAMESPACE}.svc.cluster.local:8080}"
+PROFILE="${PROFILE:-low}"
+ANALYZER_SCRIPT="${ANALYZER_SCRIPT:-robotshop_login}"
 
 echo "[analyzer] context: $(kubectl config current-context)"
 echo "[analyzer] namespace: ${NAMESPACE}"
 echo "[analyzer] job: ${JOB_NAME}"
+echo "[analyzer] profile: ${PROFILE}"
+echo "[analyzer] script: ${ANALYZER_SCRIPT}"
+echo "[analyzer] squeeze: until_violation=${SQUEEZE_UNTIL_VIOLATION} max_iterations=${SQUEEZE_MAX_ITERATIONS} settle_seconds=${SQUEEZE_SETTLE_SECONDS}"
 
 if [[ ! -f "${JOB_YAML}" ]]; then
   echo "[analyzer] job yaml not found: ${JOB_YAML}" >&2
@@ -87,9 +93,9 @@ kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
               \"python3\",
               \"start.py\",
               \"--profile\",
-              \"low\",
+              \"${PROFILE}\",
               \"--script\",
-              \"robotshop_login\",
+              \"${ANALYZER_SCRIPT}\",
               \"--squeeze\",
               ${DYNAMIC_SQUEEZE_FLAGS},
               \"--efficiency\",
@@ -117,7 +123,8 @@ mv "${MANIFEST}.tmp" "${MANIFEST}"
 kubectl set env -f "${MANIFEST}" --local -o yaml \
   RESULTS_DB_ENABLED="${RESULTS_DB_ENABLED:-false}" \
   RESULTS_DB_URI="${RESULTS_DB_URI:-mongodb://analyzer:change-me@analyzer-mongodb.svastik.svc.cluster.local:27017/admin}" \
-  RESULTS_DB_NAME="${RESULTS_DB_NAME:-stress_analyzer}" > "${MANIFEST}.tmp"
+  RESULTS_DB_NAME="${RESULTS_DB_NAME:-stress_analyzer}" \
+  SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS}" > "${MANIFEST}.tmp"
 mv "${MANIFEST}.tmp" "${MANIFEST}"
 
 if [[ -n "${IMAGE_PULL_SECRET}" ]]; then

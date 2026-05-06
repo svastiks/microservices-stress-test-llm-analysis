@@ -1,0 +1,40 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 40,
+    "provisioned_request_mem_mib": 30,
+    "provisioned_limit_cpu_m": 80,
+    "provisioned_limit_mem_mib": 70,
+    "cost_score": 0.0693
+  },
+  "failure_archetype": "AUTOSCALER_LAG",
+  "lambda_crit_estimate": null,
+  "next_experiment": "For squeeze mode, always suggest rerunning same fixed workload after change, unless SLO failed",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "p95 latency of 1356 ms exceeds SLO of 500 ms",
+    "CPU utilization at 106.6% exceeded limit",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress with high CPU vs limits; increase CPU and/or replicas.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 24.8,
+    "error_rate": 0.0,
+    "latency_ms_p95": 1356.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 106.6,
+    "mem_util_pct": 56.3,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.07,
+    "total_requests": 2251
+  }
+}

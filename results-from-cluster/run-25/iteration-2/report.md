@@ -1,0 +1,5 @@
+- SLO failed due to p95 latency violation (60s observed vs 500ms target).
+- Cost is moderate with a score of 0.7422, indicating room for optimization.
+- Current CPU utilization is at 30.9%, suggesting potential for resource scaling.
+- Recommended changes include increasing resources to handle high traffic without failing SLO.
+- Next action: re-run the same fixed workload after applying updates.

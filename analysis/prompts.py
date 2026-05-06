@@ -21,6 +21,10 @@ FAILURE ARCHETYPE RULES:
   - If failure.reason ends with "_slo_violation": this is an experiment SLO violation.
 - Hard constraint: If you violate any MUST/MUST NOT rule below, your answer is invalid. Prefer UNKNOWN over guessing.
 
+TELEMETRY / SCALING_HINT (read from experiment JSON):
+- observed.telemetry.utilization_trustworthy: when false, Prometheus did not return reliable CPU/memory series (or replica context). You MUST NOT diagnose CPU_THROTTLING, MEMORY_PRESSURE_OOM, AUTOSCALER_LAG, or DEPENDENCY_SATURATION from cpu_util_pct/mem_util_pct alone; use UNKNOWN unless k6/SLO evidence alone suffices.
+- scaling_hint (UP | DOWN | HOLD | UNKNOWN) and scaling_rationale summarize a deterministic provisioning direction. Treat UNKNOWN as “no safe utilization-based conclusion.” Align your YAML recommendations with scaling_hint when it is not UNKNOWN; do not recommend aggressive scale-down when scaling_hint is HOLD or UP.
+
 FAILURE ARCHETYPE DEFINITIONS (use only when failure.failed == true and evidence supports):
 - CPU_THROTTLING: SLO violated AND cpu_util_pct near 100%, cpu_util_to_limit > 0.9, high latency, no OOM
 - MEMORY_PRESSURE_OOM: SLO violated AND oom_kills > 0, mem_util_pct high, container restarts
@@ -113,12 +117,17 @@ Given an experiment JSON and current Deployment/HPA YAML, return exactly this JS
 }
 
 Rules:
-- If failure.failed is true, do NOT optimize down further; return empty deployment_yaml_new and hpa_yaml_new.
-- If failure.failed is false and utilization is low, recommend a modest reduction (typically 10-25%) in replicas and/or resource requests/limits.
+- This mode supports both DOWN and UP movement for fixed-workload right-sizing.
+- If failure.failed is true and scaling_hint is not UP, return empty deployment_yaml_new and hpa_yaml_new.
+- If scaling_hint is UNKNOWN OR observed.telemetry.utilization_trustworthy is false: return empty deployment_yaml_new and hpa_yaml_new (even if failure.failed is false); explain that metrics are missing in report bullets.
+- If scaling_hint is HOLD in squeeze mode: do NOT return empty YAML by default; propose a conservative directional step based on SLO status (failure.failed=true => modest UP, failure.failed=false => modest DOWN) so the loop can continue toward boundary discovery.
+- If scaling_hint is UP and utilization is trustworthy, recommend a modest increase (typically 10-25%) in replicas and/or CPU/memory requests/limits to recover SLO.
+- If failure.failed is false and scaling_hint is DOWN and utilization is trustworthy, recommend a modest reduction (typically 10-25%) in replicas and/or resource requests/limits.
 - Keep changes conservative: avoid >25% reduction in one step unless clearly over-provisioned.
+- Keep UP changes conservative: avoid >35% increase in one step unless failures are severe (high error_rate or clear saturation).
 - Always reference cost fields (cost.cost_score, provisioned_request_cpu_m, provisioned_request_mem_mib) when discussing headroom.
 - Return full-file YAMLs only when making a change.
-- LATENCY SLACK (no Prometheus / missing cpu_util_pct): If observed.latency_ms.p95 is missing or is less than 50% of slo.p95_latency_ms and failure.failed is false, treat headroom as at least MEDIUM: set optimization_headroom to MEDIUM or HIGH, over_provisioned true, and you MUST return full YAML with a modest reduction (lower spec.replicas and/or cpu+mem requests+limits and/or lower HPA minReplicas/maxReplicas), unless already at a clearly minimal config (e.g. 1 replica, <=100m CPU request, <=128Mi mem request).
+- LATENCY SLACK: If observed.telemetry.utilization_trustworthy is true AND observed.latency_ms.p95 is missing or is less than 50% of slo.p95_latency_ms and failure.failed is false, treat headroom as at least MEDIUM: set optimization_headroom to MEDIUM or HIGH, over_provisioned true, and return full YAML with a modest reduction unless already minimal. If utilization is not trustworthy, skip this shortcut (keep YAML empty and explain).
 - Do NOT suggest raising target RPS or changing the fixed workload; next_experiment must say to re-run the same workload after applying the leaner YAML.
 - lambda_crit_estimate must always be null for this mode.
 - Keep report.md simple and short: 5-8 bullet lines max, plain language, include only SLO result, cost trend, key optimization, and next action.
@@ -132,8 +141,8 @@ def build_user_prompt(
     exp_str = json.dumps(experiment_json, indent=2)
     if mode == "squeeze":
         focus = (
-            "Focus on: optimization_headroom, over_provisioning signals, cost-aware right-sizing, "
-            "and conservative YAML scale-down changes for this same fixed workload. "
+            "Focus on: optimization_headroom, over/under-provisioning signals, cost-aware right-sizing, "
+            "and conservative YAML right-sizing changes (DOWN or UP movement) for this same fixed workload. "
             "Ignore lambda_crit and higher-RPS exploration."
         )
     else:

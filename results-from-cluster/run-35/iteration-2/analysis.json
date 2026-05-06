@@ -1,0 +1,39 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 417,
+    "provisioned_request_mem_mib": 210,
+    "provisioned_limit_cpu_m": 834,
+    "provisioned_limit_mem_mib": 417,
+    "cost_score": 0.6221
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "For squeeze mode, always suggest rerunning same fixed workload after change, unless SLO failed",
+  "optimization_headroom": "NONE",
+  "over_provisioned": false,
+  "evidence": [
+    "SLO violation due to p95 latency",
+    "Utilization metrics show CPU/memory are not significantly stressed",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3"
+  ],
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress with throughput collapse or dropped iterations; increase replicas/limits to recover request handling headroom.",
+  "observed_summary": {
+    "achieved_requests_per_second": 101.1,
+    "error_rate": 0.0404,
+    "latency_ms_p95": 1570.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 41.9,
+    "mem_util_pct": 31.4,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.42,
+    "total_requests": 9160
+  }
+}

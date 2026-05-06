@@ -1,0 +1,43 @@
+{
+  "stopped_reason": "max_iterations_reached",
+  "best_pass_dir": "/app/results/run-22/iteration-3",
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "/app/results/run-22/iteration-1",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 12.0,
+      "error_rate": 0.0,
+      "replicas": 1,
+      "cpu_request_m": 100,
+      "mem_request_mib": 50,
+      "cost_score": 0.4465
+    },
+    {
+      "run_dir": "/app/results/run-22/iteration-2",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 6.0,
+      "error_rate": 0.0023,
+      "replicas": 1,
+      "cpu_request_m": 90,
+      "mem_request_mib": 45,
+      "cost_score": 0.4018
+    },
+    {
+      "run_dir": "/app/results/run-22/iteration-3",
+      "status": "PASS",
+      "target_rps": 25,
+      "achieved_rps": 25.0,
+      "p95_ms": 3.0,
+      "error_rate": 0.004,
+      "replicas": 1,
+      "cpu_request_m": 80,
+      "mem_request_mib": 40,
+      "cost_score": 0.3572
+    }
+  ]
+}

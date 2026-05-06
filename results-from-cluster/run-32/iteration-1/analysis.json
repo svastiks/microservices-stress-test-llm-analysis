@@ -1,0 +1,38 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 300,
+    "provisioned_request_mem_mib": 150,
+    "provisioned_limit_cpu_m": 600,
+    "provisioned_limit_mem_mib": 300,
+    "cost_score": 0.4465
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "For squeeze mode, always suggest rerunning same fixed workload after change, unless SLO failed",
+  "optimization_headroom": "NONE",
+  "over_provisioned": false,
+  "evidence": [
+    "SLO violation with error rate of 0.0418, CPU utilization at 64.8%, current limits on CPU are potentially blocking error rate recovery.",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3"
+  ],
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress while replicas are at HPA max; scale up CPU/memory limits and/or raise HPA max to recover headroom.",
+  "observed_summary": {
+    "achieved_requests_per_second": 97.5,
+    "error_rate": 0.0418,
+    "latency_ms_p95": 389.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 64.8,
+    "mem_util_pct": 37.6,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.65,
+    "total_requests": 11699
+  }
+}

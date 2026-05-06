@@ -1,0 +1,6 @@
+- The service experienced a p95 latency of 895ms, violating the SLO of 500ms.
+- Current CPU utilization is low at 26.4%, while memory utilization is at 31%.
+- The deployment is currently at the maximum number of replicas (4) for the HPA, indicating limitation in scaling capacity.
+- Cost score suggests a moderate investment based on the provisioned resources (CPU: 556m, Memory: 280Mi).
+- Recommended to increase resource limits slightly to aim for better SLO compliance while monitoring.
+- Next step: rerun the same workload after applying changes to evaluate the improvements.

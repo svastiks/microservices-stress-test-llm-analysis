@@ -82,24 +82,34 @@ def get_config_from_yaml(deployment_path: Path, hpa_path: Path) -> dict:
     return config
 
 
-def from_k6_summary(summary: dict, slo: dict | None = None) -> tuple[dict, dict]:
-    """Build observed (k6 part) and failure from k6 summary. slo: { p95_latency_ms, error_rate }."""
+def from_k6_summary(
+    summary: dict, slo: dict | None = None, workload: dict | None = None
+) -> tuple[dict, dict]:
+    """Build observed (k6 part) and failure from k6 summary."""
     slo = slo or {}
+    workload = workload or {}
     p95_limit = slo.get("p95_latency_ms") or 2000
     error_limit = slo.get("error_rate") or 0.05
     m = summary.get("metrics", {}) or {}
     hr = m.get("http_reqs", {}) or {}
     hrd = m.get("http_req_duration", {}) or {}
     hrf = m.get("http_req_failed", {}) or {}
+    dropped = m.get("dropped_iterations", {}) or {}
     count = int(hr.get("count", 0))
     rate = float(hr.get("rate", 0))
     duration_s = count / rate if rate else 0
+    workload_duration_s = float(workload.get("duration_s") or 0)
+    achieved_target_window_rps = (
+        (count / workload_duration_s) if workload_duration_s > 0 else rate
+    )
 
     err_val = float(hrf.get("value", 0) or 0)
     observed = {
         "total_requests": count,
         "observed_duration_s": round(duration_s, 1),
         "achieved_requests_per_second": round(rate, 1),
+        "achieved_requests_per_second_target_window": round(achieved_target_window_rps, 1),
+        "dropped_iterations": int(dropped.get("count", 0) or 0),
         "latency_ms": {
             "p95": round(hrd.get("p(95)", 0), 0),
             "p99": round(hrd.get("p(99)", 0), 0),
@@ -174,7 +184,7 @@ def build_experiment_payload(
 
     exp = experiment_config or {}
     slo = exp.get("slo") or {}
-    observed_k6, failure = from_k6_summary(summary, slo)
+    observed_k6, failure = from_k6_summary(summary, slo, exp.get("workload") or {})
     if exp.get("k6_thresholds_crossed"):
         failure["failed"] = True
         failure["reason"] = failure.get("reason") or "k6_thresholds_crossed"
@@ -202,6 +212,9 @@ def build_experiment_payload(
         "observed": observed_k6,
         "failure": failure,
     }
+
+    if exp.get("up_recovery"):
+        payload["up_recovery"] = True
 
     if observed_override:
         payload["observed"].update(observed_override)

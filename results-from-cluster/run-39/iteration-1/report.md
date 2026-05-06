@@ -1,0 +1,5 @@
+- The service failed to meet the p95 latency SLO with a reported latency of 1254 ms.
+- Currently running 3 replicas with 300m CPU provisioned and 150Mi memory.
+- Utilization metrics are trustworthy, yet SLO violation indicates an issue with performance under stress.
+- Given the observed CPU utilization of 67.4%, it's prudent to increase resource limits to recover handling capacity.
+- The next step should be to rerun the same fixed workload to verify changes.

@@ -1,0 +1,39 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 96,
+    "provisioned_request_mem_mib": 50,
+    "provisioned_limit_cpu_m": 194,
+    "provisioned_limit_mem_mib": 98,
+    "cost_score": 0.1448
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "For squeeze mode, always suggest rerunning same fixed workload after change, unless SLO failed",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "Current CPU utilization at 102.7%, with requests at 48m; suggested reduction to 36m.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "scaling_hint": "HOLD",
+  "scaling_rationale": "SLO pass but utilization elevated; do not reduce CPU/memory/replicas without stronger slack evidence.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 75.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 102.7,
+    "mem_util_pct": 38.0,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.03,
+    "total_requests": 2251
+  }
+}

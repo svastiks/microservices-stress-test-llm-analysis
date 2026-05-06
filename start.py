@@ -5,7 +5,7 @@ import re
 import subprocess
 import time
 from pathlib import Path
-from analysis.apply_diff import apply_recommended_diff
+from analysis.apply_diff import apply_recommended_diff, ensure_up_demo_thin_baseline
 from analysis.results import main as analysis_main
 from analysis.results_db import write_boundary, write_iteration
 from analysis.verify import run_verification, write_verification_output
@@ -13,6 +13,10 @@ from analysis.verify import run_verification, write_verification_output
 REPO_ROOT = Path(__file__).resolve().parent
 RESULTS_DIR = REPO_ROOT / "results"
 EXPERIMENTS_PATH = REPO_ROOT / "experiments.json"
+
+
+def _log(msg: str) -> None:
+    print(f"[pipeline] {msg}")
 
 
 def start_port_forward(cmd: list[str]) -> subprocess.Popen:
@@ -64,6 +68,23 @@ def run_k6(profile_config: dict, script_name: str, base_url: str | None = None) 
     return result.returncode
 
 
+def _read_k6_snapshot() -> dict:
+    summary_path = RESULTS_DIR / "k6-summary.json"
+    if not summary_path.exists():
+        return {}
+    try:
+        data = json.loads(summary_path.read_text())
+    except json.JSONDecodeError:
+        return {}
+    metrics = data.get("metrics") or {}
+    return {
+        "http_req_failed": (metrics.get("http_req_failed") or {}).get("value"),
+        "checks_value": (metrics.get("checks") or {}).get("value"),
+        "http_reqs": (metrics.get("http_reqs") or {}).get("count"),
+        "p95_ms": (metrics.get("http_req_duration") or {}).get("p(95)"),
+    }
+
+
 def _write_run_meta(run_meta: dict) -> None:
     (RESULTS_DIR / "run_meta.json").write_text(json.dumps(run_meta))
 
@@ -93,12 +114,27 @@ def _run_once(
     deployment_yaml: str,
     hpa_yaml: str,
     prometheus_url: str,
+    settle_seconds: int = 0,
     run_label: str | None = None,
     iteration_index: int | None = None,
+    up_recovery: bool = False,
 ) -> Path | None:
+    if settle_seconds > 0:
+        _log(f"settling_before_run seconds={settle_seconds}")
+        time.sleep(settle_seconds)
     profile_config = get_profile(profile)
+    _log(
+        f"run_start profile={profile} script={script} mode={mode} "
+        f"analysis_goal={analysis_goal} prometheus={prometheus}"
+    )
     start_ts = time.time()
     k6_exit = run_k6(profile_config, script, base_url=base_url)
+    k6_snapshot = _read_k6_snapshot()
+    _log(
+        f"k6_done exit={k6_exit} http_req_failed={k6_snapshot.get('http_req_failed')} "
+        f"checks={k6_snapshot.get('checks_value')} p95_ms={k6_snapshot.get('p95_ms')} "
+        f"http_reqs={k6_snapshot.get('http_reqs')}"
+    )
     end_ts = time.time()
     run_meta: dict = {
         "start_ts": start_ts,
@@ -127,8 +163,22 @@ def _run_once(
         run_meta["run_label"] = run_label
     if iteration_index is not None:
         run_meta["iteration_index"] = int(iteration_index)
+    if up_recovery:
+        run_meta["up_recovery"] = True
     _write_run_meta(run_meta)
+    _log("analysis_start")
     run_dir = analysis_main()
+    _log(f"analysis_done run_dir={run_dir}")
+    if run_dir is not None:
+        status, exp = _read_experiment_status(run_dir)
+        failure_reason = (exp.get("failure") or {}).get("reason")
+        telemetry = ((exp.get("observed") or {}).get("telemetry") or {})
+        _log(
+            f"experiment_status={status} failure_reason={failure_reason} "
+            f"cpu_util_pct={(exp.get('observed') or {}).get('cpu_util_pct')} "
+            f"mem_util_pct={(exp.get('observed') or {}).get('mem_util_pct')} "
+            f"utilization_trustworthy={telemetry.get('utilization_trustworthy')}"
+        )
     if run_dir is not None:
         try:
             write_iteration(run_dir, run_meta)
@@ -159,9 +209,15 @@ def _squeeze_row(run_dir: Path, experiment: dict, status: str) -> dict:
         "status": status,
         "target_rps": (experiment.get("workload") or {}).get("target_requests_per_second"),
         "achieved_rps": observed.get("achieved_requests_per_second"),
+        "achieved_rps_target_window": observed.get(
+            "achieved_requests_per_second_target_window"
+        ),
+        "dropped_iterations": observed.get("dropped_iterations"),
         "p95_ms": latency.get("p95"),
         "error_rate": observed.get("error_rate"),
-        "replicas": config.get("deployment_replicas"),
+        "cpu_util_pct": observed.get("cpu_util_pct"),
+        "mem_util_pct": observed.get("mem_util_pct"),
+        "replicas": observed.get("replicas"),
         "cpu_request_m": config.get("cpu_request_m"),
         "mem_request_mib": config.get("mem_request_mib"),
         "cost_score": cost.get("cost_score"),
@@ -192,12 +248,12 @@ def _write_squeeze_summary(
         f"- Best pass: {best_pass_dir}" if best_pass_dir else "- Best pass: none",
         f"- First fail: {first_fail_dir}" if first_fail_dir else "- First fail: none",
         "",
-        "| Run | Status | Target RPS | Achieved RPS | p95 ms | Error rate | Replicas | CPU req (m) | Mem req (Mi) | Cost |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Run | Status | Target RPS | Achieved RPS | Achieved RPS (Target Window) | Dropped Iterations | p95 ms | Error rate | CPU util % | Mem util % | Replicas | CPU req (m) | Mem req (Mi) | Cost |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         md_lines.append(
-            "| {run_dir} | {status} | {target_rps} | {achieved_rps} | {p95_ms} | {error_rate} | {replicas} | {cpu_request_m} | {mem_request_mib} | {cost_score} |".format(
+            "| {run_dir} | {status} | {target_rps} | {achieved_rps} | {achieved_rps_target_window} | {dropped_iterations} | {p95_ms} | {error_rate} | {cpu_util_pct} | {mem_util_pct} | {replicas} | {cpu_request_m} | {mem_request_mib} | {cost_score} |".format(
                 **row
             )
         )
@@ -210,7 +266,11 @@ def _write_squeeze_summary(
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Run k6 load test then LLM analysis")
-    p.add_argument("--profile", choices=["low", "medium", "high"], default="medium")
+    p.add_argument(
+        "--profile",
+        choices=["low", "medium", "high", "down_demo", "up_demo"],
+        default="medium",
+    )
     p.add_argument(
         "--script",
         choices=["login", "signup", "robotshop_login"],
@@ -235,9 +295,18 @@ if __name__ == "__main__":
         help="Maximum iterations for squeeze mode.",
     )
     p.add_argument(
+        "--settle-seconds",
+        type=int,
+        default=int(os.environ.get("SQUEEZE_SETTLE_SECONDS", "30")),
+        help="Post-rollout settle delay (seconds) before each squeeze iteration run.",
+    )
+    p.add_argument(
         "--until-violation",
         action="store_true",
-        help="For squeeze mode, keep iterating until the first FAIL instead of stopping at --max-iterations.",
+        help=(
+            "For squeeze mode, keep iterating until the first FAIL instead of stopping at "
+            "--max-iterations. Under-provisioning (UP) recovery still honors --max-iterations."
+        ),
     )
     p.add_argument(
         "--base-url",
@@ -379,6 +448,7 @@ if __name__ == "__main__":
                 deployment_yaml=deployment_yaml,
                 hpa_yaml=hpa_yaml,
                 prometheus_url=prometheus_url,
+                settle_seconds=args.settle_seconds if mode == "squeeze" else 0,
             )
         if run_1_dir is not None:
             if mode == "verify":
@@ -456,6 +526,18 @@ if __name__ == "__main__":
                 )
                 + f" [{run_label}]"
             )
+            if args.profile == "up_demo" and k8s_apply_enabled:
+                _log(
+                    "up_demo: pinning cluster to thin baseline before iteration 1 "
+                    "(single replica, HPA maxReplicas=1)"
+                )
+                ensure_up_demo_thin_baseline(
+                    deployment_yaml_path=REPO_ROOT / deployment_yaml,
+                    hpa_yaml_path=REPO_ROOT / hpa_yaml,
+                    deployment_name=k8s_deployment,
+                    namespace=k8s_namespace,
+                    repo_root=REPO_ROOT,
+                )
             run_1_dir = _run_once(
                 args.profile,
                 args.script,
@@ -468,6 +550,7 @@ if __name__ == "__main__":
                 deployment_yaml=deployment_yaml,
                 hpa_yaml=hpa_yaml,
                 prometheus_url=prometheus_url,
+                settle_seconds=args.settle_seconds,
                 run_label=run_label,
                 iteration_index=1,
             )
@@ -477,6 +560,9 @@ if __name__ == "__main__":
             first_fail_dir = None
             squeeze_rows: list[dict] = []
             stopped_reason = "unknown"
+            # UP movement path: allow recovery from an initial FAIL by applying scale-up diffs.
+            up_recovery_active = False
+            anchor_run_dir = run_1_dir
 
             status_1, exp_1 = _read_experiment_status(run_1_dir)
             squeeze_rows.append(_squeeze_row(run_1_dir, exp_1, status_1))
@@ -486,9 +572,28 @@ if __name__ == "__main__":
                     f"[squeeze] Iteration 1 PASS, cost={((exp_1.get('cost') or {}).get('cost_score'))}"
                 )
             else:
-                first_fail_dir = run_1_dir
-                stopped_reason = "first_run_failed"
-                print("[squeeze] Iteration 1 already failed; stopping.")
+                first_diff = (run_1_dir / "recommended.diff").read_text().strip()
+                first_hint = exp_1.get("scaling_hint")
+                if first_diff and first_hint == "UP":
+                    up_recovery_active = True
+                    print(
+                        "[squeeze] Iteration 1 FAIL with UP hint; entering scale-up recovery loop."
+                    )
+                else:
+                    first_fail_dir = run_1_dir
+                    stopped_reason = "first_run_failed"
+                    print("[squeeze] Iteration 1 already failed; stopping.")
+            # up_demo expects under-provisioned start (FAIL then UP). If iter 1 PASS, HPA likely
+            # scaled out — do not run DOWN squeeze or we destroy the demo narrative.
+            up_demo_skip_down_squeeze = args.profile == "up_demo" and status_1 == "PASS"
+            if up_demo_skip_down_squeeze:
+                stopped_reason = "up_demo_first_pass_overprovisioned"
+                print(
+                    "[squeeze] up_demo: iteration 1 PASS — not under-provisioned at this load "
+                    "(HPA often scales out before k6). Skipping DOWN squeeze. "
+                    "Use a thin baseline first (e.g. scale deploy to 1, HPA maxReplicas=1, "
+                    "low CPU/mem) then re-run up_demo."
+                )
             _write_squeeze_summary(
                 squeeze_rows,
                 run_root=run_root,
@@ -499,12 +604,22 @@ if __name__ == "__main__":
 
             current_iteration = 1
             while (
-                first_fail_dir is None
-                and best_pass_dir is not None
-                and (args.until_violation or current_iteration < args.max_iterations)
+                not up_demo_skip_down_squeeze
+                and first_fail_dir is None
+                and (best_pass_dir is not None or up_recovery_active)
+                and (
+                    (up_recovery_active and current_iteration < args.max_iterations)
+                    or (
+                        not up_recovery_active
+                        and (
+                            args.until_violation
+                            or current_iteration < args.max_iterations
+                        )
+                    )
+                )
             ):
                 current_iteration += 1
-                recommended_diff = (best_pass_dir / "recommended.diff").read_text().strip()
+                recommended_diff = (anchor_run_dir / "recommended.diff").read_text().strip()
                 if not recommended_diff:
                     print("[squeeze] No further optimization diff from LLM; frontier reached.")
                     stopped_reason = "empty_recommended_diff"
@@ -528,7 +643,7 @@ if __name__ == "__main__":
                     )
                 else:
                     apply_recommended_diff(
-                        best_pass_dir,
+                        anchor_run_dir,
                         deployment_yaml_path=(REPO_ROOT / deployment_yaml),
                         hpa_yaml_path=(REPO_ROOT / hpa_yaml),
                         deployment_name=k8s_deployment,
@@ -547,8 +662,10 @@ if __name__ == "__main__":
                     deployment_yaml=deployment_yaml,
                     hpa_yaml=hpa_yaml,
                     prometheus_url=prometheus_url,
+                    settle_seconds=args.settle_seconds,
                     run_label=run_label,
                     iteration_index=current_iteration,
+                    up_recovery=up_recovery_active,
                 )
                 if next_run_dir is None:
                     stopped_reason = "next_run_missing"
@@ -562,15 +679,32 @@ if __name__ == "__main__":
                     break
                 status, exp = _read_experiment_status(next_run_dir)
                 squeeze_rows.append(_squeeze_row(next_run_dir, exp, status))
+                anchor_run_dir = next_run_dir
                 if status == "PASS":
                     best_pass_dir = next_run_dir
                     print(
                         f"[squeeze] Iteration {current_iteration} PASS, cost={((exp.get('cost') or {}).get('cost_score'))}"
                     )
+                    if up_recovery_active:
+                        stopped_reason = "recovered_from_underprovisioning"
+                        _write_squeeze_summary(
+                            squeeze_rows,
+                            run_root=run_root,
+                            best_pass_dir=best_pass_dir,
+                            first_fail_dir=first_fail_dir,
+                            stopped_reason=stopped_reason,
+                        )
+                        print("[squeeze] Recovery complete after UP movement; stopping.")
+                        break
                 else:
-                    first_fail_dir = next_run_dir
-                    stopped_reason = "first_fail"
-                    print(f"[squeeze] Iteration {current_iteration} FAIL; stopping.")
+                    if not up_recovery_active:
+                        first_fail_dir = next_run_dir
+                        stopped_reason = "first_fail"
+                        print(f"[squeeze] Iteration {current_iteration} FAIL; stopping.")
+                    else:
+                        print(
+                            f"[squeeze] Iteration {current_iteration} still FAIL in recovery mode; continuing."
+                        )
                 _write_squeeze_summary(
                     squeeze_rows,
                     run_root=run_root,
@@ -587,6 +721,21 @@ if __name__ == "__main__":
                 and current_iteration >= args.max_iterations
             ):
                 stopped_reason = "max_iterations_reached"
+                _write_squeeze_summary(
+                    squeeze_rows,
+                    run_root=run_root,
+                    best_pass_dir=best_pass_dir,
+                    first_fail_dir=first_fail_dir,
+                    stopped_reason=stopped_reason,
+                )
+            elif (
+                stopped_reason == "unknown"
+                and first_fail_dir is None
+                and best_pass_dir is None
+                and up_recovery_active
+                and current_iteration >= args.max_iterations
+            ):
+                stopped_reason = "up_recovery_max_iterations_reached"
                 _write_squeeze_summary(
                     squeeze_rows,
                     run_root=run_root,

@@ -1,0 +1,39 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 500,
+    "provisioned_request_mem_mib": 300,
+    "provisioned_limit_cpu_m": 1000,
+    "provisioned_limit_mem_mib": 600,
+    "cost_score": 0.793
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Rerun the same fixed workload after applying the leaner YAML.",
+  "optimization_headroom": "LOW",
+  "over_provisioned": true,
+  "evidence": [
+    "p95 latency 60000ms exceeds SLO 500ms",
+    "error rate 0.217 exceeds the acceptable threshold",
+    "observed.replicas: 4",
+    "observed.replicas_max: 4"
+  ],
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress while replicas are at HPA max; scale up CPU/memory limits and/or raise HPA max to recover headroom.",
+  "observed_summary": {
+    "achieved_requests_per_second": 56.9,
+    "error_rate": 0.217,
+    "latency_ms_p95": 60000.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 29.6,
+    "mem_util_pct": 26.1,
+    "replicas": 4,
+    "replicas_max": 4,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.3,
+    "total_requests": 5356
+  }
+}
