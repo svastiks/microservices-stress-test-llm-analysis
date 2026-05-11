@@ -1,5 +1,6 @@
 import json
 import math
+import os
 from datetime import date
 from pathlib import Path
 
@@ -9,12 +10,19 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 from .api import analyze_with_llm
 from .experiment_build import build_experiment_payload, get_config_from_yaml
-from .prompts import EFFICIENCY_SYSTEM_PROMPT, SYSTEM_PROMPT, build_user_prompt
+from .prompts import (
+    EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT,
+    EFFICIENCY_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_user_prompt,
+)
+from .results_paths import results_dir as _results_dir_for_repo
 from .scaling_policy import attach_scaling_hint
 
-SUMMARY_PATH = REPO_ROOT / "results" / "k6-summary.json"
-RUN_META_PATH = REPO_ROOT / "results" / "run_meta.json"
-RESULTS_DIR = REPO_ROOT / "results"
+def _results_base() -> Path:
+    return _results_dir_for_repo(REPO_ROOT)
+
+
 DEFAULT_DEPLOYMENT_YAML = REPO_ROOT / "apps" / "service" / "k8s" / "deployment.yaml"
 DEFAULT_HPA_YAML = REPO_ROOT / "apps" / "service" / "k8s" / "hpa.yaml"
 DEFAULT_PROMETHEUS_URL = "http://localhost:9090"
@@ -22,6 +30,22 @@ DEFAULT_PROMETHEUS_URL = "http://localhost:9090"
 
 def _log(msg: str) -> None:
     print(f"[analysis] {msg}")
+
+
+def _coerce_report_markdown(value) -> str:
+    """LLM JSON sometimes returns report as a list of bullets; report.md must be str."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "\n".join(
+            _coerce_report_markdown(item) if isinstance(item, (list, dict)) else str(item)
+            for item in value
+        )
+    if isinstance(value, dict):
+        return json.dumps(value, indent=2)
+    return str(value)
 
 
 def _observed_summary_from_experiment(experiment: dict) -> dict:
@@ -70,6 +94,27 @@ def _postprocess_llm_result(result: dict, experiment: dict) -> dict:
     observed = experiment.get("observed") or {}
     failure = experiment.get("failure") or {}
     slo = experiment.get("slo") or {}
+
+    # In efficiency squeeze mode, a HOLD hint means "do not move" unless failure forces UP.
+    # Guard against unsafe scale-down when utilization is already high (can cause connection refused / OOM).
+    if experiment.get("analysis_goal") == "efficiency" and experiment.get("scaling_hint") == "HOLD":
+        tel = (observed.get("telemetry") or {})
+        if tel.get("utilization_trustworthy"):
+            cpu_util_pct = float(observed.get("cpu_util_pct") or 0.0)
+            mem_util_pct = float(observed.get("mem_util_pct") or 0.0)
+            cpu_util_to_limit = float(observed.get("cpu_util_to_limit") or 0.0)
+            util = max(cpu_util_pct, mem_util_pct)
+            if util >= 80.0 or cpu_util_to_limit >= 0.9:
+                # If already failing, allow UP adjustments to proceed; otherwise block YAML changes.
+                if not bool(failure.get("failed")):
+                    result["deployment_yaml_new"] = ""
+                    result["hpa_yaml_new"] = ""
+                    result["optimization_headroom"] = "NONE"
+                    ev = list(result.get("evidence") or [])
+                    ev.append(
+                        f"guard.hold_blocked_yaml: util={util:.1f} cpu_util_to_limit={cpu_util_to_limit:.2f}"
+                    )
+                    result["evidence"] = ev
 
     # If failure is only due to k6 thresholds (stricter than SLO) and SLO is actually met,
     # treat as no bottleneck to avoid bogus archetypes.
@@ -127,6 +172,69 @@ def _postprocess_llm_result(result: dict, experiment: dict) -> dict:
     return result
 
 
+def _resolve_squeeze_optimizer(meta: dict | None, experiment_config: dict | None) -> str:
+    opt = None
+    if meta:
+        opt = meta.get("squeeze_optimizer")
+    if opt is None and experiment_config:
+        opt = experiment_config.get("squeeze_optimizer")
+    if opt is None:
+        opt = os.environ.get("SQUEEZE_OPTIMIZER", "hybrid")
+    opt = str(opt).lower().strip()
+    if opt not in {"hybrid", "formula", "llm"}:
+        opt = "hybrid"
+    return opt
+
+
+def _formula_only_result(
+    experiment: dict,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+) -> dict:
+    """Deterministic squeeze step: no LLM; YAML comes only from _maybe_apply_deterministic_efficiency_yaml."""
+    step = _compute_step_pct(experiment)
+    hint = experiment.get("scaling_hint")
+    tel = ((experiment.get("observed") or {}).get("telemetry") or {})
+    trustworthy = bool(tel.get("utilization_trustworthy"))
+    slo_ok = _slo_status_from_experiment(experiment)
+    eff = hint
+    if hint == "HOLD":
+        failed = bool(((experiment.get("failure") or {}).get("failed")))
+        eff = "UP" if failed else "DOWN"
+    lines = [
+        f"- **Optimizer**: deterministic formula (no LLM for YAML this iteration).",
+        f"- **SLO**: {slo_ok}; scaling_hint={hint}; effective_direction={eff}; step_pct={step}",
+        f"- **Utilization trustworthy**: {trustworthy}",
+    ]
+    if not trustworthy:
+        lines.append("- Telemetry not trustworthy for utilization-based steps; no YAML unless policy allows.")
+    elif eff not in {"UP", "DOWN"}:
+        lines.append("- No resource step: scaling_hint does not map to UP/DOWN.")
+    else:
+        lines.append(
+            f"- Applying **{eff}** step ~{step * 100:.1f}% on requests/limits and HPA (deterministic)."
+        )
+    result = {
+        "report": "\n".join(lines),
+        "deployment_yaml_new": "",
+        "hpa_yaml_new": "",
+        "failure_archetype": "NONE",
+        "lambda_crit_estimate": None,
+        "next_experiment": "Re-run the same fixed workload after applying YAML.",
+        "optimization_headroom": "MEDIUM" if slo_ok == "PASS" and hint == "DOWN" else "NONE",
+        "over_provisioned": slo_ok == "PASS",
+        "evidence": [
+            f"formula.step_pct={step}",
+            f"formula.scaling_hint={hint}",
+        ],
+    }
+    result = _postprocess_llm_result(result, experiment)
+    _maybe_apply_deterministic_efficiency_yaml(
+        result, experiment, deployment_yaml_path, hpa_yaml_path
+    )
+    return result
+
+
 def _bound(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
@@ -134,8 +242,12 @@ def _bound(v: float, lo: float, hi: float) -> float:
 def _compute_step_pct(experiment: dict) -> float:
     """
     Deterministic step size for faster convergence.
-    - DOWN: step_pct = bound(0.10 + 0.25 * slack, 0.10, 0.30)
+    - DOWN: step_pct = bound(base + 0.25 * slack, floor, 0.30)
       where slack = max(0, (60 - max(cpu_util_pct, mem_util_pct)) / 60)
+      and base/floor are adaptive in squeeze mode to avoid over-cutting when
+      utilization is already tight:
+        * util < 60%  -> base=0.10, floor=0.10
+        * util >= 60% -> base=0.05, floor=0.05
     - UP: step_pct = bound(0.15 + 0.08 * min(severity, 3.0), 0.15, 0.40)
       where severity = max(err_pressure, lat_pressure, throughput_pressure)
     """
@@ -147,8 +259,13 @@ def _compute_step_pct(experiment: dict) -> float:
 
     if scaling_hint == "DOWN":
         # Aim around ~60% utilization; larger slack -> larger cut.
-        slack = max(0.0, (60.0 - max(cpu, mem)) / 60.0)
-        return round(_bound(0.10 + (0.25 * slack), 0.10, 0.30), 3)
+        # Keep moving DOWN in squeeze mode, but use a smaller floor when
+        # utilization is already tight to avoid over-aggressive reductions.
+        util = max(cpu, mem)
+        slack = max(0.0, (60.0 - util) / 60.0)
+        down_floor = 0.05 if util >= 60.0 else 0.10
+        down_base = down_floor
+        return round(_bound(down_base + (0.25 * slack), down_floor, 0.30), 3)
 
     if scaling_hint == "UP":
         err = float(observed.get("error_rate") or 0.0)
@@ -244,81 +361,32 @@ def _maybe_apply_deterministic_efficiency_yaml(
 
 def load_summary() -> tuple[dict, Path, dict | None]:
     """Reads k6 summary (and optional run_meta), creates run dir, copies summary. Returns (summary_dict, run_dir, run_meta or None)."""
-    if not SUMMARY_PATH.exists():
-        raise FileNotFoundError(f"Run k6 first; expected {SUMMARY_PATH}")
-    with open(SUMMARY_PATH) as f:
+    summary_path = _results_base() / "k6-summary.json"
+    run_meta_path = _results_base() / "run_meta.json"
+    results_dir = _results_base()
+    if not summary_path.exists():
+        raise FileNotFoundError(f"Run k6 first; expected {summary_path}")
+    with open(summary_path) as f:
         data = json.load(f)
 
     meta = None
-    if RUN_META_PATH.exists():
+    if run_meta_path.exists():
         try:
-            with open(RUN_META_PATH) as f:
+            with open(run_meta_path) as f:
                 meta = json.load(f)
-            if (
-                "experiment_id" in meta
-                or "workload" in meta
-                or "slo" in meta
-                or "profile" in meta
-                or "script" in meta
-                or "k6_thresholds_crossed" in meta
-                or "mode" in meta
-                or "prometheus" in meta
-                or "service" in meta
-                or "endpoint" in meta
-                or "base_url" in meta
-                or "k8s_namespace" in meta
-                or "k8s_deployment" in meta
-                or "analysis_goal" in meta
-                or "deployment_yaml" in meta
-                or "hpa_yaml" in meta
-                or "prometheus_url" in meta
-            ):
-                cfg = {
-                    "experiment_id": meta.get("experiment_id"),
-                    "workload": meta.get("workload"),
-                    "slo": meta.get("slo"),
-                }
-                if "analysis_goal" in meta:
-                    cfg["analysis_goal"] = meta["analysis_goal"]
-                if "mode" in meta:
-                    cfg["mode"] = meta["mode"]
-                if "profile" in meta:
-                    cfg["profile"] = meta["profile"]
-                if "script" in meta:
-                    cfg["script"] = meta["script"]
-                if "k6_thresholds_crossed" in meta:
-                    cfg["k6_thresholds_crossed"] = meta["k6_thresholds_crossed"]
-                if "prometheus" in meta:
-                    cfg["prometheus"] = meta["prometheus"]
-                if "service" in meta:
-                    cfg["service"] = meta["service"]
-                if "endpoint" in meta:
-                    cfg["endpoint"] = meta["endpoint"]
-                if "base_url" in meta:
-                    cfg["base_url"] = meta["base_url"]
-                if "k8s_namespace" in meta:
-                    cfg["k8s_namespace"] = meta["k8s_namespace"]
-                if "k8s_deployment" in meta:
-                    cfg["k8s_deployment"] = meta["k8s_deployment"]
-                if "deployment_yaml" in meta:
-                    cfg["deployment_yaml"] = meta["deployment_yaml"]
-                if "hpa_yaml" in meta:
-                    cfg["hpa_yaml"] = meta["hpa_yaml"]
-                if "prometheus_url" in meta:
-                    cfg["prometheus_url"] = meta["prometheus_url"]
-            RUN_META_PATH.unlink()
+            run_meta_path.unlink()
         except (json.JSONDecodeError, OSError):
             meta = None
 
     run_label = (meta or {}).get("run_label")
     iteration_index = (meta or {}).get("iteration_index")
     if run_label and iteration_index is not None:
-        run_dir = RESULTS_DIR / str(run_label) / f"iteration-{int(iteration_index)}"
+        run_dir = results_dir / str(run_label) / f"iteration-{int(iteration_index)}"
     else:
         today_str = date.today().strftime("%Y-%m-%d")
         idx = 1
         while True:
-            run_dir = RESULTS_DIR / f"{today_str}-{idx}"
+            run_dir = results_dir / f"{today_str}-{idx}"
             if not run_dir.exists():
                 break
             idx += 1
@@ -326,7 +394,7 @@ def load_summary() -> tuple[dict, Path, dict | None]:
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "k6-run-summary.json").write_text(json.dumps(data, indent=2))
     try:
-        SUMMARY_PATH.unlink()
+        summary_path.unlink()
     except FileNotFoundError:
         pass
 
@@ -347,8 +415,9 @@ def load_summary() -> tuple[dict, Path, dict | None]:
         or "analysis_goal" in meta
         or "deployment_yaml" in meta
         or "hpa_yaml" in meta
-                or "prometheus_url" in meta
-                or "up_recovery" in meta
+        or "prometheus_url" in meta
+        or "up_recovery" in meta
+        or "squeeze_optimizer" in meta
     ):
         cfg = {
             "experiment_id": meta.get("experiment_id"),
@@ -385,6 +454,8 @@ def load_summary() -> tuple[dict, Path, dict | None]:
             cfg["prometheus_url"] = meta["prometheus_url"]
         if meta.get("up_recovery"):
             cfg["up_recovery"] = True
+        if "squeeze_optimizer" in meta:
+            cfg["squeeze_optimizer"] = meta["squeeze_optimizer"]
         (run_dir / "experiment_config.json").write_text(json.dumps(cfg))
 
     return data, run_dir, meta
@@ -423,6 +494,11 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
                     "k8s_namespace": existing.get("k8s_namespace", "default"),
                     "k8s_deployment": existing.get("k8s_deployment", "stress-service"),
                     "analysis_goal": existing.get("analysis_goal", "failure"),
+                    "mode": existing.get("mode"),
+                    "deployment_yaml": existing.get("deployment_yaml"),
+                    "hpa_yaml": existing.get("hpa_yaml"),
+                    "prometheus_url": existing.get("prometheus_url"),
+                    "squeeze_optimizer": existing.get("squeeze_optimizer"),
                 }
             except (json.JSONDecodeError, OSError):
                 pass
@@ -453,6 +529,7 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
         or "hpa_yaml" in meta
         or "prometheus_url" in meta
         or "up_recovery" in meta
+        or "squeeze_optimizer" in meta
     ):
         experiment_config = {
             "experiment_id": meta.get("experiment_id"),
@@ -489,6 +566,8 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             experiment_config["prometheus_url"] = meta["prometheus_url"]
         if meta.get("up_recovery"):
             experiment_config["up_recovery"] = True
+        if "squeeze_optimizer" in meta:
+            experiment_config["squeeze_optimizer"] = meta["squeeze_optimizer"]
     if experiment_config is None:
         config_path = run_dir / "experiment_config.json"
         if config_path.exists():
@@ -510,6 +589,7 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             "deployment_yaml",
             "hpa_yaml",
             "prometheus_url",
+            "squeeze_optimizer",
         ):
             if experiment_config.get(k) is not None:
                 meta[k] = experiment_config[k]
@@ -574,9 +654,12 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             "hpa_yaml",
             "prometheus_url",
             "up_recovery",
+            "squeeze_optimizer",
         ):
             if k in meta:
                 exp_data[k] = meta[k]
+    squeeze_opt = _resolve_squeeze_optimizer(meta, experiment_config)
+    exp_data["squeeze_optimizer"] = squeeze_opt
     attach_scaling_hint(exp_data)
     (run_dir / "experiment.json").write_text(json.dumps(exp_data, indent=2))
     _log(
@@ -590,21 +673,38 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
     user_mode = "squeeze" if use_efficiency else "failure"
     yaml_str = load_current_yaml(deployment_yaml_path, hpa_yaml_path)
     user_prompt = build_user_prompt(exp_data, yaml_str, mode=user_mode)
-    system_prompt = EFFICIENCY_SYSTEM_PROMPT if use_efficiency else SYSTEM_PROMPT
-    _log(
-        f"llm_analyze_start mode={user_mode} analysis_goal={analysis_goal} "
-        f"user_prompt_chars={len(user_prompt)}"
-    )
-    result = analyze_with_llm(system_prompt, user_prompt)
-    result = _postprocess_llm_result(result, exp_data)
-    _maybe_apply_deterministic_efficiency_yaml(
-        result, exp_data, deployment_yaml_path, hpa_yaml_path
-    )
-    _log(
-        f"llm_analyze_done failure_archetype={result.get('failure_archetype')} "
-        f"has_deployment_yaml_new={bool((result.get('deployment_yaml_new') or '').strip())} "
-        f"has_hpa_yaml_new={bool((result.get('hpa_yaml_new') or '').strip())}"
-    )
+
+    if use_efficiency and squeeze_opt == "formula":
+        _log(
+            f"formula_optimizer_step mode={user_mode} analysis_goal={analysis_goal} "
+            f"scaling_hint={exp_data.get('scaling_hint')}"
+        )
+        result = _formula_only_result(exp_data, deployment_yaml_path, hpa_yaml_path)
+        _log(
+            f"formula_optimizer_done failure_archetype={result.get('failure_archetype')} "
+            f"has_deployment_yaml_new={bool((result.get('deployment_yaml_new') or '').strip())} "
+            f"has_hpa_yaml_new={bool((result.get('hpa_yaml_new') or '').strip())}"
+        )
+    else:
+        if use_efficiency and squeeze_opt == "llm":
+            system_prompt = EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT
+        else:
+            system_prompt = EFFICIENCY_SYSTEM_PROMPT if use_efficiency else SYSTEM_PROMPT
+        _log(
+            f"llm_analyze_start mode={user_mode} analysis_goal={analysis_goal} "
+            f"optimizer={squeeze_opt} user_prompt_chars={len(user_prompt)}"
+        )
+        result = analyze_with_llm(system_prompt, user_prompt)
+        result = _postprocess_llm_result(result, exp_data)
+        if use_efficiency and squeeze_opt == "hybrid":
+            _maybe_apply_deterministic_efficiency_yaml(
+                result, exp_data, deployment_yaml_path, hpa_yaml_path
+            )
+        _log(
+            f"llm_analyze_done failure_archetype={result.get('failure_archetype')} "
+            f"has_deployment_yaml_new={bool((result.get('deployment_yaml_new') or '').strip())} "
+            f"has_hpa_yaml_new={bool((result.get('hpa_yaml_new') or '').strip())}"
+        )
     return result, run_dir, deployment_yaml_path, hpa_yaml_path
 
 
@@ -617,9 +717,31 @@ def write_outputs(
     """Write report.md, recommended.diff (for display), analysis.json; overwrite repo YAMLs when LLM returns full files."""
     import difflib
 
-    report = result.get("report", "")
+    report = _coerce_report_markdown(result.get("report", ""))
     deployment_yaml_new = (result.get("deployment_yaml_new") or "").strip()
     hpa_yaml_new = (result.get("hpa_yaml_new") or "").strip()
+
+    # If the LLM produces invalid YAML, don't write/apply it (avoids breaking subsequent iterations).
+    if deployment_yaml_new:
+        try:
+            yaml.safe_load(deployment_yaml_new)
+        except Exception as e:
+            report = (
+                report
+                + "\n\n"
+                + f"- WARNING: deployment_yaml_new was invalid YAML; ignoring. error={e}\n"
+            )
+            deployment_yaml_new = ""
+    if hpa_yaml_new:
+        try:
+            yaml.safe_load(hpa_yaml_new)
+        except Exception as e:
+            report = (
+                report
+                + "\n\n"
+                + f"- WARNING: hpa_yaml_new was invalid YAML; ignoring. error={e}\n"
+            )
+            hpa_yaml_new = ""
     (run_dir / "report.md").write_text(report)
 
     diff_parts = []
@@ -672,6 +794,7 @@ def write_outputs(
     analysis_artifact = {
         "mode": (experiment.get("mode") if experiment else None),
         "analysis_goal": (experiment.get("analysis_goal") if experiment else None),
+        "squeeze_optimizer": experiment.get("squeeze_optimizer") if experiment else None,
         "slo_status": _slo_status_from_experiment(experiment) if experiment else "UNKNOWN",
         "cost": (experiment.get("cost") if experiment else {}),
         "failure_archetype": result.get("failure_archetype", ""),

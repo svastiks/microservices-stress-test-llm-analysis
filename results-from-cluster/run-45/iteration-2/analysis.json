@@ -1,0 +1,41 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 278,
+    "provisioned_request_mem_mib": 140,
+    "provisioned_limit_cpu_m": 556,
+    "provisioned_limit_mem_mib": 278,
+    "cost_score": 0.4147
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Rerun the same fixed workload after change.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "p95 latency exceeded SLO (22003ms, target 500ms)",
+    "error rate was 27.57%",
+    "CPU utilization was only 45.8%, indicating headroom",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "scaling_hint": "UP",
+  "scaling_rationale": "Under-provisioning recovery sweep: keep increasing capacity until SLO passes.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 86.2,
+    "error_rate": 0.2757,
+    "latency_ms_p95": 22003.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 45.8,
+    "mem_util_pct": 16.1,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.46,
+    "total_requests": 8955
+  }
+}

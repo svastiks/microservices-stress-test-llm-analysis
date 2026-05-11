@@ -1,0 +1,42 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 300,
+    "provisioned_request_mem_mib": 150,
+    "provisioned_limit_cpu_m": 600,
+    "provisioned_limit_mem_mib": 300,
+    "cost_score": 0.4465
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "CPU utilization at 33.5% and memory utilization at 22.5%.",
+    "Cost score of 0.4465 indicates potential for further efficiency.",
+    "Effective CPU requests at 300m vs achieved 100m (3 replicas).",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3"
+  ],
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with low CPU and memory vs limits; candidate for modest right-sizing down.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 33.5,
+    "mem_util_pct": 22.5,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.33,
+    "total_requests": 1500
+  }
+}

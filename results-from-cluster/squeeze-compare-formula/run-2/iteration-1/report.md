@@ -1,0 +1,4 @@
+- **Optimizer**: deterministic formula (no LLM for YAML this iteration).
+- **SLO**: PASS; scaling_hint=UNKNOWN; effective_direction=UNKNOWN; step_pct=0.0
+- **Utilization trustworthy**: False
+- Telemetry not trustworthy for utilization-based steps; no YAML unless policy allows.

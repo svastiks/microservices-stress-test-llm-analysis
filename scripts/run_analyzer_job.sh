@@ -11,8 +11,16 @@ SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-stress-analyzer}"
 OPENAI_SECRET_NAME="${OPENAI_SECRET_NAME:-llm-api}"
 RESULTS_PVC_YAML="${RESULTS_PVC_YAML:-./infra/k8s/spark/analyzer-results-pvc.yaml}"
 SQUEEZE_UNTIL_VIOLATION="${SQUEEZE_UNTIL_VIOLATION:-false}"
-SQUEEZE_MAX_ITERATIONS="${SQUEEZE_MAX_ITERATIONS:-5}"
+SQUEEZE_MAX_ITERATIONS="${SQUEEZE_MAX_ITERATIONS:-8}"
 SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS:-30}"
+COMPARE_SQUEEZE_OPTIMIZERS="${COMPARE_SQUEEZE_OPTIMIZERS:-false}"
+SQUEEZE_FINAL_REPORT_LLM="${SQUEEZE_FINAL_REPORT_LLM:-false}"
+
+for arg in "$@"; do
+  if [[ "${arg}" == "--compare-squeeze-optimizers" ]]; then
+    COMPARE_SQUEEZE_OPTIMIZERS="true"
+  fi
+done
 SUT_BASE_URL="${SUT_BASE_URL:-http://web.${NAMESPACE}.svc.cluster.local:8080}"
 PROFILE="${PROFILE:-low}"
 ANALYZER_SCRIPT="${ANALYZER_SCRIPT:-robotshop_login}"
@@ -22,7 +30,7 @@ echo "[analyzer] namespace: ${NAMESPACE}"
 echo "[analyzer] job: ${JOB_NAME}"
 echo "[analyzer] profile: ${PROFILE}"
 echo "[analyzer] script: ${ANALYZER_SCRIPT}"
-echo "[analyzer] squeeze: until_violation=${SQUEEZE_UNTIL_VIOLATION} max_iterations=${SQUEEZE_MAX_ITERATIONS} settle_seconds=${SQUEEZE_SETTLE_SECONDS}"
+echo "[analyzer] squeeze: until_violation=${SQUEEZE_UNTIL_VIOLATION} max_iterations=${SQUEEZE_MAX_ITERATIONS} settle_seconds=${SQUEEZE_SETTLE_SECONDS} compare_optimizers=${COMPARE_SQUEEZE_OPTIMIZERS} final_report_llm=${SQUEEZE_FINAL_REPORT_LLM}"
 
 if [[ ! -f "${JOB_YAML}" ]]; then
   echo "[analyzer] job yaml not found: ${JOB_YAML}" >&2
@@ -76,55 +84,112 @@ kubectl patch --local -f "${MANIFEST}" --type strategic -p \
 mv "${MANIFEST}.tmp" "${MANIFEST}"
 
 # Configure squeeze stop mode without manual YAML edits.
+# With --until-violation, start.py still needs --max-iterations as a hard ceiling (UP recovery + safety).
 if [[ "${SQUEEZE_UNTIL_VIOLATION}" == "true" ]]; then
-  DYNAMIC_SQUEEZE_FLAGS='"--until-violation"'
+  DYNAMIC_SQUEEZE_FLAGS='"--until-violation","--max-iterations","'"${SQUEEZE_MAX_ITERATIONS}"'"'
 else
   DYNAMIC_SQUEEZE_FLAGS="\"--max-iterations\",\"${SQUEEZE_MAX_ITERATIONS}\""
 fi
 
-kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
-  \"spec\":{
-    \"template\":{
-      \"spec\":{
-        \"containers\":[
-          {
-            \"name\":\"runner\",
-            \"command\":[
-              \"python3\",
-              \"start.py\",
-              \"--profile\",
-              \"${PROFILE}\",
-              \"--script\",
-              \"${ANALYZER_SCRIPT}\",
-              \"--squeeze\",
-              ${DYNAMIC_SQUEEZE_FLAGS},
-              \"--efficiency\",
-              \"--k8s-namespace\",
-              \"${NAMESPACE}\",
-              \"--k8s-deployment\",
-              \"web\",
-              \"--base-url\",
-              \"${SUT_BASE_URL}\",
-              \"--deployment-yaml\",
-              \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
-              \"--hpa-yaml\",
-              \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
-              \"--prometheus-url\",
-              \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\"
-            ]
-          }
-        ]
+if [[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" ]]; then
+  FINAL_REPORT_JSON=""
+  if [[ "${SQUEEZE_FINAL_REPORT_LLM}" == "true" ]]; then
+    FINAL_REPORT_JSON=',"--squeeze-final-report-llm"'
+  fi
+  COMPARE_FORMULA_MAX_ITER="${SQUEEZE_COMPARE_FORMULA_MAX_ITERATIONS:-3}"
+  kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
+    \"spec\":{
+      \"template\":{
+        \"spec\":{
+          \"containers\":[
+            {
+              \"name\":\"runner\",
+              \"command\":[
+                \"python3\",
+                \"start.py\",
+                \"--compare-squeeze-optimizers\",
+                \"--compare-formula-max-iterations\",
+                \"${COMPARE_FORMULA_MAX_ITER}\",
+                \"--profile\",
+                \"${PROFILE}\",
+                \"--script\",
+                \"${ANALYZER_SCRIPT}\",
+                ${DYNAMIC_SQUEEZE_FLAGS},
+                \"--settle-seconds\",
+                \"${SQUEEZE_SETTLE_SECONDS}\",
+                \"--efficiency\",
+                \"--k8s-namespace\",
+                \"${NAMESPACE}\",
+                \"--k8s-deployment\",
+                \"web\",
+                \"--base-url\",
+                \"${SUT_BASE_URL}\",
+                \"--deployment-yaml\",
+                \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
+                \"--hpa-yaml\",
+                \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
+                \"--prometheus-url\",
+                \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\"
+                ${FINAL_REPORT_JSON}
+              ]
+            }
+          ]
+        }
       }
     }
-  }
-}" -o yaml > "${MANIFEST}.tmp"
-mv "${MANIFEST}.tmp" "${MANIFEST}"
+  }" -o yaml > "${MANIFEST}.tmp"
+  mv "${MANIFEST}.tmp" "${MANIFEST}"
+else
+  kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
+    \"spec\":{
+      \"template\":{
+        \"spec\":{
+          \"containers\":[
+            {
+              \"name\":\"runner\",
+              \"command\":[
+                \"python3\",
+                \"start.py\",
+                \"--profile\",
+                \"${PROFILE}\",
+                \"--script\",
+                \"${ANALYZER_SCRIPT}\",
+                \"--squeeze\",
+                ${DYNAMIC_SQUEEZE_FLAGS},
+                \"--efficiency\",
+                \"--k8s-namespace\",
+                \"${NAMESPACE}\",
+                \"--k8s-deployment\",
+                \"web\",
+                \"--base-url\",
+                \"${SUT_BASE_URL}\",
+                \"--deployment-yaml\",
+                \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
+                \"--hpa-yaml\",
+                \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
+                \"--prometheus-url\",
+                \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }" -o yaml > "${MANIFEST}.tmp"
+  mv "${MANIFEST}.tmp" "${MANIFEST}"
+fi
 
-kubectl set env -f "${MANIFEST}" --local -o yaml \
-  RESULTS_DB_ENABLED="${RESULTS_DB_ENABLED:-false}" \
-  RESULTS_DB_URI="${RESULTS_DB_URI:-mongodb://analyzer:change-me@analyzer-mongodb.svastik.svc.cluster.local:27017/admin}" \
-  RESULTS_DB_NAME="${RESULTS_DB_NAME:-stress_analyzer}" \
-  SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS}" > "${MANIFEST}.tmp"
+SET_ENV_CMD=(
+  kubectl set env -f "${MANIFEST}" --local -o yaml
+  RESULTS_DB_ENABLED="${RESULTS_DB_ENABLED:-false}"
+  RESULTS_DB_URI="${RESULTS_DB_URI:-mongodb://analyzer:change-me@analyzer-mongodb.svastik.svc.cluster.local:27017/admin}"
+  RESULTS_DB_NAME="${RESULTS_DB_NAME:-stress_analyzer}"
+  SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS}"
+)
+if [[ -n "${SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION="${SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION}")
+fi
+"${SET_ENV_CMD[@]}" > "${MANIFEST}.tmp"
 mv "${MANIFEST}.tmp" "${MANIFEST}"
 
 if [[ -n "${IMAGE_PULL_SECRET}" ]]; then

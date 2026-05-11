@@ -24,7 +24,17 @@ DEPLOY_ANALYZER_MONGODB="${DEPLOY_ANALYZER_MONGODB:-false}"
 LOG_DIR="${LOG_DIR:-./results/cluster-run-logs}"
 DEPLOYMENT_YAML="${DEPLOYMENT_YAML:-infra/k8s/spark/robot-shop-web-deployment.yaml}"
 HPA_YAML="${HPA_YAML:-infra/k8s/spark/robot-shop-web-hpa.yaml}"
+BASELINE_DEPLOYMENT_YAML="${BASELINE_DEPLOYMENT_YAML:-infra/k8s/spark/robot-shop-web-deployment.baseline.yaml}"
+BASELINE_HPA_YAML="${BASELINE_HPA_YAML:-infra/k8s/spark/robot-shop-web-hpa.baseline.yaml}"
 FORCE_DEPLOY_STACK="${FORCE_DEPLOY_STACK:-true}"
+UP_DEMO_STABILIZE_USER="${UP_DEMO_STABILIZE_USER:-true}"
+UP_DEMO_USER_CPU_REQUEST="${UP_DEMO_USER_CPU_REQUEST:-150m}"
+UP_DEMO_USER_CPU_LIMIT="${UP_DEMO_USER_CPU_LIMIT:-300m}"
+UP_DEMO_USER_MEM_REQUEST="${UP_DEMO_USER_MEM_REQUEST:-128Mi}"
+UP_DEMO_USER_MEM_LIMIT="${UP_DEMO_USER_MEM_LIMIT:-256Mi}"
+# After a squeeze, web can be left with tiny requests/limits and stay NotReady; restore baseline
+# before blocking on rollout (only when we already reset per profile — same baseline files).
+WEB_INITIAL_ROLLOUT_TIMEOUT="${WEB_INITIAL_ROLLOUT_TIMEOUT:-300s}"
 
 # Auto-load .env for convenience (existing shell env still wins).
 if [[ -f ".env" ]]; then
@@ -75,6 +85,10 @@ log "cleanup_completed_jobs: ${CLEANUP_COMPLETED_JOBS}"
 log "cleanup_terminal_pods: ${CLEANUP_TERMINAL_PODS}"
 log "cleanup_failed_jobs: ${CLEANUP_FAILED_JOBS}"
 log "deploy_analyzer_mongodb: ${DEPLOY_ANALYZER_MONGODB}"
+log "up_demo_stabilize_user: ${UP_DEMO_STABILIZE_USER}"
+if [[ "$#" -gt 0 ]]; then
+  log "extra args for analyzer job: $*"
+fi
 
 get_job_pod_name() {
   local job_name="$1"
@@ -92,6 +106,27 @@ save_job_logs() {
     kubectl -n "${NAMESPACE}" logs "job/${job_name}" --all-containers=true --tail=500 > "${out_file}" 2>&1 || true
   fi
 }
+
+reset_managed_web_yaml_to_baseline() {
+  cp "${BASELINE_DEPLOYMENT_YAML}" "${DEPLOYMENT_YAML}"
+  cp "${BASELINE_HPA_YAML}" "${HPA_YAML}"
+}
+
+apply_managed_web_baseline() {
+  log "apply immutable managed baseline (web deployment + hpa)"
+  reset_managed_web_yaml_to_baseline
+  kubectl apply -f "${DEPLOYMENT_YAML}" >/dev/null
+  kubectl apply -f "${HPA_YAML}" >/dev/null
+  kubectl -n "${NAMESPACE}" rollout status deployment/web --timeout=300s >/dev/null
+}
+
+if [[ ! -f "${BASELINE_DEPLOYMENT_YAML}" || ! -f "${BASELINE_HPA_YAML}" ]]; then
+  log "baseline YAML missing: ${BASELINE_DEPLOYMENT_YAML} / ${BASELINE_HPA_YAML}"
+  exit 1
+fi
+
+# Prevent stale/mutated optimization YAML from leaking between runs or into the image build.
+reset_managed_web_yaml_to_baseline
 
 if [[ "${BUILD_ANALYZER_IMAGE}" == "true" ]]; then
   log "building and pushing analyzer image: ${ANALYZER_IMAGE}"
@@ -143,8 +178,12 @@ else
     deploy_stack_with_fallback
   fi
 fi
+if [[ "${RESET_BASELINE_EACH_PROFILE}" == "true" ]]; then
+  log "pre-run: restore managed web baseline (prior runs may leave web NotReady / HPA unknown)"
+  apply_managed_web_baseline
+fi
 kubectl -n "${NAMESPACE}" get deploy,svc,hpa
-kubectl -n "${NAMESPACE}" rollout status deployment/web --timeout=300s
+kubectl -n "${NAMESPACE}" rollout status deployment/web --timeout="${WEB_INITIAL_ROLLOUT_TIMEOUT}"
 
 log "ensure analyzer infra..."
 kubectl apply -f infra/k8s/spark/analyzer-rbac.yaml >/dev/null
@@ -159,6 +198,8 @@ kubectl -n "${NAMESPACE}" create secret generic llm-api \
   --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
   --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
+EXTRA_ARGS=("$@")
+
 IFS=',' read -r -a PROFILE_LIST <<< "${PROFILES_CSV}"
 for profile in "${PROFILE_LIST[@]}"; do
   p="$(echo "${profile}" | xargs)"
@@ -167,10 +208,16 @@ for profile in "${PROFILE_LIST[@]}"; do
   fi
 
   if [[ "${RESET_BASELINE_EACH_PROFILE}" == "true" ]]; then
-    log "reset baseline YAML in cluster before profile=${p}"
-    kubectl apply -f "${DEPLOYMENT_YAML}" >/dev/null
-    kubectl apply -f "${HPA_YAML}" >/dev/null
-    kubectl -n "${NAMESPACE}" rollout status deployment/web --timeout=300s >/dev/null
+    log "reset baseline in cluster before profile=${p}"
+    apply_managed_web_baseline
+  fi
+
+  if [[ "${p}" == "up_demo" && "${UP_DEMO_STABILIZE_USER}" == "true" ]]; then
+    log "up_demo: raising user service memory/cpu to avoid OOM during recovery demo"
+    kubectl -n "${NAMESPACE}" set resources deployment/user \
+      --requests="cpu=${UP_DEMO_USER_CPU_REQUEST},memory=${UP_DEMO_USER_MEM_REQUEST}" \
+      --limits="cpu=${UP_DEMO_USER_CPU_LIMIT},memory=${UP_DEMO_USER_MEM_LIMIT}" >/dev/null
+    kubectl -n "${NAMESPACE}" rollout status deployment/user --timeout=300s >/dev/null
   fi
 
   p_job="$(echo "${p}" | tr '[:upper:]' '[:lower:]' | tr '_' '-' | tr -cd 'a-z0-9.-')"
@@ -188,7 +235,7 @@ for profile in "${PROFILE_LIST[@]}"; do
   ANALYZER_IMAGE="${ANALYZER_IMAGE}" \
   ANALYZER_IMAGE_PULL_POLICY="${ANALYZER_IMAGE_PULL_POLICY}" \
   JOB_NAME="${job_name}" \
-  ./scripts/run_analyzer_job.sh
+  ./scripts/run_analyzer_job.sh "${EXTRA_ARGS[@]}"
 
   log "waiting for ${job_name} (timeout=${WAIT_TIMEOUT})"
   log_pid=""

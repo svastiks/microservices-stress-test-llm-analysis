@@ -126,6 +126,22 @@ def _cadvisor_pod_selector(namespace: str, deployment_name: str) -> str:
     )
 
 
+def _cadvisor_pod_selector_loose(namespace: str, deployment_name: str) -> str:
+    """Same as strict cadvisor selector but omit image!= — absent `image` drops all series with strict matcher."""
+    return (
+        f'namespace="{namespace}",pod=~"{deployment_name}.+",'
+        f'container!="",container!="POD"'
+    )
+
+
+def _deployment_pod_re(namespace: str, deployment_name: str) -> str:
+    """Pods from a Deployment are {name}-{rs-hash}-{rand}; prefer this regex first."""
+    return (
+        f'namespace="{namespace}",pod=~"{deployment_name}-.+",'
+        f'container!="",container!="POD"'
+    )
+
+
 def _first_non_empty_range(
     base_url: str, queries: list[str], start: float, end: float, step: str
 ) -> tuple[list[dict], int]:
@@ -209,19 +225,31 @@ def get_prometheus_observed(
     observed["replicas_max"] = max_replicas
 
     cadv = _cadvisor_pod_selector(namespace, deployment_name)
+    cadv_loose = _cadvisor_pod_selector_loose(namespace, deployment_name)
+    dep_pod = _deployment_pod_re(namespace, deployment_name)
     cpu_queries = [
+        # Deployment-shaped pod names, loose labels, longer rate window (sparse scrapes / k3s)
+        f"sum(rate(container_cpu_usage_seconds_total{{{dep_pod}}}[5m]))",
+        f"sum(rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[5m]))",
+        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{dep_pod}}}[5m]))',
+        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv_loose}}}[5m]))',
+        f'sum(rate(container_cpu_usage_seconds_total{{job=~"(kubelet|.*cadvisor.*)",namespace="{namespace}",pod=~"{deployment_name}-.+",container!="",container!="POD"}}[5m]))',
         # kubelet/cadvisor explicit labels (matches many kube-prometheus setups)
         f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}[1m]))',
+        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}[5m]))',
         # same but without image label constraint
         f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[1m]))',
+        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m]))',
         # Preferred strict selector
         f"sum(rate(container_cpu_usage_seconds_total{{{cadv}}}[1m]))",
+        f"sum(rate(container_cpu_usage_seconds_total{{{cadv}}}[5m]))",
         # Fallback when image label is absent in exporter payload
+        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m]))',
         f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[1m]))',
         # Final fallback: pod-only selector
-        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+"}}[1m]))',
+        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+"}}[5m]))',
         # Older scrape label variants
-        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[1m]))',
+        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[5m]))',
     ]
     cpu_results, cpu_query_attempts = _first_non_empty_range(
         prometheus_url, cpu_queries, q_start, q_end, step
@@ -229,10 +257,31 @@ def get_prometheus_observed(
     cpu_usage_cores = _max_value(cpu_results)
     cpu_collection_mode = "aggregate_query"
     if not cpu_results:
+        instant_cpu_queries = [
+            f"sum(rate(container_cpu_usage_seconds_total{{{dep_pod}}}[5m]))",
+            f"sum(rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[5m]))",
+            f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m]))',
+        ]
+        for iq in instant_cpu_queries:
+            cpu_query_attempts += 1
+            inst = _query(prometheus_url, iq, time_ts=q_end)
+            if inst:
+                cpu_results = inst
+                cpu_collection_mode = "instant_query"
+                try:
+                    cpu_usage_cores = float((inst[0].get("value") or [0, "0"])[1])
+                except (TypeError, ValueError, IndexError):
+                    cpu_usage_cores = 0.0
+                break
+    if not cpu_results:
         cpu_per_pod_queries = [
+            f"rate(container_cpu_usage_seconds_total{{{dep_pod}}}[5m])",
+            f"rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[5m])",
+            f'rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{dep_pod}}}[5m])',
             f'rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}[1m])',
+            f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m])',
             f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[1m])',
-            f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[1m])',
+            f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[5m])',
         ]
         cpu_per_pod_results, cpu_per_pod_attempts = _first_non_empty_range(
             prometheus_url, cpu_per_pod_queries, q_start, q_end, step

@@ -1,0 +1,5 @@
+- The SLO was violated with a p95 latency of 2654ms, significantly exceeding the target of 500ms.
+- The observed error rate reached 10.26%, indicating a critical failure in performance.
+- Current resource requests and limits (100m CPU / 200m limit, 50Mi memory / 100Mi limit) are insufficient to handle workload spikes.
+- Over-provisioning is suspected due to the high CPU utilization (84.2%), but limited resource requests and current limits do not sustain demands.
+- Next action: Increase CPU/memory requests and limits conservatively to recover SLO compliance while monitoring the impact on cost. An increase of approximately 25% may be warranted.

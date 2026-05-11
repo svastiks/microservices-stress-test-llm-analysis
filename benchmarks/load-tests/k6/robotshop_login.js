@@ -12,7 +12,9 @@ const HEADERS = {
 const scenario = "constant_rate";
 const rps = parseInt(__ENV.RPS || "50", 10);
 const duration = __ENV.DURATION || "60s";
-const maxVUs = Math.min(500, Math.max(rps + 50, 50));
+const sloP95Ms = parseInt(__ENV.SLO_P95_MS || "500", 10);
+const sloErrorRate = parseFloat(__ENV.SLO_ERROR_RATE || "0.01");
+const maxVUs = Math.min(1000, Math.max(rps + 200, 100));
 export const options = {
   scenarios:
     scenario === "ramp"
@@ -36,13 +38,13 @@ export const options = {
             rate: rps,
             timeUnit: "1s",
             duration: duration,
-            preAllocatedVUs: Math.min(maxVUs, rps + 25),
+            preAllocatedVUs: Math.min(maxVUs, rps + 120),
             maxVUs: maxVUs,
           },
         },
   thresholds: {
-    http_req_failed: ["rate<0.05"],
-    http_req_duration: ["p(95)<400", "p(99)<800"],
+    http_req_failed: [`rate<${sloErrorRate}`],
+    http_req_duration: [`p(95)<${sloP95Ms}`],
   },
 };
 

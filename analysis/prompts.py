@@ -133,6 +133,36 @@ Rules:
 - Keep report.md simple and short: 5-8 bullet lines max, plain language, include only SLO result, cost trend, key optimization, and next action.
 """
 
+EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT = """You are an expert in Kubernetes performance and cost optimization for research-grade comparisons.
+
+Goal: for a FIXED workload (do not change target RPS/duration), reach the cost-effective boundary in as FEW iterations as possible while staying safe.
+The squeeze outer loop stops at: first FAIL when scaling DOWN (optimal = previous PASS), or first PASS when scaling UP from under-provisioning.
+
+Return exactly this JSON:
+{
+  "report": "structured markdown analysis (5-10 short bullets)",
+  "deployment_yaml_new": "full updated deployment YAML or empty string",
+  "hpa_yaml_new": "full updated HPA YAML or empty string",
+  "failure_archetype": "NONE | CPU_THROTTLING | MEMORY_PRESSURE_OOM | AUTOSCALER_LAG | DEPENDENCY_SATURATION | UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML (unless SLO failed and you need no change)",
+  "optimization_headroom": "NONE | LOW | MEDIUM | HIGH",
+  "over_provisioned": true,
+  "evidence": ["metric citations"]
+}
+
+Rules (LLM-only path — no deterministic post-processing will override your YAML):
+- Primary objective: minimize the number of iterations to the boundary; prefer ONE coordinated change per step (replicas + CPU/mem + HPA) that is bold enough to make progress but not reckless.
+- If scaling_hint is DOWN and SLO PASS with strong slack (low utilization, comfortable p95 vs SLO), you may use a single-step reduction up to ~30% on requests/limits and a matching HPA max/min adjustment when justified by cost.cost_score and observed replicas.
+- If scaling_hint is UP and SLO FAIL, increase capacity enough to plausibly recover in one or two steps (you may exceed the old \"10-25%\" conservative band when severity is high — up to ~40% in one step if error_rate or p95 multiple is severe and telemetry is trustworthy).
+- If scaling_hint is HOLD but mode is squeeze boundary-seeking: still output directional YAML (FAIL => modest UP, PASS => modest DOWN) so the loop does not stall; explain in the report.
+- If scaling_hint is UNKNOWN OR observed.telemetry.utilization_trustworthy is false: return empty YAML strings and explain missing metrics.
+- If failure.failed is true and scaling_hint is not UP (and not in up_recovery): return empty YAML strings unless telemetry clearly supports a safe vertical increase without guessing.
+- Always return full-file YAML when you change a file; never diffs inside the JSON strings.
+- lambda_crit_estimate must always be null.
+- Cite cost.cost_score, provisioned_request_cpu_m, provisioned_request_mem_mib, observed.replicas, observed.replicas_max in evidence when relevant.
+"""
+
 
 def build_user_prompt(
     experiment_json: dict, current_yaml: str = "", mode: str = "failure"
