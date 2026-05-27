@@ -108,17 +108,29 @@ def attach_scaling_hint(experiment: dict) -> None:
             "SLO pass with low CPU and memory vs limits; candidate for modest right-sizing down."
         )
     elif cpu_pct > 75 or mem_pct > 80:
-        experiment["scaling_hint"] = "HOLD"
-        experiment["scaling_rationale"] = (
-            "SLO pass but utilization elevated; do not reduce CPU/memory/replicas without stronger slack evidence."
-        )
+        if experiment.get("mode") == "squeeze" and not experiment.get("up_recovery"):
+            experiment["scaling_hint"] = "DOWN"
+            experiment["scaling_rationale"] = (
+                "SLO pass in squeeze DOWN boundary search; continue reducing despite elevated utilization."
+            )
+        else:
+            experiment["scaling_hint"] = "HOLD"
+            experiment["scaling_rationale"] = (
+                "SLO pass but utilization elevated; do not reduce CPU/memory/replicas without stronger slack evidence."
+            )
     elif cpu_pct < 35 or mem_pct < 40:
         experiment["scaling_hint"] = "DOWN"
         experiment["scaling_rationale"] = (
             "SLO pass with slack on at least one resource; small reduction may be safe."
         )
     else:
-        experiment["scaling_hint"] = "HOLD"
-        experiment["scaling_rationale"] = (
-            "SLO pass with mid-range utilization; prefer small or no moves."
-        )
+        if experiment.get("mode") == "squeeze" and not experiment.get("up_recovery"):
+            experiment["scaling_hint"] = "DOWN"
+            experiment["scaling_rationale"] = (
+                "SLO pass in squeeze DOWN boundary search; continue reducing toward first FAIL."
+            )
+        else:
+            experiment["scaling_hint"] = "HOLD"
+            experiment["scaling_rationale"] = (
+                "SLO pass with mid-range utilization; prefer small or no moves."
+            )

@@ -1,0 +1,9 @@
+- The workload achieved SLO PASS conditions with a p95 latency of 27 ms versus a target of 500 ms.
+- Observed CPU utilization was at 73.3%, indicating a moderate level of over-provisioning.
+- Memory utilization was at 39.7%, showing significant headroom for resource reductions.
+- The deployed configuration features 4 replicas, which can be reduced based on current demands and observed metrics.
+- The previous iteration also recorded a resource pass streak, indicating successful provisioning levels prior to this test.
+- Considering the high CPU utilization, we will downsize CPU requests and limits, aiming for better cost efficiency while remaining within safe operational limits.
+- HPA maxReplicas will also be adjusted to match the new replica count, ensuring an appropriate scaling path.
+- All changes aim to fine-tune costs while retaining pass conditions observed during the test.
+- The changes ensure a more optimal cost score of 0.3572 is improved by reducing provisioned resources and adjusting replicas accordingly.

@@ -7,3 +7,6 @@ __pycache__
 
 /robot-shop/
 
+# Cluster analyzer copies (thousands of generated files; do not track in git)
+/results-from-cluster/
+

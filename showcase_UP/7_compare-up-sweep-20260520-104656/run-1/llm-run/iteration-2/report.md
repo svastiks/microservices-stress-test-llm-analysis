@@ -1,0 +1,9 @@
+- Current p95 latency is 515ms, exceeding the SLO target of 500ms, indicating an SLO violation.
+- CPU utilization is at 22%, suggesting under-utilization, while memory utilization is at 12.7%, also indicating buffer capacity.
+- Observed metrics show that scaling up is necessary to achieve SLO compliance, especially since error rate is 0.0.
+- Previous configurations (1 pod with even higher resource requests) resulted in high latencies (3153ms). 
+- The goal is to increase CPU and memory requests as well as replicas, taking into account the low cost score of the current configuration (0.2084).
+- Increasing both requests for CPU and memory while also adding one replica is the preferred course to maintain balance and allow for efficient scaling while addressing the SLO violation.
+- Proposed values aim to safely maximize resource utilization without breaching latency requirements.
+- Final recommendations will include maintaining a conservative scale while optimizing costs. 
+- Total capacity (CPU and memory requests) and total pods will be increased in this recovery step while justifying against SLO metrics.

@@ -1,0 +1,46 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 70,
+    "provisioned_request_mem_mib": 35,
+    "provisioned_limit_cpu_m": 150,
+    "provisioned_limit_mem_mib": 75,
+    "cost_score": 0.1042
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "cpu_util_pct: 97.5%",
+    "mem_util_pct: 158.5%",
+    "p95_latency: 1633ms vs slo: 500ms",
+    "cost.cost_score: 0.1042",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1",
+    "guard.up_recovery: cpu_req=94m mem_req=47Mi (metric_step cpu=94 mem=47; mem_util=158% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "Under-provisioning recovery sweep: keep increasing capacity until SLO passes.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 217.4,
+    "error_rate": 0.0,
+    "latency_ms_p95": 1633.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 97.5,
+    "mem_util_pct": 158.5,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.98,
+    "total_requests": 19801
+  }
+}

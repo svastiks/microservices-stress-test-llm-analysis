@@ -1,0 +1,9 @@
+- High CPU and memory utilization observed: cpu_util_pct is 275.0% and mem_util_pct is 184.0%
+- SLO violated due to p95 latency of 816ms exceeding the target of 500ms.
+- Current configuration is significantly over-provisioned; both CPU and memory limits exceed usage.
+- Cost score is low (0.0474), indicating potential for savings with resource adjustments.
+- Recommend downsizing CPU requests to 35m and memory requests to 15Mi to fit better with observed utilization.
+- Reducing replicas is limited to 1 due to current settings, but signals suggest a large headroom exists if configured correctly.
+- Transition to resource-only adjustments first before considering replica cuts in the next iteration.
+- Telemetry indicates reliable utilization, making scaling adjustments safe.
+- Dependence on observed metrics is crucial; proceed cautiously based on their implications.

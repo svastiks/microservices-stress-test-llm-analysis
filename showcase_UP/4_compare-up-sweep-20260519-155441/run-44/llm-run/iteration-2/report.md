@@ -1,0 +1,8 @@
+- Current configuration is under-provisioned, resulting in a p95 latency of 1633ms, far exceeding the SLO target of 500ms.
+- CPU utilization is at 97.5%, suggesting CPU resources are nearly maxed out.
+- Memory utilization is significantly over at 158.5%, indicating memory limits are insufficient and need to be increased accordingly.
+- The last iteration showed a cost score of 0.1042, which needs improvement as we scale up resources to meet the specifications without compromising efficiency.
+- Proposed adjustments will prioritize CPU and memory increases in tandem, adhering to resource allocation best practices and aiming for cost savings.
+- Adjustments will only increase the number of replicas if resource increments still result in SLO failures after this vertical scaling effort.
+- Plan to adjust the CPU and memory requests upwards by approximately 40-50%, targeting realistic limits to improve p95 latency towards the SLO threshold.
+- The strategy will help maintain a single replica while optimizing CPU/memory resources until scaling out becomes absolutely necessary.

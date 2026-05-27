@@ -2,18 +2,29 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+from analysis.results import squeeze_cluster_ahead_of_yaml
 from analysis.apply_diff import (
+    apply_hpa_only_baseline,
+    apply_managed_web_baseline,
     apply_recommended_diff,
+    apply_recovery_probe_up_step,
+    apply_squeeze_stall_resource_step,
+    apply_violation_probe_down_step,
+    ensure_squeeze_cluster_ready_before_k6,
     ensure_up_demo_thin_baseline,
     kubectl_apply,
+    reset_managed_web_yaml_to_baseline,
+    squeeze_yaml_live_replica_drift,
     wait_rollout,
 )
 from analysis.results import main as analysis_main
+from analysis.cost_model import boundary_cost_totals
 from analysis.results_db import write_boundary, write_iteration
 from analysis.results_paths import results_dir as _results_dir_for_repo
 from analysis.verify import run_verification, write_verification_output
@@ -49,6 +60,39 @@ def get_profile(profile: str) -> dict:
     with open(EXPERIMENTS_PATH) as f:
         data = json.load(f)
     return data.get(profile, {})
+
+
+def _effective_profile_config(profile: str) -> dict:
+    """
+    Profile JSON from experiments.json, with optional k6 overrides from the environment
+    (so cluster jobs can vary RPS without adding new --profile argparse choices).
+
+    STRESS_K6_RPS: integer target RPS (updates RPS, workload.target_requests_per_second)
+    STRESS_K6_DURATION: k6 duration string, e.g. 90s (updates DURATION, workload.duration_s when parseable)
+    """
+    base = get_profile(profile) or {}
+    cfg = json.loads(json.dumps(base)) if base else {}
+    rps_ov = os.environ.get("STRESS_K6_RPS", "").strip()
+    if rps_ov:
+        try:
+            r = int(rps_ov)
+            cfg["RPS"] = r
+            wl = dict(cfg.get("workload") or {})
+            wl["target_requests_per_second"] = r
+            cfg["workload"] = wl
+        except ValueError:
+            pass
+    dur_ov = os.environ.get("STRESS_K6_DURATION", "").strip()
+    if dur_ov:
+        cfg["DURATION"] = dur_ov
+        wl = dict(cfg.get("workload") or {})
+        ds = dur_ov.rstrip("sS")
+        try:
+            wl["duration_s"] = int(float(ds))
+        except ValueError:
+            pass
+        cfg["workload"] = wl
+    return cfg
 
 
 def _validate_k6_summary_export(summary_path: Path) -> None:
@@ -131,6 +175,9 @@ def _write_run_meta(run_meta: dict) -> None:
 
 
 def _next_run_label() -> str:
+    forced = os.environ.get("STRESS_RESULTS_RUN_LABEL", "").strip()
+    if forced:
+        return forced
     max_idx = 0
     rd = _results_dir()
     if rd.exists():
@@ -141,6 +188,45 @@ def _next_run_label() -> str:
             if m:
                 max_idx = max(max_idx, int(m.group(1)))
     return f"run-{max_idx + 1}"
+
+
+def _max_run_index_under(parent: Path) -> int:
+    max_idx = 0
+    if not parent.is_dir():
+        return 0
+    for p in parent.iterdir():
+        if not p.is_dir():
+            continue
+        m = re.fullmatch(r"run-(\d+)", p.name)
+        if m:
+            max_idx = max(max_idx, int(m.group(1)))
+    return max_idx
+
+
+def _prune_compare_run_dirs(repo_root: Path, *subdir_names: str) -> None:
+    if os.environ.get("SQUEEZE_COMPARE_PRUNE_PRIOR", "1").strip().lower() not in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    ):
+        return
+    for sub in subdir_names:
+        parent = repo_root / "results" / sub.strip().strip("/")
+        if not parent.is_dir():
+            continue
+        for p in list(parent.iterdir()):
+            if p.is_dir() and re.fullmatch(r"run-\d+", p.name):
+                shutil.rmtree(p, ignore_errors=True)
+                print(f"[squeeze-compare] pruned prior {p}", flush=True)
+
+
+def _allocate_compare_pair_label(repo_root: Path, sub_formula: str, sub_llm: str) -> str:
+    n = max(
+        _max_run_index_under(repo_root / "results" / sub_formula),
+        _max_run_index_under(repo_root / "results" / sub_llm),
+    )
+    return f"run-{n + 1}"
 
 
 def _run_once(
@@ -165,7 +251,7 @@ def _run_once(
     if settle_seconds > 0:
         _log(f"settling_before_run seconds={settle_seconds}")
         time.sleep(settle_seconds)
-    profile_config = get_profile(profile)
+    profile_config = _effective_profile_config(profile)
     _log(
         f"run_start profile={profile} script={script} mode={mode} "
         f"analysis_goal={analysis_goal} prometheus={prometheus}"
@@ -244,6 +330,75 @@ def _read_experiment_status(run_dir: Path) -> tuple[str, dict]:
     return ("FAIL" if failed else "PASS"), exp
 
 
+def _squeeze_progress_key(experiment: dict) -> tuple:
+    """Dimensions that must change between productive DOWN iterations."""
+    cfg = experiment.get("config") or {}
+    hpa = cfg.get("hpa") or {}
+    observed = experiment.get("observed") or {}
+    cost = experiment.get("cost") or {}
+    return (
+        cfg.get("cpu_request_m"),
+        cfg.get("mem_request_mib"),
+        cfg.get("deployment_replicas"),
+        hpa.get("min_replicas"),
+        hpa.get("max_replicas"),
+        observed.get("replicas"),
+        cost.get("cost_score"),
+    )
+
+
+def _squeeze_effective_progress_key(experiment: dict) -> tuple:
+    """Live scale + provisioned resources + cost (detects yaml/live replica stall)."""
+    cfg = experiment.get("config") or {}
+    observed = experiment.get("observed") or {}
+    cost = experiment.get("cost") or {}
+    live_rep = max(
+        int(observed.get("replicas") or 0),
+        int(observed.get("replicas_max") or 0),
+    )
+    score = cost.get("cost_score")
+    try:
+        score = round(float(score), 6) if score is not None else None
+    except (TypeError, ValueError):
+        score = None
+    return (
+        cfg.get("cpu_request_m"),
+        cfg.get("mem_request_mib"),
+        live_rep,
+        score,
+    )
+
+
+def _is_up_demo_profile(profile: str | None) -> bool:
+    return (profile or "").strip() in {"up_demo", "up_demo_strict"}
+
+
+def _squeeze_preflight_before_k6(
+    *,
+    mode: str,
+    profile: str,
+    base_url: str | None,
+    k8s_apply_enabled: bool,
+    deployment_yaml: str,
+    hpa_yaml: str,
+    k8s_namespace: str,
+    k8s_deployment: str,
+) -> None:
+    if mode != "squeeze" or (base_url and not k8s_apply_enabled):
+        return
+    # down_demo compare: wait for yaml/live replica match. up_demo uses thin baseline + UP recovery.
+    if _is_up_demo_profile(profile):
+        return
+    dep_path = REPO_ROOT / deployment_yaml
+    hpa_path = REPO_ROOT / hpa_yaml
+    ensure_squeeze_cluster_ready_before_k6(
+        deployment_yaml_path=dep_path,
+        hpa_yaml_path=hpa_path,
+        deployment_name=k8s_deployment,
+        namespace=k8s_namespace,
+    )
+
+
 def _squeeze_row(run_dir: Path, experiment: dict, status: str) -> dict:
     observed = experiment.get("observed") or {}
     latency = observed.get("latency_ms") or {}
@@ -265,7 +420,10 @@ def _squeeze_row(run_dir: Path, experiment: dict, status: str) -> dict:
         "replicas": observed.get("replicas"),
         "cpu_request_m": config.get("cpu_request_m"),
         "mem_request_mib": config.get("mem_request_mib"),
+        "cpu_limit_m": config.get("cpu_limit_m"),
+        "mem_limit_mib": config.get("mem_limit_mib"),
         "cost_score": cost.get("cost_score"),
+        "cost_score_util": cost.get("cost_score_util"),
     }
 
 
@@ -286,6 +444,7 @@ def _write_squeeze_summary(
     }
     if squeeze_optimizer:
         summary["squeeze_optimizer"] = squeeze_optimizer
+    summary.update(boundary_cost_totals(rows))
     run_root.mkdir(parents=True, exist_ok=True)
     (run_root / "cost-effective-boundary.json").write_text(json.dumps(summary, indent=2))
 
@@ -295,14 +454,17 @@ def _write_squeeze_summary(
         f"- Stopped reason: {stopped_reason}",
         f"- Best pass: {best_pass_dir}" if best_pass_dir else "- Best pass: none",
         f"- First fail: {first_fail_dir}" if first_fail_dir else "- First fail: none",
+        f"- Cost model: {summary.get('cost_model', 'weighted')} · search={summary.get('cost_search')} · "
+        f"steady={summary.get('cost_steady_state')} · total={summary.get('cost_total')} "
+        f"(T={summary.get('cost_iteration_hours')}h, H={summary.get('cost_horizon_hours')}h)",
         "",
-        "| Run | Status | Target RPS | Achieved RPS | Achieved RPS (Target Window) | Dropped Iterations | p95 ms | Error rate | CPU util % | Mem util % | Replicas | CPU req (m) | Mem req (Mi) | Cost |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "| Run | Status | Target RPS | Achieved RPS | Achieved RPS (Target Window) | Dropped Iterations | p95 ms | Error rate | CPU util % | Mem util % | Replicas | CPU req (m) | Mem req (Mi) | CPU lim (m) | Mem lim (Mi) | Prov cost | Util cost |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for row in rows:
         md_lines.append(
-            "| {run_dir} | {status} | {target_rps} | {achieved_rps} | {achieved_rps_target_window} | {dropped_iterations} | {p95_ms} | {error_rate} | {cpu_util_pct} | {mem_util_pct} | {replicas} | {cpu_request_m} | {mem_request_mib} | {cost_score} |".format(
-                **row
+            "| {run_dir} | {status} | {target_rps} | {achieved_rps} | {achieved_rps_target_window} | {dropped_iterations} | {p95_ms} | {error_rate} | {cpu_util_pct} | {mem_util_pct} | {replicas} | {cpu_request_m} | {mem_request_mib} | {cpu_limit_m} | {mem_limit_mib} | {cost_score} | {cost_score_util} |".format(
+                **{**row, "cost_score_util": row.get("cost_score_util", "—")}
             )
         )
     (run_root / "cost-effective-boundary.md").write_text("\n".join(md_lines) + "\n")
@@ -326,6 +488,20 @@ def _warn_squeeze_boundary_health(boundary_path: Path, label: str) -> None:
             f"[squeeze-compare] WARNING: {label} has no boundary rows (stopped_reason={sr!r})",
             flush=True,
         )
+    if sr == "up_recovery_probe_exhausted":
+        print(
+            f"[squeeze-compare] WARNING: {label} stopped on up_recovery_probe_exhausted — "
+            "empty recommended.diff during UP recovery and synthetic UP probe hit caps; "
+            "cluster may still be under capacity.",
+            flush=True,
+        )
+    if sr == "until_violation_probe_exhausted":
+        print(
+            f"[squeeze-compare] WARNING: {label} stopped on until_violation_probe_exhausted — "
+            "empty recommended.diff and deployment CPU/memory could not be reduced further "
+            "(probe floors); no measured FAIL in boundary.",
+            flush=True,
+        )
     if sr == "empty_recommended_diff":
         print(
             f"[squeeze-compare] WARNING: {label} stopped on empty_recommended_diff — "
@@ -336,6 +512,13 @@ def _warn_squeeze_boundary_health(boundary_path: Path, label: str) -> None:
     if sr == "first_run_failed":
         print(
             f"[squeeze-compare] WARNING: {label} stopped on first_run_failed — comparison may be one-sided",
+            flush=True,
+        )
+    if sr == "no_progress":
+        print(
+            f"[squeeze-compare] WARNING: {label} stopped on no_progress — "
+            "two consecutive PASS iterations had identical provisioned config (often request floors); "
+            "inspect last recommended.diff.",
             flush=True,
         )
 
@@ -370,6 +553,9 @@ def _run_squeeze_subprocess(
     env = os.environ.copy()
     env["STRESS_RESULTS_SUBDIR"] = results_subdir
     env["SQUEEZE_OPTIMIZER"] = optimizer
+    pair = os.environ.get("SQUEEZE_COMPARE_PAIR_ID", "").strip()
+    if pair:
+        env["STRESS_RESULTS_RUN_LABEL"] = pair
     cap = max(1, int(squeeze_max_iterations))
     cmd = [
         sys.executable,
@@ -427,11 +613,162 @@ def _run_squeeze_subprocess(
     return proc.returncode
 
 
+def _run_hpa_only_subprocess(args: argparse.Namespace, *, results_subdir: str) -> int:
+    env = os.environ.copy()
+    env["STRESS_RESULTS_SUBDIR"] = results_subdir
+    pair = os.environ.get("SQUEEZE_COMPARE_PAIR_ID", "").strip()
+    if pair:
+        env["STRESS_RESULTS_RUN_LABEL"] = pair
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "start.py"),
+        "--hpa-only",
+        "--profile",
+        args.profile,
+        "--script",
+        args.script,
+        "--settle-seconds",
+        str(args.settle_seconds),
+        "--k8s-namespace",
+        str(args.k8s_namespace),
+        "--k8s-deployment",
+        str(args.k8s_deployment),
+        "--deployment-yaml",
+        args.deployment_yaml,
+        "--hpa-yaml",
+        args.hpa_yaml,
+        "--sut-service",
+        args.sut_service,
+        "--sut-service-port",
+        str(args.sut_service_port),
+        "--prometheus-url",
+        args.prometheus_url,
+        "--efficiency",
+    ]
+    if args.robot_shop:
+        cmd.append("--robot-shop")
+    if args.base_url:
+        cmd.extend(["--base-url", args.base_url])
+    if args.no_prometheus:
+        cmd.append("--no-prometheus")
+    print(
+        f"[hpa-compare] subprocess hpa-only subdir={results_subdir}",
+        flush=True,
+    )
+    proc = subprocess.run(cmd, cwd=REPO_ROOT, env=env)
+    if proc.returncode != 0:
+        print(
+            f"[hpa-compare] subprocess failed exit={proc.returncode} (see logs above)",
+            flush=True,
+        )
+    return proc.returncode
+
+
+def _hpa_only_pipeline(
+    args: argparse.Namespace,
+    *,
+    base_url: str | None,
+    prometheus: bool,
+    k8s_namespace: str,
+    k8s_deployment: str,
+    deployment_yaml: str,
+    hpa_yaml: str,
+    prometheus_url: str,
+    analysis_goal: str,
+) -> int:
+    """Single k6 window with HPA enabled; writes one-row cost-effective boundary."""
+    k8s_apply_enabled = bool(k8s_namespace and k8s_deployment and deployment_yaml and hpa_yaml)
+    if not k8s_apply_enabled:
+        print("[hpa-only] requires k8s deployment/hpa paths", flush=True)
+        return 1
+
+    pair = os.environ.get("SQUEEZE_COMPARE_PAIR_ID", "").strip()
+    run_label = os.environ.get("STRESS_RESULTS_RUN_LABEL", "").strip() or _next_run_label()
+    run_root = _results_dir() / run_label
+    run_root.mkdir(parents=True, exist_ok=True)
+
+    apply_hpa_only_baseline(
+        deployment_yaml_path=REPO_ROOT / deployment_yaml,
+        hpa_yaml_path=REPO_ROOT / hpa_yaml,
+        deployment_name=k8s_deployment,
+        namespace=k8s_namespace,
+        profile=args.profile,
+        repo_root=REPO_ROOT,
+    )
+    if args.settle_seconds > 0:
+        _log(f"post-hpa-baseline settle seconds={args.settle_seconds}")
+        time.sleep(args.settle_seconds)
+
+    print(f"[hpa-only] run_label={run_label} profile={args.profile}", flush=True)
+    run_dir = _run_once(
+        args.profile,
+        args.script,
+        "squeeze",
+        base_url=base_url,
+        prometheus=prometheus,
+        k8s_namespace=k8s_namespace,
+        k8s_deployment=k8s_deployment,
+        analysis_goal=analysis_goal,
+        deployment_yaml=deployment_yaml,
+        hpa_yaml=hpa_yaml,
+        prometheus_url=prometheus_url,
+        settle_seconds=0,
+        run_label=run_label,
+        iteration_index=1,
+        squeeze_optimizer="hpa",
+    )
+    if run_dir is None:
+        print("[hpa-only] run failed (no iteration dir)", flush=True)
+        return 1
+
+    status, exp = _read_experiment_status(run_dir)
+    row = _squeeze_row(run_dir, exp, status)
+    best_pass = run_dir if status == "PASS" else None
+    first_fail = run_dir if status == "FAIL" else None
+    _write_squeeze_summary(
+        [row],
+        run_root=run_root,
+        best_pass_dir=best_pass,
+        first_fail_dir=first_fail,
+        stopped_reason="hpa_only",
+        squeeze_optimizer="hpa",
+    )
+    print(f"[hpa-only] wrote {run_root / 'cost-effective-boundary.json'}", flush=True)
+    return 0
+
+
+def _apply_compare_arm_baseline(args: argparse.Namespace, *, label: str) -> None:
+    """Shared cluster + YAML starting point for each compare arm."""
+    print(f"[squeeze-compare] baseline reset ({label})...", flush=True)
+    if _is_up_demo_profile(args.profile):
+        print(
+            "[squeeze-compare] up_demo: thin web baseline (1 replica, HPA max=1); "
+            "start.py will re-pin before iteration 1.",
+            flush=True,
+        )
+        ensure_up_demo_thin_baseline(
+            deployment_yaml_path=REPO_ROOT / args.deployment_yaml,
+            hpa_yaml_path=REPO_ROOT / args.hpa_yaml,
+            deployment_name=args.k8s_deployment,
+            namespace=args.k8s_namespace,
+            repo_root=REPO_ROOT,
+        )
+    else:
+        apply_managed_web_baseline(
+            deployment_yaml_path=REPO_ROOT / args.deployment_yaml,
+            hpa_yaml_path=REPO_ROOT / args.hpa_yaml,
+            deployment_name=args.k8s_deployment,
+            namespace=args.k8s_namespace,
+            repo_root=REPO_ROOT,
+        )
+    if args.settle_seconds > 0:
+        _log(f"post-baseline settle seconds={args.settle_seconds} ({label})")
+        time.sleep(args.settle_seconds)
+
+
 def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
     dep_path = REPO_ROOT / args.deployment_yaml
     hpa_path = REPO_ROOT / args.hpa_yaml
-    dep_backup = dep_path.read_text()
-    hpa_backup = hpa_path.read_text()
     sub_formula = (
         os.environ.get("SQUEEZE_COMPARE_SUBDIR_FORMULA", "squeeze-compare-formula")
         .strip()
@@ -458,6 +795,12 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
             if _formula_uv
             else int(args.compare_formula_max_iterations)
         )
+        _prune_compare_run_dirs(REPO_ROOT, sub_formula, sub_llm)
+        pair_id = _allocate_compare_pair_label(REPO_ROOT, sub_formula, sub_llm)
+        os.environ["SQUEEZE_COMPARE_PAIR_ID"] = pair_id
+        print(f"[squeeze-compare] paired run label={pair_id} (formula + llm)", flush=True)
+
+        _apply_compare_arm_baseline(args, label="before formula arm")
         c1 = _run_squeeze_subprocess(
             args,
             optimizer="formula",
@@ -466,23 +809,19 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
             squeeze_max_iterations=_formula_cap,
             squeeze_until_violation=_formula_uv,
         )
-        if c1 != 0:
+        _continue = os.environ.get(
+            "SQUEEZE_COMPARE_CONTINUE_ON_FORMULA_FAIL", "1"
+        ).strip().lower() in ("1", "true", "yes", "on")
+        if c1 != 0 and not _continue:
             return c1
-
-        dep_path.write_text(dep_backup)
-        hpa_path.write_text(hpa_backup)
-        try:
-            kubectl_apply(dep_path, hpa_path, REPO_ROOT)
-            wait_rollout(
-                deployment_name=args.k8s_deployment,
-                namespace=args.k8s_namespace,
+        if c1 != 0:
+            print(
+                "[squeeze-compare] formula arm failed; continuing to LLM arm "
+                f"(pair={pair_id})",
+                flush=True,
             )
-        except Exception as e:
-            print(f"[squeeze-compare] baseline kubectl restore failed: {e}", flush=True)
-            return 1
-        if args.settle_seconds > 0:
-            _log(f"post-restore settle seconds={args.settle_seconds}")
-            time.sleep(args.settle_seconds)
+
+        _apply_compare_arm_baseline(args, label="before llm arm")
 
         c2 = _run_squeeze_subprocess(
             args,
@@ -494,6 +833,9 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
         )
         if c2 != 0:
             return c2
+
+        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
+        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
 
         root_formula = REPO_ROOT / "results" / sub_formula
         root_llm = REPO_ROOT / "results" / sub_llm
@@ -542,15 +884,132 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
         print(f"[squeeze-compare] wrote {out_versioned}", flush=True)
         return 0
     finally:
-        dep_path.write_text(dep_backup)
-        hpa_path.write_text(hpa_backup)
+        try:
+            reset_managed_web_yaml_to_baseline(dep_path, hpa_path)
+        except Exception as e:
+            print(f"[squeeze-compare] warning: could not restore baseline YAML: {e}", flush=True)
+
+
+def _compare_hpa_vs_llm_main(args: argparse.Namespace) -> int:
+    dep_path = REPO_ROOT / args.deployment_yaml
+    hpa_path = REPO_ROOT / args.hpa_yaml
+    sub_hpa = (
+        os.environ.get("SQUEEZE_COMPARE_SUBDIR_HPA", "squeeze-compare-hpa")
+        .strip()
+        .strip("/")
+        or "squeeze-compare-hpa"
+    )
+    sub_llm = (
+        os.environ.get("SQUEEZE_COMPARE_SUBDIR_LLM", "squeeze-compare-llm")
+        .strip()
+        .strip("/")
+        or "squeeze-compare-llm"
+    )
+    try:
+        _prune_compare_run_dirs(REPO_ROOT, sub_hpa, sub_llm)
+        if os.environ.get("SQUEEZE_COMPARE_PRUNE_STALE_FORMULA", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            _prune_compare_run_dirs(REPO_ROOT, "squeeze-compare-formula")
+        pair_id = _allocate_compare_pair_label(REPO_ROOT, sub_hpa, sub_llm)
+        os.environ["SQUEEZE_COMPARE_PAIR_ID"] = pair_id
+        print(f"[hpa-compare] paired run label={pair_id} (hpa + llm)", flush=True)
+
+        print("[hpa-compare] HPA arm baseline...", flush=True)
+        apply_hpa_only_baseline(
+            deployment_yaml_path=dep_path,
+            hpa_yaml_path=hpa_path,
+            deployment_name=args.k8s_deployment,
+            namespace=args.k8s_namespace,
+            profile=args.profile,
+            repo_root=REPO_ROOT,
+        )
+        if args.settle_seconds > 0:
+            time.sleep(args.settle_seconds)
+
+        c1 = _run_hpa_only_subprocess(args, results_subdir=sub_hpa)
+        _continue = os.environ.get(
+            "SQUEEZE_COMPARE_CONTINUE_ON_HPA_FAIL", "1"
+        ).strip().lower() in ("1", "true", "yes", "on")
+        if c1 != 0 and not _continue:
+            return c1
+        if c1 != 0:
+            print(
+                f"[hpa-compare] HPA arm failed; continuing to LLM arm (pair={pair_id})",
+                flush=True,
+            )
+
+        _apply_compare_arm_baseline(args, label="before llm arm")
+        c2 = _run_squeeze_subprocess(
+            args,
+            optimizer="llm",
+            results_subdir=sub_llm,
+            final_report_llm=False,
+            squeeze_max_iterations=args.max_iterations,
+            squeeze_until_violation=args.until_violation,
+        )
+        if c2 != 0:
+            return c2
+
+        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
+        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
+
+        root_hpa = REPO_ROOT / "results" / sub_hpa
+        root_llm = REPO_ROOT / "results" / sub_llm
+        run_a = _latest_run_root(root_hpa)
+        run_b = _latest_run_root(root_llm)
+        if not run_a or not run_b:
+            print("[hpa-compare] could not find run-* under comparison subdirs", flush=True)
+            return 1
+        b_a = run_a / "cost-effective-boundary.json"
+        b_b = run_b / "cost-effective-boundary.json"
+        if not b_a.exists() or not b_b.exists():
+            print(f"[hpa-compare] missing boundary: {b_a} {b_b}", flush=True)
+            return 1
+
+        _warn_squeeze_boundary_health(b_a, "hpa")
+        _warn_squeeze_boundary_health(b_b, "llm")
+
+        from analysis.compare_squeeze_methods import compare as compare_boundaries
+
+        text = compare_boundaries(b_a, b_b, label_a="hpa", label_b="llm")
+        out = REPO_ROOT / "results" / "squeeze-optimizer-comparison.md"
+        out_versioned = (
+            REPO_ROOT
+            / "results"
+            / f"squeeze-optimizer-comparison-{run_a.name}-vs-{run_b.name}.md"
+        )
+        out.write_text(text)
+        out_versioned.write_text(text)
+        print(text, end="")
+        print(f"[hpa-compare] wrote {out}", flush=True)
+        return 0
+    finally:
+        try:
+            reset_managed_web_yaml_to_baseline(dep_path, hpa_path)
+        except Exception as e:
+            print(f"[hpa-compare] warning: could not restore baseline YAML: {e}", flush=True)
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Run k6 load test then LLM analysis")
     p.add_argument(
         "--profile",
-        choices=["low", "medium", "high", "down_demo", "up_demo", "up_demo_strict"],
+        choices=[
+            "low",
+            "medium",
+            "high",
+            "down_demo",
+            "down_demo_r15",
+            "down_demo_r25",
+            "down_demo_r35",
+            "down_demo_r45",
+            "up_demo",
+            "up_demo_strict",
+        ],
         default="medium",
     )
     p.add_argument(
@@ -575,12 +1034,27 @@ if __name__ == "__main__":
         action="store_true",
         help=(
             "Run squeeze with formula optimizer (STRESS_RESULTS_SUBDIR=squeeze-compare-formula by default), "
-            "restore repo YAML + kubectl apply, settle, then run squeeze with LLM-only optimizer "
+            "reset managed web to *.baseline.yaml + kubectl apply + replica_wait + settle before "
+            "each arm, then run squeeze with LLM-only optimizer "
             "(squeeze-compare-llm). Writes results/squeeze-optimizer-comparison.md (Markdown tables). "
             "Formula phase uses --compare-formula-max-iterations (capped); "
             "env SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION=1 adds --until-violation with ceiling "
             "max(compare cap, --max-iterations)."
         ),
+    )
+    mode_group.add_argument(
+        "--compare-hpa-vs-llm",
+        action="store_true",
+        help=(
+            "Method 2: one HPA-only load window (squeeze-compare-hpa) then vanilla LLM squeeze "
+            "(squeeze-compare-llm). HPA may scale replicas; requests stay fixed. "
+            "Writes results/squeeze-optimizer-comparison.md with labels hpa vs llm."
+        ),
+    )
+    p.add_argument(
+        "--hpa-only",
+        action="store_true",
+        help="Single evaluation: fixed CPU/mem requests, HPA scales replicas during k6 (subprocess of --compare-hpa-vs-llm).",
     )
     p.add_argument(
         "--max-iterations",
@@ -610,8 +1084,13 @@ if __name__ == "__main__":
         "--until-violation",
         action="store_true",
         help=(
-            "For squeeze mode, keep iterating until the first FAIL instead of stopping at "
-            "--max-iterations. Under-provisioning (UP) recovery still honors --max-iterations."
+            "For squeeze mode on Kubernetes: keep iterating toward the first measured FAIL so the "
+            "last PASS is the frontier. With kubectl apply enabled, if the optimizer returns an "
+            "empty recommended.diff, a small deterministic DOWN step on deployment CPU/memory may "
+            "still be applied (env SQUEEZE_UNTIL_VIOLATION_PROBE_STEP_PCT) for formula/hybrid "
+            "unless disabled; optimizer=llm skips that probe by default so compare LLM runs use "
+            "LLM patches only (set SQUEEZE_UNTIL_VIOLATION_PROBE_LLM=1 to opt in). Without this flag, "
+            "the loop stops at empty diff or the iteration cap. UP recovery still honors --max-iterations."
         ),
     )
     p.add_argument(
@@ -673,11 +1152,12 @@ if __name__ == "__main__":
     )
     p.add_argument(
         "--squeeze-optimizer",
-        choices=["hybrid", "formula", "llm"],
+        choices=["hybrid", "formula", "llm", "hpa"],
         default=os.environ.get("SQUEEZE_OPTIMIZER", "hybrid"),
         help=(
             "squeeze YAML source: hybrid=LLM then deterministic override (default); "
-            "formula=Python step only; llm=LLM only (no deterministic YAML)."
+            "formula=Python step only; llm=LLM only (no deterministic YAML); "
+            "hpa=observe only (HPA-only arm)."
         ),
     )
     p.add_argument(
@@ -695,11 +1175,18 @@ if __name__ == "__main__":
             p.error("--compare-squeeze-optimizers cannot be used with --verify")
         sys.exit(_compare_squeeze_optimizers_main(args))
 
+    if args.compare_hpa_vs_llm:
+        if args.verify:
+            p.error("--compare-hpa-vs-llm cannot be used with --verify")
+        sys.exit(_compare_hpa_vs_llm_main(args))
+
     mode: str | None = None
     if args.verify:
         mode = "verify"
     elif args.squeeze or args.until_violation:
         mode = "squeeze"
+    elif args.hpa_only:
+        mode = "hpa_only"
 
     base_url = args.base_url
     if args.robot_shop:
@@ -761,6 +1248,21 @@ if __name__ == "__main__":
             )
             # k6 scripts consume BASE_URL; point them at the forwarded local port.
             base_url = "http://localhost:8000"
+
+        if mode == "hpa_only":
+            sys.exit(
+                _hpa_only_pipeline(
+                    args,
+                    base_url=base_url,
+                    prometheus=prometheus,
+                    k8s_namespace=k8s_namespace,
+                    k8s_deployment=k8s_deployment,
+                    deployment_yaml=deployment_yaml,
+                    hpa_yaml=hpa_yaml,
+                    prometheus_url=prometheus_url,
+                    analysis_goal=analysis_goal,
+                )
+            )
 
         run_1_dir: Path | None = None
         if mode != "squeeze":
@@ -906,11 +1408,22 @@ if __name__ == "__main__":
             else:
                 first_diff = (run_1_dir / "recommended.diff").read_text().strip()
                 first_hint = exp_1.get("scaling_hint")
-                if first_diff and first_hint == "UP":
+                fail_1 = bool((exp_1.get("failure") or {}).get("failed"))
+                up_demo_fail_recovery = (
+                    is_up_demo_profile
+                    and fail_1
+                    and first_hint in ("UP", "HOLD", None)
+                )
+                if (first_diff and first_hint == "UP") or up_demo_fail_recovery:
                     up_recovery_active = True
                     print(
-                        "[squeeze] Iteration 1 FAIL with UP hint, "
-                        f"cost={((exp_1.get('cost') or {}).get('cost_score'))}; "
+                        "[squeeze] Iteration 1 FAIL"
+                        + (
+                            " (up_demo under-provisioned start)"
+                            if up_demo_fail_recovery and first_hint != "UP"
+                            else " with UP hint"
+                        )
+                        + f", cost={((exp_1.get('cost') or {}).get('cost_score'))}; "
                         "entering scale-up recovery loop."
                     )
                 else:
@@ -958,40 +1471,160 @@ if __name__ == "__main__":
             ):
                 current_iteration += 1
                 recommended_diff = (anchor_run_dir / "recommended.diff").read_text().strip()
-                if not recommended_diff:
-                    print(
-                        "[squeeze] No further optimization diff; frontier reached "
-                        f"(optimizer={args.squeeze_optimizer})."
-                    )
-                    stopped_reason = "empty_recommended_diff"
-                    _write_squeeze_summary(
-                        squeeze_rows,
-                        run_root=run_root,
-                        best_pass_dir=best_pass_dir,
-                        first_fail_dir=first_fail_dir,
-                        stopped_reason=stopped_reason,
-                        squeeze_optimizer=args.squeeze_optimizer,
-                    )
-                    break
-
-                print(
-                    f"[squeeze] Applying optimization and running iteration {current_iteration}..."
+                squeeze_kubectl = not (base_url and not k8s_apply_enabled)
+                # Deterministic probe must not run for optimizer=llm during squeeze-compare LLM arm:
+                # that phase should advance only on LLM-produced YAML, not hidden formula-like cuts.
+                _llm_probe = os.environ.get("SQUEEZE_UNTIL_VIOLATION_PROBE_LLM", "").strip().lower() in (
+                    "1",
+                    "true",
+                    "yes",
+                    "on",
                 )
-                if base_url and not k8s_apply_enabled:
-                    print(
-                        "[squeeze] BASE_URL is set (e.g. Robot Shop in Docker): skipping "
-                        "`kubectl apply`. Repo YAML still updates each analysis; k6 hits the same "
-                        "URL — metrics reflect the live SUT, not every YAML change."
-                    )
-                else:
-                    apply_recommended_diff(
-                        anchor_run_dir,
-                        deployment_yaml_path=(REPO_ROOT / deployment_yaml),
-                        hpa_yaml_path=(REPO_ROOT / hpa_yaml),
-                        deployment_name=k8s_deployment,
-                        namespace=k8s_namespace,
-                        repo_root=REPO_ROOT,
-                    )
+                probe_allowed = (
+                    args.until_violation
+                    and not up_recovery_active
+                    and squeeze_kubectl
+                    and k8s_apply_enabled
+                    and (args.squeeze_optimizer != "llm" or _llm_probe)
+                )
+                recovery_probe_applied = False
+                probe_applied = False
+                reconcile_apply = False
+                if not recommended_diff:
+                    exp_path = anchor_run_dir / "experiment.json"
+                    if (
+                        args.squeeze_optimizer == "llm"
+                        and squeeze_kubectl
+                        and k8s_apply_enabled
+                        and not up_recovery_active
+                        and exp_path.exists()
+                    ):
+                        try:
+                            anchor_exp = json.loads(exp_path.read_text())
+                            reconcile_apply = squeeze_cluster_ahead_of_yaml(anchor_exp)
+                        except json.JSONDecodeError:
+                            reconcile_apply = False
+                    if reconcile_apply:
+                        print(
+                            "[squeeze] empty recommended.diff but live replicas exceed "
+                            "managed YAML; re-applying cluster manifests before next iteration.",
+                            flush=True,
+                        )
+                    elif up_recovery_active and squeeze_kubectl and k8s_apply_enabled:
+                        recovery_probe_applied = apply_recovery_probe_up_step(
+                            deployment_yaml_path=(REPO_ROOT / deployment_yaml),
+                            hpa_yaml_path=(REPO_ROOT / hpa_yaml),
+                            deployment_name=k8s_deployment,
+                            namespace=k8s_namespace,
+                            repo_root=REPO_ROOT,
+                        )
+                    elif probe_allowed:
+                        probe_applied = apply_violation_probe_down_step(
+                            deployment_yaml_path=(REPO_ROOT / deployment_yaml),
+                            hpa_yaml_path=(REPO_ROOT / hpa_yaml),
+                            deployment_name=k8s_deployment,
+                            namespace=k8s_namespace,
+                            repo_root=REPO_ROOT,
+                        )
+                    if not (
+                        recovery_probe_applied or probe_applied or reconcile_apply
+                    ):
+                        if probe_allowed:
+                            stopped_reason = "until_violation_probe_exhausted"
+                            print(
+                                "[squeeze] until_violation: empty recommended.diff and violation "
+                                "probe could not shrink deployment further (floors or no resources); "
+                                f"stopping (optimizer={args.squeeze_optimizer}).",
+                                flush=True,
+                            )
+                        elif (
+                            up_recovery_active
+                            and squeeze_kubectl
+                            and k8s_apply_enabled
+                        ):
+                            stopped_reason = "up_recovery_probe_exhausted"
+                            print(
+                                "[squeeze] up_recovery: empty recommended.diff and recovery UP "
+                                "probe could not add capacity further (caps or no resources block); "
+                                f"stopping (optimizer={args.squeeze_optimizer}).",
+                                flush=True,
+                            )
+                        else:
+                            stopped_reason = "empty_recommended_diff"
+                            if (
+                                args.until_violation
+                                and args.squeeze_optimizer == "llm"
+                                and squeeze_kubectl
+                                and k8s_apply_enabled
+                                and not _llm_probe
+                            ):
+                                print(
+                                    "[squeeze] until_violation: empty recommended.diff with "
+                                    "optimizer=llm; stopping without deterministic probe (LLM arm uses "
+                                    "LLM patches only). Set SQUEEZE_UNTIL_VIOLATION_PROBE_LLM=1 to allow probe.",
+                                    flush=True,
+                                )
+                            else:
+                                print(
+                                    "[squeeze] No further optimization diff; frontier reached "
+                                    f"(optimizer={args.squeeze_optimizer}).",
+                                    flush=True,
+                                )
+                        _write_squeeze_summary(
+                            squeeze_rows,
+                            run_root=run_root,
+                            best_pass_dir=best_pass_dir,
+                            first_fail_dir=first_fail_dir,
+                            stopped_reason=stopped_reason,
+                            squeeze_optimizer=args.squeeze_optimizer,
+                        )
+                        break
+
+                if recommended_diff or reconcile_apply:
+                    if reconcile_apply and not recommended_diff:
+                        print(
+                            f"[squeeze] Reconciling managed YAML to cluster and running "
+                            f"iteration {current_iteration}..."
+                        )
+                    else:
+                        print(
+                            f"[squeeze] Applying optimization and running iteration {current_iteration}..."
+                        )
+                    if base_url and not k8s_apply_enabled:
+                        print(
+                            "[squeeze] BASE_URL is set (e.g. Robot Shop in Docker): skipping "
+                            "`kubectl apply`. Repo YAML still updates each analysis; k6 hits the same "
+                            "URL — metrics reflect the live SUT, not every YAML change."
+                        )
+                    else:
+                        apply_recommended_diff(
+                            anchor_run_dir,
+                            deployment_yaml_path=(REPO_ROOT / deployment_yaml),
+                            hpa_yaml_path=(REPO_ROOT / hpa_yaml),
+                            deployment_name=k8s_deployment,
+                            namespace=k8s_namespace,
+                            repo_root=REPO_ROOT,
+                            allow_empty_diff=reconcile_apply,
+                        )
+                elif recovery_probe_applied or probe_applied:
+                    if recovery_probe_applied:
+                        print(
+                            f"[squeeze] After recovery UP probe synthetic apply, running iteration {current_iteration}..."
+                        )
+                    else:
+                        print(
+                            f"[squeeze] After violation-probe DOWN, running iteration {current_iteration}..."
+                        )
+                _squeeze_preflight_before_k6(
+                    mode=mode,
+                    profile=args.profile,
+                    base_url=base_url,
+                    k8s_apply_enabled=k8s_apply_enabled,
+                    deployment_yaml=deployment_yaml,
+                    hpa_yaml=hpa_yaml,
+                    k8s_namespace=k8s_namespace,
+                    k8s_deployment=k8s_deployment,
+                )
                 next_run_dir = _run_once(
                     args.profile,
                     args.script,
@@ -1029,6 +1662,116 @@ if __name__ == "__main__":
                     print(
                         f"[squeeze] Iteration {current_iteration} PASS, cost={((exp.get('cost') or {}).get('cost_score'))}"
                     )
+                    if (
+                        not up_recovery_active
+                        and current_iteration > 1
+                    ):
+                        prev_exp_path = (
+                            run_root / f"iteration-{current_iteration - 1}" / "experiment.json"
+                        )
+                        if prev_exp_path.exists():
+                            try:
+                                prev_exp = json.loads(prev_exp_path.read_text())
+                                effective_stall = (
+                                    _squeeze_effective_progress_key(exp)
+                                    == _squeeze_effective_progress_key(prev_exp)
+                                )
+                                if effective_stall:
+                                    dep_path = REPO_ROOT / deployment_yaml
+                                    hpa_path = REPO_ROOT / hpa_yaml
+                                    recovered = False
+                                    if (
+                                        squeeze_kubectl
+                                        and k8s_apply_enabled
+                                        and squeeze_yaml_live_replica_drift(
+                                            dep_path,
+                                            deployment_name=k8s_deployment,
+                                            namespace=k8s_namespace,
+                                        )
+                                    ):
+                                        print(
+                                            f"[squeeze] Iteration {current_iteration}: "
+                                            "effective stall with yaml/live replica drift; "
+                                            "re-waiting and re-running k6...",
+                                            flush=True,
+                                        )
+                                        ensure_squeeze_cluster_ready_before_k6(
+                                            deployment_yaml_path=dep_path,
+                                            hpa_yaml_path=hpa_path,
+                                            deployment_name=k8s_deployment,
+                                            namespace=k8s_namespace,
+                                        )
+                                        retry_dir = _run_once(
+                                            args.profile,
+                                            args.script,
+                                            mode,
+                                            base_url=base_url,
+                                            prometheus=prometheus,
+                                            k8s_namespace=k8s_namespace,
+                                            k8s_deployment=k8s_deployment,
+                                            analysis_goal=analysis_goal,
+                                            deployment_yaml=deployment_yaml,
+                                            hpa_yaml=hpa_yaml,
+                                            prometheus_url=prometheus_url,
+                                            settle_seconds=args.settle_seconds,
+                                            run_label=run_label,
+                                            iteration_index=current_iteration,
+                                            up_recovery=up_recovery_active,
+                                            squeeze_optimizer=args.squeeze_optimizer,
+                                        )
+                                        if retry_dir is not None:
+                                            retry_status, retry_exp = (
+                                                _read_experiment_status(retry_dir)
+                                            )
+                                            squeeze_rows[-1] = _squeeze_row(
+                                                retry_dir, retry_exp, retry_status
+                                            )
+                                            anchor_run_dir = retry_dir
+                                            status, exp = retry_status, retry_exp
+                                            if status == "PASS":
+                                                best_pass_dir = retry_dir
+                                            recovered = (
+                                                _squeeze_effective_progress_key(exp)
+                                                != _squeeze_effective_progress_key(prev_exp)
+                                            )
+                                    if (
+                                        not recovered
+                                        and squeeze_kubectl
+                                        and k8s_apply_enabled
+                                        and apply_squeeze_stall_resource_step(
+                                            deployment_yaml_path=dep_path,
+                                            hpa_yaml_path=hpa_path,
+                                            deployment_name=k8s_deployment,
+                                            namespace=k8s_namespace,
+                                            repo_root=REPO_ROOT,
+                                        )
+                                    ):
+                                        print(
+                                            f"[squeeze] Iteration {current_iteration}: "
+                                            "effective stall; applied resource-only recovery "
+                                            "before next iteration.",
+                                            flush=True,
+                                        )
+                                        recovered = True
+                                    if not recovered:
+                                        stopped_reason = "no_effective_progress"
+                                        print(
+                                            f"[squeeze] Iteration {current_iteration}: "
+                                            "no effective DOWN progress vs previous PASS "
+                                            "(live replicas + cost unchanged); stopping.",
+                                            flush=True,
+                                        )
+                                        _write_squeeze_summary(
+                                            squeeze_rows,
+                                            run_root=run_root,
+                                            best_pass_dir=best_pass_dir,
+                                            first_fail_dir=first_fail_dir,
+                                            stopped_reason=stopped_reason,
+                                            squeeze_optimizer=args.squeeze_optimizer,
+                                        )
+                                        break
+                            except json.JSONDecodeError:
+                                pass
                     if up_recovery_active:
                         stopped_reason = "recovered_from_underprovisioning"
                         _write_squeeze_summary(

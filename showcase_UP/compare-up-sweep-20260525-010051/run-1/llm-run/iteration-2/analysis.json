@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 140,
+    "provisioned_request_mem_mib": 70,
+    "provisioned_limit_cpu_m": 400,
+    "provisioned_limit_mem_mib": 200,
+    "per_pod_unit_cost": 0.066418,
+    "per_pod_unit_cost_util": 0.035166,
+    "cost_score": 0.1328,
+    "cost_score_util": 0.0703,
+    "cost_score_legacy": 0.2084
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "Observed latency at p95: 1047ms exceeds SLO of 500ms.",
+    "Current CPU Utilization: 52.9%, memory Utilization: 53.8%.",
+    "Cost score: 0.1328 based on current provisioned resources and efficiency.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2",
+    "guard.up_recovery: cpu_req=87m mem_req=44Mi axes=cpu,mem,replica (metric_step cpu=87 mem=44; mem_util=54% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "Under-provisioning recovery sweep: keep increasing capacity until SLO passes.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 277.6,
+    "error_rate": 0.0,
+    "latency_ms_p95": 1047.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 52.9,
+    "mem_util_pct": 53.8,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.53,
+    "total_requests": 25199
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "stopped_reason": "recovered_from_underprovisioning",
+  "best_pass_dir": "/app/results/squeeze-compare-formula/run-1/iteration-3",
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "/app/results/squeeze-compare-formula/run-1/iteration-1",
+      "status": "FAIL",
+      "target_rps": 220,
+      "achieved_rps": 218.7,
+      "achieved_rps_target_window": 220.0,
+      "dropped_iterations": 0,
+      "p95_ms": 1658.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 213.0,
+      "mem_util_pct": 147.5,
+      "replicas": 1,
+      "cpu_request_m": 50,
+      "mem_request_mib": 25,
+      "cpu_limit_m": 100,
+      "mem_limit_mib": 50,
+      "cost_score": 0.0744
+    },
+    {
+      "run_dir": "/app/results/squeeze-compare-formula/run-1/iteration-2",
+      "status": "FAIL",
+      "target_rps": 220,
+      "achieved_rps": 218.0,
+      "achieved_rps_target_window": 220.0,
+      "dropped_iterations": 0,
+      "p95_ms": 1100.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 72.0,
+      "mem_util_pct": 84.6,
+      "replicas": 2,
+      "cpu_request_m": 50,
+      "mem_request_mib": 25,
+      "cpu_limit_m": 100,
+      "mem_limit_mib": 50,
+      "cost_score": 0.1488
+    },
+    {
+      "run_dir": "/app/results/squeeze-compare-formula/run-1/iteration-3",
+      "status": "PASS",
+      "target_rps": 220,
+      "achieved_rps": 219.2,
+      "achieved_rps_target_window": 220.0,
+      "dropped_iterations": 0,
+      "p95_ms": 382.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 65.3,
+      "mem_util_pct": 50.6,
+      "replicas": 3,
+      "cpu_request_m": 63,
+      "mem_request_mib": 32,
+      "cpu_limit_m": 125,
+      "mem_limit_mib": 63,
+      "cost_score": 0.2828
+    }
+  ],
+  "squeeze_optimizer": "formula"
+}

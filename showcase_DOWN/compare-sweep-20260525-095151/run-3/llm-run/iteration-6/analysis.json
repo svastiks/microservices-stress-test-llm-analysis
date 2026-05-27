@@ -1,0 +1,51 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 150,
+    "provisioned_request_mem_mib": 75,
+    "provisioned_limit_cpu_m": 600,
+    "provisioned_limit_mem_mib": 300,
+    "per_pod_unit_cost": 0.047441,
+    "per_pod_unit_cost_util": 0.028803,
+    "cost_score": 0.1423,
+    "cost_score_util": 0.0864,
+    "cost_score_legacy": 0.2232
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "observed.cpu_util_pct: 62.4%, target: 60%; indicates need for CPU trimming.",
+    "observed.mem_util_pct: 29.6%, healthy headroom for resource cuts.",
+    "current pod count: 3 with a pass streak allowing for downscaling resources and replicas.",
+    "cost.cost_score: 0.1423 experiencing inefficiencies due to over-provisioned resources.",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3",
+    "squeeze_down_axis=replica"
+  ],
+  "squeeze_down_axis": "replica",
+  "resource_pass_streak": 0,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 62.4,
+    "mem_util_pct": 29.6,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.62,
+    "total_requests": 3151
+  }
+}

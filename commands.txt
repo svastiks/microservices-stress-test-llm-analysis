@@ -1,0 +1,13 @@
+PROFILES_CSV=up_demo SQUEEZE_UNTIL_VIOLATION=true SQUEEZE_SETTLE_SECONDS=30 BUILD_ANALYZER_IMAGE=true bash scripts/run_cluster_profiles.sh
+
+PROFILES_CSV=down_demo SQUEEZE_UNTIL_VIOLATION=true SQUEEZE_SETTLE_SECONDS=30 BUILD_ANALYZER_IMAGE=true bash scripts/run_cluster_profiles.sh
+
+
+LLM ONLY
+BUILD_ANALYZER_IMAGE=true ./scripts/run_down_demo_llm_squeeze.sh
+
+COMPARE FORMULA VS LLM (down_demo — 5 repl @ 150m / 75Mi baseline)
+BUILD_ANALYZER_IMAGE=true COMPARE_SWEEP_RPS=25 COMPARE_SWEEP_ROUNDS=1 ./scripts/run_down_demo_compare_sweep.sh
+
+COMPARE FORMULA VS LLM (up_demo — 1 repl @ 50m/25Mi, HPA max=1)
+BUILD_ANALYZER_IMAGE=true COMPARE_SWEEP_RPS=220 COMPARE_SWEEP_ROUNDS=1 ./scripts/run_up_demo_compare_sweep.sh

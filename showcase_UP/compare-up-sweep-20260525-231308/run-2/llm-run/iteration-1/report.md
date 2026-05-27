@@ -1,0 +1,10 @@
+- The workload achieved a p95 latency of 991ms, exceeding the SLO target of 500ms, resulting in a SLO failure.
+- Observed CPU utilization was 272.9%, indicating significant over-provisioning, given that the request limits were set at 100m.
+- Memory usage was reported at 189.8%, suggesting a similar issue with memory provisioning.
+- Autoscaler metrics indicate that scaling up from 1 replica is necessary to handle the current workload effectively.
+- The CPU requests and limits should be reduced to address over-provisioning but still need to accommodate current utilization levels.
+- Deployment and HPA configurations suggest that both requests and limits are currently too high and should be adjusted accordingly.
+- Considering the observed metrics, a conservative decrease in CPU and memory requests will help optimize costs while ensuring the workload can be managed efficiently.
+- Future iterations should aim for 50m CPU and 25Mi memory requests, but considering the high utilization, the limits need to be trimmed consistently.
+- Recommendations indicate moving from the current limits toward 75m for CPU and 40Mi for memory while maintaining 1 replica until utilization improves adequately. 
+- Continued observation of SLO adherence and resource utilization is critical before making drastic adjustments on future passes.

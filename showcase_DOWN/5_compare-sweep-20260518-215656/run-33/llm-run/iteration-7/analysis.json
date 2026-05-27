@@ -1,0 +1,44 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 300,
+    "provisioned_request_mem_mib": 150,
+    "provisioned_limit_cpu_m": 300,
+    "provisioned_limit_mem_mib": 150,
+    "cost_score": 0.4465
+  },
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "CPU utilization at 122.6%, which exceeds limits (cost.cost_score: 0.4465).",
+    "Provisioned requests: 300m CPU, current requests: 100m each, need trims to 75m each.",
+    "Observed replicas at 3; effective for workload capability but indicates over-provisioning in resources.",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 106.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 122.6,
+    "mem_util_pct": 58.3,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.23,
+    "total_requests": 2251
+  }
+}

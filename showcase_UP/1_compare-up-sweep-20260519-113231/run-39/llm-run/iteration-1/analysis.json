@@ -1,0 +1,46 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 50,
+    "provisioned_request_mem_mib": 25,
+    "provisioned_limit_cpu_m": 100,
+    "provisioned_limit_mem_mib": 50,
+    "cost_score": 0.0744
+  },
+  "failure_archetype": "p95_slo_violation",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "NONE",
+  "over_provisioned": false,
+  "evidence": [
+    "CPU utilization at 188.2% exceeds limits, indicating under-provisioning requiring more CPU allocation.",
+    "Memory utilization at 280.7% clearly shows over-usage of memory beyond limits.",
+    "p95 latency of 6591ms violates SLO of 500ms, necessitating resource adjustments.",
+    "Cost score of 0.0744 suggests a need for right-sizing efforts despite being low-cost.",
+    "Observed metrics: CPU request (50m), memory request (25Mi); scaling of limits to (200m, 100Mi) to accommodate load.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress while replicas are at HPA max; scale up CPU/memory limits and/or raise HPA max to recover headroom.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 166.7,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6591.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 188.2,
+    "mem_util_pct": 280.7,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.88,
+    "total_requests": 15541
+  }
+}

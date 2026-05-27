@@ -1,0 +1,6 @@
+- Current CPU utilization is at 24.4%, well below the target of 60%.
+- Memory utilization is at 14.8%, indicating significant headroom.
+- The SLO latency is comfortably met (p95 at 7ms versus a target of 500ms).
+- No errors were reported during the test, solidifying confidence in the current setup.
+- The current resource requests are over-provisioned, suggesting an opportunity for cost savings through downsizing CPU and memory limits.
+- Aggressively cutting resource requests will help move towards our target utilization range of 55-65%.

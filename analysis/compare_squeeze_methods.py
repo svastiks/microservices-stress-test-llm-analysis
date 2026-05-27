@@ -6,6 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
+from analysis.cost_model import row_util_cost
+
 
 def _load_boundary(path: Path) -> dict:
     return json.loads(path.read_text())
@@ -56,15 +58,49 @@ def compare(
         except (TypeError, ValueError):
             return "n/a"
 
+    def _util_cell(r: dict | None) -> str:
+        if not r:
+            return "—"
+        u = row_util_cost(r)
+        return "—" if u is None else f"{u:.4g}"
+
+    def _cost_line(d: dict, rows: list) -> str:
+        parts: list[str] = []
+        if d.get("cost_total") is not None:
+            parts.append(
+                f"prov_cost_total={d.get('cost_total')} (steady={d.get('cost_steady_state')}, "
+                f"best_pass={d.get('cost_best_pass_score')})"
+            )
+        if d.get("cost_total_util") is not None:
+            parts.append(
+                f"util_cost_total={d.get('cost_total_util')} (steady={d.get('cost_steady_state_util')}, "
+                f"best_pass={d.get('cost_best_pass_score_util')})"
+            )
+        elif rows:
+            last_pass = next(
+                (r for r in reversed(rows) if r.get("status") == "PASS"),
+                None,
+            )
+            if last_pass:
+                if last_pass.get("cost_score") is not None:
+                    parts.append(f"best_pass_prov_cost={last_pass.get('cost_score')}")
+                u = row_util_cost(last_pass)
+                if u is not None:
+                    parts.append(f"best_pass_util_cost={u}")
+        return (" · " + ", ".join(parts)) if parts else ""
+
     lines: list[str] = [
         "# Squeeze optimizer comparison",
         "",
         "## Summary",
         "",
+        f"- **Cost model**: `{da.get('cost_model') or db.get('cost_model') or 'weighted'}` (see cost_model.md) — "
+        f"**prov cost** / **util cost**: same N×(p_cpu·r + p_mem·m); util uses effective r·u",
+        "",
         f"- **{label_a}**: `optimizer={da.get('squeeze_optimizer')}` · `stopped_reason={da.get('stopped_reason')}` · "
-        f"iterations={_iter_count(ra)} · `best_pass_dir={da.get('best_pass_dir')}`",
+        f"iterations={_iter_count(ra)} · `best_pass_dir={da.get('best_pass_dir')}`{_cost_line(da, ra)}",
         f"- **{label_b}**: `optimizer={db.get('squeeze_optimizer')}` · `stopped_reason={db.get('stopped_reason')}` · "
-        f"iterations={_iter_count(rb)} · `best_pass_dir={db.get('best_pass_dir')}`",
+        f"iterations={_iter_count(rb)} · `best_pass_dir={db.get('best_pass_dir')}`{_cost_line(db, rb)}",
         "",
         "## Resource delta (first row → last row)",
         "",
@@ -80,11 +116,13 @@ def compare(
         "One row per iteration index (boundary `rows` order).",
         "",
         "| # | "
-        f"{label_a} status | {label_a} cost | {label_a} p95 | {label_a} err | {label_a} ach RPS | "
-        f"{label_a} cpu% | {label_a} mem% | {label_a} cpu m | {label_a} mem Mi | {label_a} repl | "
-        f"{label_b} status | {label_b} cost | {label_b} p95 | {label_b} err | {label_b} ach RPS | "
-        f"{label_b} cpu% | {label_b} mem% | {label_b} cpu m | {label_b} mem Mi | {label_b} repl |",
-        "| " + " | ".join(["---"] * 21) + " |",
+        f"{label_a} status | {label_a} prov cost | {label_a} util cost | {label_a} p95 | {label_a} err | {label_a} ach RPS | "
+        f"{label_a} cpu% | {label_a} mem% | {label_a} cpu m | {label_a} mem Mi | "
+        f"{label_a} cpu lim | {label_a} mem lim | {label_a} repl | "
+        f"{label_b} status | {label_b} prov cost | {label_b} util cost | {label_b} p95 | {label_b} err | {label_b} ach RPS | "
+        f"{label_b} cpu% | {label_b} mem% | {label_b} cpu m | {label_b} mem Mi | "
+        f"{label_b} cpu lim | {label_b} mem lim | {label_b} repl |",
+        "| " + " | ".join(["---"] * 27) + " |",
     ]
 
     nmax = max(len(ra), len(rb))
@@ -93,12 +131,14 @@ def compare(
         b = rb[i] if i < len(rb) else None
         lines.append(
             f"| {i + 1} | "
-            f"{_cell(a, 'status')} | {_cell(a, 'cost_score')} | {_cell(a, 'p95_ms')} | {_cell(a, 'error_rate')} | "
+            f"{_cell(a, 'status')} | {_cell(a, 'cost_score')} | {_util_cell(a)} | {_cell(a, 'p95_ms')} | {_cell(a, 'error_rate')} | "
             f"{_cell(a, 'achieved_rps_target_window')} | {_cell(a, 'cpu_util_pct')} | {_cell(a, 'mem_util_pct')} | "
-            f"{_cell(a, 'cpu_request_m')} | {_cell(a, 'mem_request_mib')} | {_cell(a, 'replicas')} | "
-            f"{_cell(b, 'status')} | {_cell(b, 'cost_score')} | {_cell(b, 'p95_ms')} | {_cell(b, 'error_rate')} | "
+            f"{_cell(a, 'cpu_request_m')} | {_cell(a, 'mem_request_mib')} | "
+            f"{_cell(a, 'cpu_limit_m')} | {_cell(a, 'mem_limit_mib')} | {_cell(a, 'replicas')} | "
+            f"{_cell(b, 'status')} | {_cell(b, 'cost_score')} | {_util_cell(b)} | {_cell(b, 'p95_ms')} | {_cell(b, 'error_rate')} | "
             f"{_cell(b, 'achieved_rps_target_window')} | {_cell(b, 'cpu_util_pct')} | {_cell(b, 'mem_util_pct')} | "
-            f"{_cell(b, 'cpu_request_m')} | {_cell(b, 'mem_request_mib')} | {_cell(b, 'replicas')} |"
+            f"{_cell(b, 'cpu_request_m')} | {_cell(b, 'mem_request_mib')} | "
+            f"{_cell(b, 'cpu_limit_m')} | {_cell(b, 'mem_limit_mib')} | {_cell(b, 'replicas')} |"
         )
 
     if len(ra) != len(rb):
@@ -107,6 +147,27 @@ def compare(
                 "",
                 f"*Iteration count mismatch: {label_a}={len(ra)}, {label_b}={len(rb)}.*",
             ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Cost per iteration",
+            "",
+            "One row per iteration; prov cost and util cost only (easier to scan than the full table above).",
+            "",
+            f"| # | {label_a} status | {label_a} prov cost | {label_a} util cost | "
+            f"{label_b} status | {label_b} prov cost | {label_b} util cost |",
+            "| " + " | ".join(["---"] * 7) + " |",
+        ]
+    )
+    for i in range(nmax):
+        a = ra[i] if i < len(ra) else None
+        b = rb[i] if i < len(rb) else None
+        lines.append(
+            f"| {i + 1} | "
+            f"{_cell(a, 'status')} | {_cell(a, 'cost_score')} | {_util_cell(a)} | "
+            f"{_cell(b, 'status')} | {_cell(b, 'cost_score')} | {_util_cell(b)} |"
         )
 
     lines.append("")

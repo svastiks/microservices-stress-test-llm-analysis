@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 180,
+    "provisioned_request_mem_mib": 40,
+    "provisioned_limit_cpu_m": 400,
+    "provisioned_limit_mem_mib": 200,
+    "per_pod_unit_cost": 0.082953,
+    "per_pod_unit_cost_util": 0.06153,
+    "cost_score": 0.1659,
+    "cost_score_util": 0.1231,
+    "cost_score_legacy": 0.2191
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "HIGH",
+  "over_provisioned": true,
+  "evidence": [
+    "Observed CPU Utilization: 75.1%, previous CPU Utilization: 90.3%\n",
+    "Cost Score: 0.1659 indicates potential cost savings\n",
+    "Provisioned Request CPU: 180m, Proposed Request CPU: 60m",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2",
+    "squeeze_down_axis=replica"
+  ],
+  "squeeze_down_axis": "replica",
+  "resource_pass_streak": 0,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 75.1,
+    "mem_util_pct": 35.8,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.75,
+    "total_requests": 3151
+  }
+}

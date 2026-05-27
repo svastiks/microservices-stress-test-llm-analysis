@@ -1,0 +1,9 @@
+- The workload achieved 277.6 RPS, which is close to the target of 280 RPS but failed the SLO with a p95 latency of 1047ms versus the 500ms threshold.
+- CPU utilization was relatively low at 52.9%, indicating potential for increasing CPU requests to improve latency.
+- Currently, requests are set at 70m CPU and 35Mi memory with limits of 200m CPU and 100Mi memory. Increasing these values could help improve latency.
+- Since memory utilization is below 100% (53.8%), I can set memory requests higher than or equal to CPU requests during scaling.
+- The previous iteration had a failure due to p95 SLO violation, indicating an urgent need to increase capacity.
+- To minimize cost while ensuring compliance with the SLO, I plan to increase both CPU and memory requests to accommodate demand while raising one pod.
+- The current cost_score is 0.1328, and adjustments should aim for a more optimal value.
+- Proposing an increase of CPU requests to 100m, memory to 50Mi, and a scale-up of the replicas to a maximum of three for a more robust capacity ready for peak load.
+- Overall, the urgent need is to achieve compliance with the SLO without excessive scaling and cost increases.

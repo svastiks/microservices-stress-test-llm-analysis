@@ -1,0 +1,72 @@
+{
+  "stopped_reason": "recovered_from_underprovisioning",
+  "best_pass_dir": "/app/results/squeeze-compare-formula/run-39/iteration-4",
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "/app/results/squeeze-compare-formula/run-39/iteration-1",
+      "status": "FAIL",
+      "target_rps": 220,
+      "achieved_rps": 164.0,
+      "achieved_rps_target_window": 169.5,
+      "dropped_iterations": 4541,
+      "p95_ms": 5074.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 194.3,
+      "mem_util_pct": 130.7,
+      "replicas": 1,
+      "cpu_request_m": 50,
+      "mem_request_mib": 25,
+      "cost_score": 0.0744
+    },
+    {
+      "run_dir": "/app/results/squeeze-compare-formula/run-39/iteration-2",
+      "status": "FAIL",
+      "target_rps": 220,
+      "achieved_rps": 216.3,
+      "achieved_rps_target_window": 219.6,
+      "dropped_iterations": 41,
+      "p95_ms": 3209.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 93.7,
+      "mem_util_pct": 121.3,
+      "replicas": 1,
+      "cpu_request_m": 70,
+      "mem_request_mib": 35,
+      "cost_score": 0.1042
+    },
+    {
+      "run_dir": "/app/results/squeeze-compare-formula/run-39/iteration-3",
+      "status": "FAIL",
+      "target_rps": 220,
+      "achieved_rps": 219.1,
+      "achieved_rps_target_window": 220.0,
+      "dropped_iterations": 0,
+      "p95_ms": 736.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 77.8,
+      "mem_util_pct": 127.8,
+      "replicas": 1,
+      "cpu_request_m": 98,
+      "mem_request_mib": 49,
+      "cost_score": 0.1459
+    },
+    {
+      "run_dir": "/app/results/squeeze-compare-formula/run-39/iteration-4",
+      "status": "PASS",
+      "target_rps": 220,
+      "achieved_rps": 219.6,
+      "achieved_rps_target_window": 220.0,
+      "dropped_iterations": 0,
+      "p95_ms": 318.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 79.2,
+      "mem_util_pct": 109.7,
+      "replicas": 1,
+      "cpu_request_m": 117,
+      "mem_request_mib": 59,
+      "cost_score": 0.1746
+    }
+  ],
+  "squeeze_optimizer": "formula"
+}

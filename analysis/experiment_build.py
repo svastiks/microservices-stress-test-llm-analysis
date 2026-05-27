@@ -2,6 +2,8 @@
 Build combined experiment JSON from k6 summary + config from YAML + optional Prometheus observed.
 """
 import json
+import math
+import os
 from pathlib import Path
 from typing import Any
 from datetime import datetime, timezone
@@ -9,31 +11,99 @@ from datetime import datetime, timezone
 import yaml
 import uuid
 
+from .cost_model import cost_from_config
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _parse_cpu(s: str) -> int:
-    """Parse Kubernetes CPU (e.g. '100m', '1') to millicores."""
+def parse_cpu_millicores(val: str | int | float | None) -> int:
+    """Parse Kubernetes CPU (e.g. '100m', '112.5m', '1') to integer millicores."""
+    if val is None:
+        return 0
+    s = str(val).strip()
     if not s:
         return 0
-    s = str(s).strip()
     if s.endswith("m"):
-        return int(s[:-1])
-    return int(float(s) * 1000)
+        v = float(s[:-1])
+        return max(1, int(v) if v == int(v) else math.ceil(v))
+    v = float(s) * 1000
+    return max(1, int(v) if v == int(v) else math.ceil(v))
+
+
+def format_cpu_millicores(millicores: int) -> str:
+    return f"{max(1, int(millicores))}m"
+
+
+def parse_memory_mib(val: str | int | float | None) -> int:
+    """Parse Kubernetes memory to integer MiB."""
+    if val is None:
+        return 0
+    s = str(val).strip()
+    if not s:
+        return 0
+    if s.endswith("Mi"):
+        v = float(s[:-2])
+        return max(1, int(v) if v == int(v) else math.ceil(v))
+    if s.endswith("Gi"):
+        return max(1, int(round(float(s[:-2]) * 1024)))
+    if s.endswith("Ki"):
+        return max(1, int(round(float(s[:-2]) / 1024)))
+    return max(1, int(s))  # assume bytes, rough
+
+
+def format_memory_mib(mib: int) -> str:
+    return f"{max(1, int(mib))}Mi"
+
+
+def _parse_cpu(s: str) -> int:
+    return parse_cpu_millicores(s)
 
 
 def _parse_memory_mib(s: str) -> int:
-    """Parse Kubernetes memory to MiB."""
-    if not s:
-        return 0
-    s = str(s).strip()
-    if s.endswith("Mi"):
-        return int(s[:-2])
-    if s.endswith("Gi"):
-        return int(s[:-2]) * 1024
-    if s.endswith("Ki"):
-        return int(s[:-2]) // 1024
-    return int(s)  # assume bytes, rough
+    return parse_memory_mib(s)
+
+
+def normalize_deployment_yaml_resources(yaml_text: str) -> tuple[str, list[str]]:
+    """Round fractional LLM CPU/memory quantities to valid Kubernetes strings."""
+    if not yaml_text.strip():
+        return yaml_text, []
+    try:
+        doc = yaml.safe_load(yaml_text)
+    except Exception:
+        return yaml_text, []
+    if not isinstance(doc, dict) or doc.get("kind") != "Deployment":
+        return yaml_text, []
+    notes: list[str] = []
+    spec = doc.get("spec") or {}
+    template = (spec.get("template") or {}).get("spec") or {}
+    for container in template.get("containers") or []:
+        res = container.get("resources") or {}
+        for block_name in ("requests", "limits"):
+            block = res.get(block_name) or {}
+            if not isinstance(block, dict):
+                continue
+            if "cpu" in block and block["cpu"] is not None:
+                old = block["cpu"]
+                new_m = parse_cpu_millicores(old)
+                new = format_cpu_millicores(new_m)
+                if str(old) != new:
+                    notes.append(f"{block_name}.cpu: {old} -> {new}")
+                    block["cpu"] = new
+            if "memory" in block and block["memory"] is not None:
+                old = block["memory"]
+                new_mib = parse_memory_mib(old)
+                new = format_memory_mib(new_mib)
+                if str(old) != new:
+                    notes.append(f"{block_name}.memory: {old} -> {new}")
+                    block["memory"] = new
+    if not notes:
+        return yaml_text, notes
+    dump_kw = {
+        "default_flow_style": False,
+        "sort_keys": False,
+        "allow_unicode": True,
+    }
+    return yaml.safe_dump(doc, **dump_kw), notes
 
 
 def get_config_from_yaml(deployment_path: Path, hpa_path: Path) -> dict:
@@ -128,40 +198,35 @@ def from_k6_summary(
     return observed, failure
 
 
+def squeeze_cpu_util_fail_pct() -> float:
+    """PASS/FAIL threshold for observed CPU utilization in squeeze mode (default 95%)."""
+    return float(os.environ.get("SQUEEZE_CPU_UTIL_FAIL_PCT", "95"))
+
+
+def apply_squeeze_cpu_util_failure(payload: dict) -> None:
+    """
+    In squeeze mode, high CPU utilization ends the PASS frontier (same class as p95 SLO breach).
+    Requires trustworthy Prometheus telemetry.
+    """
+    if payload.get("mode") != "squeeze":
+        return
+    failure = payload.setdefault("failure", {"failed": False, "reason": ""})
+    if failure.get("failed"):
+        return
+    observed = payload.get("observed") or {}
+    tel = observed.get("telemetry") or {}
+    if not tel.get("utilization_trustworthy"):
+        return
+    cpu = float(observed.get("cpu_util_pct") or 0.0)
+    threshold = squeeze_cpu_util_fail_pct()
+    if cpu > threshold:
+        failure["failed"] = True
+        failure["reason"] = "cpu_utilization_exceeded"
+
+
 def _cost_from_config(config: dict, observed: dict) -> dict:
-    """Compute simple cost metrics from replicas and per-pod resources."""
-    hpa = config.get("hpa") or {}
-    replicas_observed = int(observed.get("replicas") or observed.get("replicas_max") or 0)
-    dep_rep = int(config.get("deployment_replicas") or 0)
-    min_r = int(hpa.get("min_replicas") or 0)
-    # Prefer live observation; else static deployment spec; else HPA floor — never HPA max (that inflated cost).
-    replicas_effective = replicas_observed or dep_rep or min_r or 1
-    replicas_effective = max(1, replicas_effective)
-
-    cpu_request_m = int(config.get("cpu_request_m") or 0)
-    mem_request_mib = int(config.get("mem_request_mib") or 0)
-    cpu_limit_m = int(config.get("cpu_limit_m") or 0)
-    mem_limit_mib = int(config.get("mem_limit_mib") or 0)
-
-    provisioned_request_cpu_m = replicas_effective * cpu_request_m
-    provisioned_request_mem_mib = replicas_effective * mem_request_mib
-    provisioned_limit_cpu_m = replicas_effective * cpu_limit_m
-    provisioned_limit_mem_mib = replicas_effective * mem_limit_mib
-
-    # Unit-normalized score based on requests (preferred for right-sizing).
-    cost_score = round(
-        replicas_effective * ((cpu_request_m / 1000.0) + (mem_request_mib / 1024.0)),
-        4,
-    )
-
-    return {
-        "replicas_effective": replicas_effective,
-        "provisioned_request_cpu_m": provisioned_request_cpu_m,
-        "provisioned_request_mem_mib": provisioned_request_mem_mib,
-        "provisioned_limit_cpu_m": provisioned_limit_cpu_m,
-        "provisioned_limit_mem_mib": provisioned_limit_mem_mib,
-        "cost_score": cost_score,
-    }
+    """Compute provisioned cost from replicas and per-pod requests (see cost_model.py)."""
+    return cost_from_config(config, observed)
 
 
 def build_experiment_payload(
@@ -232,5 +297,6 @@ def build_experiment_payload(
         except (ValueError, OSError):
             pass
 
+    apply_squeeze_cpu_util_failure(payload)
     payload["cost"] = _cost_from_config(payload.get("config") or {}, payload.get("observed") or {})
     return payload

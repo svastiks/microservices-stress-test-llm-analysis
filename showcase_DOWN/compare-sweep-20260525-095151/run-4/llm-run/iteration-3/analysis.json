@@ -1,0 +1,51 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 5,
+    "provisioned_request_cpu_m": 400,
+    "provisioned_request_mem_mib": 200,
+    "provisioned_limit_cpu_m": 400,
+    "provisioned_limit_mem_mib": 200,
+    "per_pod_unit_cost": 0.075906,
+    "per_pod_unit_cost_util": 0.073863,
+    "cost_score": 0.3795,
+    "cost_score_util": 0.3693,
+    "cost_score_legacy": 0.5953
+  },
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "Observed CPU Utilization: 107.7%, indicating CPU limits were exceeded. See failure.reason 'cpu_utilization_exceeded'.",
+    "Previous replicate size of 5 exceeds current deployment. Adjusting down for alignment with observed.",
+    "Cost score of 0.3795 indicates further room for optimization under current workload conditions.",
+    "Current CPU requests are set at 80m; adjusting to 50m based on observed utilization and provided limits.",
+    "Effective request configuration supports memory utilization at a stable 47.7%, indicating no immediate changes needed there.",
+    "observed.replicas: 5",
+    "observed.replicas_max: 5"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 45.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 190.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 107.7,
+    "mem_util_pct": 47.7,
+    "replicas": 5,
+    "replicas_max": 5,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.08,
+    "total_requests": 4050
+  }
+}

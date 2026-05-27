@@ -1,0 +1,8 @@
+- The current deployment has 5 replicas and shows low CPU (24.2%) and memory (14.8%) utilization.
+- Observed latency (7ms) is well below the SLO (500ms), indicating sufficient performance headroom.
+- CPU requests can be aggressively reduced from 150m to approximately 100m to target ~55-65% utilization based on current observed metrics.
+- Memory requests can similarly be cut from 75Mi to around 50Mi, based on observed utilization.
+- HPA maximum replicas should align with the new deployment replicas to maintain autoscaling consistency while reducing over-provisioning.
+- Current cost score is 0.7116, indicating room for cost optimization through resource reduction.
+- The proposed changes aim to maintain performance while minimizing cost; this reflects a strategy of right-sizing deployments based on actual usage data.
+- No errors or OOM kills were encountered, so the risk of further performance degradation from scaling down appears minimal.

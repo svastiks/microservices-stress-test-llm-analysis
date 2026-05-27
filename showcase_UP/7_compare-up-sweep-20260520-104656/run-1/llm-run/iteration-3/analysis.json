@@ -1,0 +1,47 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 243,
+    "provisioned_request_mem_mib": 123,
+    "provisioned_limit_cpu_m": 1800,
+    "provisioned_limit_mem_mib": 1350,
+    "cost_score": 0.3631
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "p95 latency: 420ms (SLO < 500ms)",
+    "CPU utilization: 17.7%, memory utilization: 4.6%",
+    "Observed RPS: 279.4, target RPS: 280",
+    "Current CPU and memory requests are significantly below limits (cpu_util_to_limit: 0.18 and mem_util_to_limit: 0.09)",
+    "Current cost score: 0.3631; plan aims for increased efficiency with more replicas and higher requests",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3",
+    "guard.up_recovery: cpu_req=94m mem_req=48Mi axes=cpu,mem,replica (metric_step cpu=94 mem=48; mem_util=5% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with low CPU and memory vs limits; candidate for modest right-sizing down.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 279.4,
+    "error_rate": 0.0,
+    "latency_ms_p95": 420.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 17.7,
+    "mem_util_pct": 4.6,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.18,
+    "total_requests": 25200
+  }
+}

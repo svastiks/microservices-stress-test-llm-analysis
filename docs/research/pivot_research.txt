@@ -1,0 +1,106 @@
+Efficiency Mapping: Cost-Optimal Microservice
+Configuration via Iterative LLM-Guided Stress Testing
+Abstract
+While microservices offer scalability, cloud environments
+often suffer from significant over-provisioning due to the
+difficulty of predicting performance under specific work-
+loads. This paper proposes a closed-loop, LLM-driven
+methodology to identify the ”Efficiency Frontier” for mi-
+croservice deployments. By subjecting a service to a tar-
+get workload (e.g., 1000 RPS) and iteratively reducing
+resource allocations from a safe baseline, we utilize Large
+Language Models (LLMs) to analyze system telemetry
+and propose progressively leaner configurations. The ob-
+jective is to discover the minimum resource footprint that
+maintains Service Level Objectives (SLOs), effectively
+mapping the most cost-effective configuration for a given
+traffic intensity.
+3. Resource Reduction: The LLM generates a leaner
+YAML configuration (HPA/Deployment).
+4. Validation: The new configuration is applied, and
+the workload is re-run.
+5. Termination: The loop terminates when an SLO
+violation (e.g., p95 latency > 500ms) occurs. The
+configuration from the previous successful run is
+identified as the optimal state.
+1 Introduction
+Operating microservice-based systems is cost-intensive
+because performance boundaries are non-linear. To
+avoid on-call incidents, SREs frequently over-provision
+resources, leading to ”slack” where CPU and memory re-
+main unutilized. Traditional autoscaling (HPA) addresses
+traffic spikes but does not necessarily optimize for the
+most cost-efficient base configuration.
+We propose a ”Stress-to-Optimize” workflow. Instead
+of reacting to failures, we proactive hunt for the breaking
+point of a specific workload. By starting with a known-
+safe, high-resource configuration and iteratively ”squeez-
+ing” the resources in a closed validation loop, we can
+identify the exact point where cost-efficiency meets per-
+formance stability.
+3 Problem Formulation
+We define the optimization task as finding the configura-
+tion C that minimizes total resource cost while satisfying
+performance constraints for a fixed arrival rate λ.
+3.1 The Objective Function
+Let Cost(C) be the aggregate cost of replicas N, CPU
+requests Rcpu, and Memory requests Rmem:
+Minimize F(C) = N ×(w1Rcpu + w2Rmem) (1)
+subject to:
+Lp95 ≤LSLO and Erate ≤ESLO (2)
+3.2 Inputs and Observables
+The system consumes a Stress Test Record containing:
+• Static Params: Nmin,Nmax, CPU/Mem Limits.
+• Workload: Fixed λ (e.g., 1000 requests/sec).
+• Observables: ρcpu (utilization-to-limit ratio),
+ρmem, and Lp95 latency.
+2 Methodology: The Iterative
+Squeeze
+The framework operates as a closed-loop controller con-
+sisting of a Load Generator (k6), a Telemetry Collector
+(Prometheus), and a Decision Engine (LLM).
+The process follows an N-step iterative scale-down:
+1. Baseline Run: Execute the target workload against
+a generous, over-provisioned configuration.
+2. Slack Analysis: The LLM evaluates the gap be-
+tween observed utilization and allocated limits.
+4 LLM-Guided Optimization
+For each iteration, the LLM acts as a heuristic optimizer.
+It is provided with the JSON record of the current run
+and asked to identify ”Optimization Headroom.”
+Listing 1: Optimized Stress-Test Record JSON
+1 {
+2 " r un _ in de x ": 4 ,
+3 " config ": {
+4 " c p u _ r e q u e s t _ m ": 200 ,
+1
+8 " a c h i e v e d _ r p s ": 5 " r e p l i c a s _ m i n ": 5
+6 } ,
+7 " observed ": {
+10 11 12 13 14 15 }
+1000 ,
+9 " l a t e n c y _ m s ": {" p95 ": 210} ,
+" c p u _ u t i l _ p c t ": 45 ,
+" s l o _ s t a t u s ": " PASS "
+} ,
+" o p t i m i z a t i o n _ p o t e n t i a l ": " HIGH " ,
+" r e c o m m e n d a t i o n ": " Reduce replicas to 4 or CPU to 150
+m "
+Unlike reactive mitigation, the LLM here is prompted
+with a Cost Archetype (e.g., OVER PROVISIONED). If the
+Lp95 is significantly lower than LSLO and ρcpu is low, the
+LLM must propose a reduction.
+5 Architecture
+The pipeline utilizes an orchestrator to manage the life-
+cycle of a test. It triggers the k6 load profile, queries
+Prometheus for the 60-second observation window, and
+feeds the resulting JSON to the LLM. If the LLM pro-
+duces a recommendation and the current run is successful,
+the orchestrator applies the new YAML and triggers the
+next iteration.
+6 Conclusion
+By pivoting from failure analysis to cost-optimization, we
+provide a quantifiable method for right-sizing microser-
+vices. This approach identifies not just why a system
+fails, but exactly how much it costs to keep it successful.
+2

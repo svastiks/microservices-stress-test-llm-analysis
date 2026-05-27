@@ -1,0 +1,8 @@
+- The current p95 latency is 4839 ms, significantly exceeding the SLO of 500 ms, indicating a severe performance issue.
+- The observed CPU utilization is at 192.4%, and memory utilization at 279.6%, showing that both resources are heavily saturated, with memory requiring more urgent scaling.
+- Since both CPU and memory are over their respective thresholds, an increase in requests and limits for both resources is warranted to meet the SLO.
+- I propose increasing CPU and memory requests by approximately 40% to address the current latency and resource utilization status effectively.
+- The cost score, considering the deployed resources, is currently 0.0744, which we will aim to minimize while scaling up.
+- The deployment will remain at one replica initially, with the HPA set to allow for future scaling if necessary and contingent upon the next test results.
+- Evidence of resource saturation includes metrics such as cpu_util_pct and mem_util_pct being significantly above their expected utility levels.
+- This step will facilitate stress to fine-tune capacities without immediately jumping to multi-replica scaling, maintaining cost-effectiveness.

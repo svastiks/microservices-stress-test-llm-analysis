@@ -1,0 +1,52 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 5,
+    "provisioned_request_cpu_m": 500,
+    "provisioned_request_mem_mib": 250,
+    "provisioned_limit_cpu_m": 500,
+    "provisioned_limit_mem_mib": 250,
+    "per_pod_unit_cost": 0.094883,
+    "per_pod_unit_cost_util": 0.082736,
+    "cost_score": 0.4744,
+    "cost_score_util": 0.4137,
+    "cost_score_legacy": 0.7441
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "Observed CPU utilization: 89.2% (high usage suggests over-provisioned CPU given requested 100m)",
+    "P95 latency: 124ms (well below SLO threshold of 500ms indicating sufficient latency margins)",
+    "Cost score: 0.4744 (indicating potential for cost optimization with current metrics and resource allocation)",
+    "Requested CPU/memory reduced from 100m/50Mi to 90m/45Mi considering observed utilization patterns",
+    "Deployment replicas changed from 5 to 4 based on observed metrics and operational headroom",
+    "observed.replicas: 5",
+    "observed.replicas_max: 5",
+    "squeeze_down_axis=replica"
+  ],
+  "squeeze_down_axis": "replica",
+  "resource_pass_streak": 0,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 54.9,
+    "error_rate": 0.0,
+    "latency_ms_p95": 124.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 89.2,
+    "mem_util_pct": 50.3,
+    "replicas": 5,
+    "replicas_max": 5,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.89,
+    "total_requests": 4951
+  }
+}

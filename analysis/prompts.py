@@ -1,4 +1,5 @@
 import json
+import os
 
 SYSTEM_PROMPT = """You are an expert in microservice performance analysis and Kubernetes autoscaling. Your task is to analyze stress-test results and identify failure archetypes, estimate critical load thresholds (lambda_crit), and produce actionable diagnoses.
 
@@ -120,12 +121,11 @@ Rules:
 - This mode supports both DOWN and UP movement for fixed-workload right-sizing.
 - If failure.failed is true and scaling_hint is not UP, return empty deployment_yaml_new and hpa_yaml_new.
 - If scaling_hint is UNKNOWN OR observed.telemetry.utilization_trustworthy is false: return empty deployment_yaml_new and hpa_yaml_new (even if failure.failed is false); explain that metrics are missing in report bullets.
-- If scaling_hint is HOLD in squeeze mode: do NOT return empty YAML by default; propose a conservative directional step based on SLO status (failure.failed=true => modest UP, failure.failed=false => modest DOWN) so the loop can continue toward boundary discovery.
-- If scaling_hint is UP and utilization is trustworthy, recommend a modest increase (typically 10-25%) in replicas and/or CPU/memory requests/limits to recover SLO.
-- If failure.failed is false and scaling_hint is DOWN and utilization is trustworthy, recommend a modest reduction (typically 10-25%) in replicas and/or resource requests/limits.
-- Keep changes conservative: avoid >25% reduction in one step unless clearly over-provisioned.
-- Keep UP changes conservative: avoid >35% increase in one step unless failures are severe (high error_rate or clear saturation).
-- Always reference cost fields (cost.cost_score, provisioned_request_cpu_m, provisioned_request_mem_mib) when discussing headroom.
+- If scaling_hint is HOLD in squeeze mode: do NOT return empty YAML by default; propose a directional step sized from SLO status and utilization (failure.failed=true => UP, false => DOWN) so the loop can continue toward boundary discovery.
+- If scaling_hint is UP and utilization is trustworthy: **minimize cost_score at PASS** — grow CPU, memory, and replicas together when metrics show need (mem_util high, cpu_util high, or throughput near target but p95 still fails). At most one replica step per iteration; set spec.replicas and hpa maxReplicas together.
+- If failure.failed is false and scaling_hint is DOWN and utilization is trustworthy, reduce resources based on how low util is and how much latency slack exists; larger cuts only when clearly over-provisioned.
+- Size every change from experiment metrics; cite the reasoning in evidence (e.g. "cpu_util 22% vs 60% target → reduce request 100m→70m").
+- Always reference cost fields (cost.cost_score, provisioned_request_cpu_m, provisioned_request_mem_mib) when discussing headroom. cost_score weights CPU ~90% vs memory ~10% (GCP-aligned); CPU request cuts matter more than memory for cost.
 - Return full-file YAMLs only when making a change.
 - LATENCY SLACK: If observed.telemetry.utilization_trustworthy is true AND observed.latency_ms.p95 is missing or is less than 50% of slo.p95_latency_ms and failure.failed is false, treat headroom as at least MEDIUM: set optimization_headroom to MEDIUM or HIGH, over_provisioned true, and return full YAML with a modest reduction unless already minimal. If utilization is not trustworthy, skip this shortcut (keep YAML empty and explain).
 - Do NOT suggest raising target RPS or changing the fixed workload; next_experiment must say to re-run the same workload after applying the leaner YAML.
@@ -151,16 +151,31 @@ Return exactly this JSON:
   "evidence": ["metric citations"]
 }
 
-Rules (LLM-only path — no deterministic post-processing will override your YAML):
-- Primary objective: minimize the number of iterations to the boundary; prefer ONE coordinated change per step (replicas + CPU/mem + HPA) that is bold enough to make progress but not reckless.
-- If scaling_hint is DOWN and SLO PASS with strong slack (low utilization, comfortable p95 vs SLO), you may use a single-step reduction up to ~30% on requests/limits and a matching HPA max/min adjustment when justified by cost.cost_score and observed replicas.
-- If scaling_hint is UP and SLO FAIL, increase capacity enough to plausibly recover in one or two steps (you may exceed the old \"10-25%\" conservative band when severity is high — up to ~40% in one step if error_rate or p95 multiple is severe and telemetry is trustworthy).
-- If scaling_hint is HOLD but mode is squeeze boundary-seeking: still output directional YAML (FAIL => modest UP, PASS => modest DOWN) so the loop does not stall; explain in the report.
-- If scaling_hint is UNKNOWN OR observed.telemetry.utilization_trustworthy is false: return empty YAML strings and explain missing metrics.
-- If failure.failed is true and scaling_hint is not UP (and not in up_recovery): return empty YAML strings unless telemetry clearly supports a safe vertical increase without guessing.
+Rules (LLM-only / research path — you are the sole source of sizing; Python does not rewrite your YAML each iteration):
+- Primary objective: minimize iterations to the boundary while beating formula on cost_score. Python only clamps replica steps to at most one pod vs live and vetoes illegal replica cuts.
+- Phase 1 (resource squeeze): while cpu_request_m is above ~100m OR fewer than two consecutive resource-only PASS steps, hold spec.replicas at the current file value and aggressively cut CPU/memory (e.g. 150m/75Mi → ~100m/50Mi) using observed.cpu_util_pct and mem_util_pct. Target ~55–65% utilization before replica cuts when telemetry is trustworthy.
+- Phase 2 (replica squeeze): after Phase 1, alternate replica vs resource DOWN — never lower replicas two PASS iterations in a row. If previous squeeze_down_axis was **replica**, cut CPU/memory only. On a replica step: lower spec.replicas by at most 1 vs live AND trim CPU/memory when headroom exists.
+- On a **replica** iteration: lower spec.replicas by at most 1 vs live AND reduce CPU/memory vs the current file.
+- On a **resources** iteration: reduce CPU/memory vs the current file; keep spec.replicas unchanged unless already at one pod.
+- Read failure.failed, slo, observed.cpu_util_pct, mem_util_pct, latency vs slo, cost.cost_score, observed.replicas. The experiment may omit scaling_hint (llm_pure_squeeze); do not wait for it.
+- DOWN boundary (SLO PASS, seeking cost-effective limit): you MUST return full deployment_yaml_new and/or hpa_yaml_new with a scale-down — never empty strings. NEVER increase cpu/memory requests or limits vs the current on-disk file on PASS (high cpu_util_pct means hot, not "raise requests"). If a repair prompt shows your rejected (too-large) YAML, fix it with a DOWN-only proposal vs the on-disk baseline.
+- NEVER return YAML identical to the current on-disk file during squeeze-down. If the file already shows fewer replicas than max(observed.replicas, observed.replicas_max), still return full YAML with spec.replicas = max(1, live-1), aligned HPA maxReplicas, and reduced CPU/memory vs the file so the cluster can converge.
+- If utilization is not trustworthy but SLO PASS: still propose a conservative DOWN patch from whatever metrics exist; explain uncertainty in the report.
+- If failure.failed is true: propose UP sized from failure severity and utilization unless scale-up is unsafe (then empty YAML + explain).
+- Code may only clamp replicas to at most one fewer than max(observed.replicas, observed.replicas_max); it will not rewrite your CPU/memory choices.
 - Always return full-file YAML when you change a file; never diffs inside the JSON strings.
 - lambda_crit_estimate must always be null.
 - Cite cost.cost_score, provisioned_request_cpu_m, provisioned_request_mem_mib, observed.replicas, observed.replicas_max in evidence when relevant.
+
+REPLICAS (hard, separate from CPU/mem sizing):
+- On SLO PASS when reducing replicas: lower spec.replicas by **at most 1** vs max(observed.replicas, observed.replicas_max). Set hpa maxReplicas to that same target. Never skip steps (e.g. 3→1).
+
+CPU / MEMORY (derive step size from metrics — no fixed % cap):
+- Use observed.cpu_util_pct, mem_util_pct, latency vs slo.p95_latency_ms, optimization_headroom, over_provisioned, and cost.cost_score vs prior iteration when available.
+- SLO PASS + trustworthy telemetry: cut requests/limits more when utilization is far below the HPA target and latency has large slack; cut less when util is moderate or headroom is LOW. State the implied util/latency margin and chosen millicores/Mi in evidence.
+- SLO PASS but util not trustworthy: prefer a small CPU/mem trim or replica-only step; explain missing telemetry in the report.
+- SLO FAIL: increase enough to clear the bottleneck suggested by failure_archetype and metrics (CPU vs memory vs replicas/HPA); larger steps only when saturation is clear (e.g. cpu_util_pct very high or repeated FAIL after small UP).
+- Replicas follow the one-step rule above; coordinate CPU/mem sizes with observed utilization on every DOWN step.
 """
 
 
@@ -169,12 +184,30 @@ def build_user_prompt(
 ) -> str:
     """Build prompt from experiment.json (and optional deployment YAML)."""
     exp_str = json.dumps(experiment_json, indent=2)
+    failure = experiment_json.get("failure") or {}
+    failed = bool(failure.get("failed"))
+    scaling_hint = (experiment_json.get("scaling_hint") or "").strip()
+    in_up_recovery = bool(
+        experiment_json.get("up_recovery")
+        or (failed and scaling_hint == "UP")
+    )
     if mode == "squeeze":
-        focus = (
-            "Focus on: optimization_headroom, over/under-provisioning signals, cost-aware right-sizing, "
-            "and conservative YAML right-sizing changes (DOWN or UP movement) for this same fixed workload. "
-            "Ignore lambda_crit and higher-RPS exploration."
-        )
+        if in_up_recovery:
+            focus = (
+                "Focus on: under-provisioned UP recovery at fixed workload — reach SLO PASS with the "
+                "**lowest cost_score** (replicas × CPU/mem requests). Scale CPU, memory, and replicas "
+                "from observed metrics (same PASS rules as DOWN: p95 ≤ SLO, error_rate ≤ SLO, "
+                "cpu_util ≤ 95% when telemetry is trustworthy). At most one replica step per iteration. "
+                "Ignore lambda_crit."
+            )
+        else:
+            focus = (
+                "Focus on: optimization_headroom, over/under-provisioning signals, cost-aware right-sizing, "
+                "and YAML changes for this same fixed workload (DOWN on PASS; UP only after FAIL). "
+                "Choose CPU/memory step sizes from observed utilization, latency vs SLO, and headroom — "
+                "not from fixed percentage rules. Replicas: at most one pod fewer per DOWN step. "
+                "Ignore lambda_crit and higher-RPS exploration."
+            )
     else:
         focus = (
             "Focus on: failure_archetype (NONE when failure.failed is false), lambda_crit estimate, "
@@ -186,6 +219,89 @@ def build_user_prompt(
         "\n```\n\n",
         f"{focus}\n\n",
     ]
+    if mode == "squeeze" and in_up_recovery:
+        cfg = experiment_json.get("config") or {}
+        obs = experiment_json.get("observed") or {}
+        dep_rep = int(cfg.get("deployment_replicas") or 0)
+        hpa_cfg = cfg.get("hpa") or {}
+        hpa_max = int(hpa_cfg.get("max_replicas") or dep_rep or 1)
+        live_rep = int(obs.get("replicas") or 0)
+        live_max = int(obs.get("replicas_max") or 0)
+        at_single_pod = max(dep_rep, hpa_max, live_rep, live_max) <= 1
+        slo = experiment_json.get("slo") or {}
+        p95 = float((obs.get("latency_ms") or {}).get("p95") or 0)
+        slo_p95 = float(slo.get("p95_latency_ms") or 500)
+        parts.append(
+            "\nUP recovery (cost-aware): scaling_hint=UP — grow capacity until SLO passes, "
+            "but minimize provisioned cost_score.\n"
+            "- **Multi-axis UP** (like DOWN multi-axis): in one iteration you may raise CPU requests/limits, "
+            "memory requests/limits, and spec.replicas + hpa maxReplicas together when metrics justify it.\n"
+            "- Raise **memory at least as much as CPU** when mem_util_pct is above 100%; set limits "
+            "~1.5–2× requests.\n"
+            "- Add **at most one** replica per iteration when at a single-pod baseline and achieved RPS is "
+            "≥85% of workload target (including under memory/CPU saturation).\n"
+            "- PASS requires p95 ≤ slo.p95_latency_ms, error_rate ≤ slo.error_rate, and (when telemetry "
+            "is trustworthy) cpu_util_pct ≤ 95% — same frontier as the DOWN squeeze demos.\n"
+            "- Never scale DOWN while failure.failed is true.\n"
+            f"- Current: deployment_replicas={dep_rep}, hpa max={hpa_max}, live={live_rep}, "
+            f"p95={p95:.0f}ms vs slo={slo_p95:.0f}ms, single_pod={at_single_pod}.\n"
+        )
+    if mode == "squeeze" and not in_up_recovery:
+        prev = experiment_json.get("_prev_iteration") or {}
+        prev_axis = prev.get("squeeze_down_axis") or "none"
+        streak = int(prev.get("resource_pass_streak") or 0)
+        cfg = experiment_json.get("config") or {}
+        cpu_m = int(cfg.get("cpu_request_m") or 0)
+        ceiling = int(os.environ.get("SQUEEZE_LLM_REPLICA_CPU_REQUEST_CEILING_M", "100"))
+        min_passes = int(
+            os.environ.get("SQUEEZE_LLM_MIN_RESOURCE_PASSES_BEFORE_REPLICA", "2")
+        )
+        replica_ok = (cpu_m > 0 and cpu_m <= ceiling) or streak >= min_passes
+        if replica_ok and prev_axis != "replica":
+            phase = (
+                "Phase 2: replica DOWN is allowed this iteration if metrics support it; "
+                "still trim CPU/memory when headroom exists."
+            )
+        elif prev_axis == "replica":
+            phase = (
+                "Phase 2: previous axis was replica — cut CPU/memory only; "
+                "do not lower spec.replicas."
+            )
+        else:
+            phase = (
+                f"Phase 1: hold replicas (cpu_request_m={cpu_m}, "
+                f"resource_pass_streak={streak}); aggressively reduce CPU/memory toward "
+                "~55–65% utilization before any replica cut."
+            )
+        parts.append(
+            f"\nDOWN strategy: previous squeeze_down_axis={prev_axis}, "
+            f"resource_pass_streak={streak}. {phase} "
+            "Never lower replicas two PASS iterations in a row.\n"
+        )
+        obs = experiment_json.get("observed") or {}
+        dep_rep = int(cfg.get("deployment_replicas") or 0)
+        live_rep = int(obs.get("replicas") or 0)
+        live_max = int(obs.get("replicas_max") or 0)
+        live_for_step = max(live_rep, live_max) if live_rep > 0 else live_max
+        if live_for_step > 1 and replica_ok and prev_axis != "replica":
+            next_rep = max(1, live_for_step - 1)
+            parts.append(
+                f"\nLIVE SCALE: observed.replicas={live_rep}"
+                + (f", observed.replicas_max={live_max}" if live_max else "")
+                + f" → for this DOWN step set spec.replicas={next_rep} and hpa maxReplicas={next_rep} "
+                f"(exactly one fewer than live={live_for_step}; never skip steps).\n"
+            )
+        elif live_for_step > 1 and not replica_ok:
+            hold_rep = dep_rep if dep_rep > 0 else live_for_step
+            parts.append(
+                f"\nLIVE SCALE: hold spec.replicas={hold_rep} and hpa maxReplicas={hold_rep} "
+                f"(resource phase; live={live_for_step}).\n"
+            )
+        elif live_rep > 0 and dep_rep != live_rep:
+            parts.append(
+                f"\nLIVE SCALE: observed.replicas={live_rep} (authoritative); "
+                f"config.deployment_replicas={dep_rep} may lag the cluster.\n"
+            )
     if current_yaml.strip():
         parts.append(
             "Current Kubernetes deployment + HPA YAML (each file prefixed with '# FILE: <relative-path>'). If you change a file, return the ENTIRE updated YAML in deployment_yaml_new and/or hpa_yaml_new. If no change for a file, use empty string for that field.\n```yaml\n"

@@ -1,0 +1,7 @@
+- Current CPU utilization is high at 69.6%, but memory utilization is critically above 100% at 110.7%.
+- The observed p95 latency of 423ms is below the SLO target of 500ms, meeting the latency requirements.
+- Scaling up is necessary to avoid potential memory saturation, as memory requests are low compared to utilization.
+- Proposing a conservative CPU and memory increase of approximately 40% to ensure reliability while minimizing cost.
+- Current cost score is 0.1399; adjustments should aim to improve efficiency without breaching resource limits.
+- The up recovery strategy focuses on vertical scaling only to start, as there is still only one pod in operation.
+- Following the proposed changes, expectations are set for improved resource management and sustained SLO compliance.

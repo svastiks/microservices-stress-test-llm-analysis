@@ -14,13 +14,21 @@ SQUEEZE_UNTIL_VIOLATION="${SQUEEZE_UNTIL_VIOLATION:-false}"
 SQUEEZE_MAX_ITERATIONS="${SQUEEZE_MAX_ITERATIONS:-8}"
 SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS:-30}"
 COMPARE_SQUEEZE_OPTIMIZERS="${COMPARE_SQUEEZE_OPTIMIZERS:-false}"
+COMPARE_HPA_VS_LLM="${COMPARE_HPA_VS_LLM:-false}"
 SQUEEZE_FINAL_REPORT_LLM="${SQUEEZE_FINAL_REPORT_LLM:-false}"
 
 for arg in "$@"; do
   if [[ "${arg}" == "--compare-squeeze-optimizers" ]]; then
     COMPARE_SQUEEZE_OPTIMIZERS="true"
   fi
+  if [[ "${arg}" == "--compare-hpa-vs-llm" ]]; then
+    COMPARE_HPA_VS_LLM="true"
+  fi
 done
+if [[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" && "${COMPARE_HPA_VS_LLM}" == "true" ]]; then
+  echo "[analyzer] cannot use --compare-squeeze-optimizers and --compare-hpa-vs-llm together" >&2
+  exit 1
+fi
 SUT_BASE_URL="${SUT_BASE_URL:-http://web.${NAMESPACE}.svc.cluster.local:8080}"
 PROFILE="${PROFILE:-low}"
 ANALYZER_SCRIPT="${ANALYZER_SCRIPT:-robotshop_login}"
@@ -30,7 +38,7 @@ echo "[analyzer] namespace: ${NAMESPACE}"
 echo "[analyzer] job: ${JOB_NAME}"
 echo "[analyzer] profile: ${PROFILE}"
 echo "[analyzer] script: ${ANALYZER_SCRIPT}"
-echo "[analyzer] squeeze: until_violation=${SQUEEZE_UNTIL_VIOLATION} max_iterations=${SQUEEZE_MAX_ITERATIONS} settle_seconds=${SQUEEZE_SETTLE_SECONDS} compare_optimizers=${COMPARE_SQUEEZE_OPTIMIZERS} final_report_llm=${SQUEEZE_FINAL_REPORT_LLM}"
+echo "[analyzer] squeeze: until_violation=${SQUEEZE_UNTIL_VIOLATION} max_iterations=${SQUEEZE_MAX_ITERATIONS} settle_seconds=${SQUEEZE_SETTLE_SECONDS} compare_optimizers=${COMPARE_SQUEEZE_OPTIMIZERS} compare_hpa_vs_llm=${COMPARE_HPA_VS_LLM} final_report_llm=${SQUEEZE_FINAL_REPORT_LLM}"
 
 if [[ ! -f "${JOB_YAML}" ]]; then
   echo "[analyzer] job yaml not found: ${JOB_YAML}" >&2
@@ -91,7 +99,47 @@ else
   DYNAMIC_SQUEEZE_FLAGS="\"--max-iterations\",\"${SQUEEZE_MAX_ITERATIONS}\""
 fi
 
-if [[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" ]]; then
+if [[ "${COMPARE_HPA_VS_LLM}" == "true" ]]; then
+  kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
+    \"spec\":{
+      \"template\":{
+        \"spec\":{
+          \"containers\":[
+            {
+              \"name\":\"runner\",
+              \"command\":[
+                \"python3\",
+                \"start.py\",
+                \"--compare-hpa-vs-llm\",
+                \"--profile\",
+                \"${PROFILE}\",
+                \"--script\",
+                \"${ANALYZER_SCRIPT}\",
+                ${DYNAMIC_SQUEEZE_FLAGS},
+                \"--settle-seconds\",
+                \"${SQUEEZE_SETTLE_SECONDS}\",
+                \"--efficiency\",
+                \"--k8s-namespace\",
+                \"${NAMESPACE}\",
+                \"--k8s-deployment\",
+                \"web\",
+                \"--base-url\",
+                \"${SUT_BASE_URL}\",
+                \"--deployment-yaml\",
+                \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
+                \"--hpa-yaml\",
+                \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
+                \"--prometheus-url\",
+                \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }" -o yaml > "${MANIFEST}.tmp"
+  mv "${MANIFEST}.tmp" "${MANIFEST}"
+elif [[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" ]]; then
   FINAL_REPORT_JSON=""
   if [[ "${SQUEEZE_FINAL_REPORT_LLM}" == "true" ]]; then
     FINAL_REPORT_JSON=',"--squeeze-final-report-llm"'
@@ -186,8 +234,51 @@ SET_ENV_CMD=(
   RESULTS_DB_NAME="${RESULTS_DB_NAME:-stress_analyzer}"
   SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS}"
 )
+if [[ -n "${STRESS_K6_RPS:-}" ]]; then
+  SET_ENV_CMD+=(STRESS_K6_RPS="${STRESS_K6_RPS}")
+fi
+if [[ -n "${STRESS_K6_DURATION:-}" ]]; then
+  SET_ENV_CMD+=(STRESS_K6_DURATION="${STRESS_K6_DURATION}")
+fi
 if [[ -n "${SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION:-}" ]]; then
   SET_ENV_CMD+=(SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION="${SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION}")
+fi
+if [[ -n "${SQUEEZE_LLM_DOWN_BOUNDARY:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_LLM_DOWN_BOUNDARY="${SQUEEZE_LLM_DOWN_BOUNDARY}")
+fi
+if [[ -n "${SQUEEZE_LLM_PURE+x}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_LLM_PURE="${SQUEEZE_LLM_PURE}")
+fi
+if [[ -n "${SQUEEZE_CPU_UTIL_FAIL_PCT:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_CPU_UTIL_FAIL_PCT="${SQUEEZE_CPU_UTIL_FAIL_PCT}")
+fi
+if [[ -n "${SQUEEZE_LLM_CPU_GUARD_PCT:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_LLM_CPU_GUARD_PCT="${SQUEEZE_LLM_CPU_GUARD_PCT}")
+fi
+if [[ -n "${SQUEEZE_LLM_P95_REGRESSION_RATIO:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_LLM_P95_REGRESSION_RATIO="${SQUEEZE_LLM_P95_REGRESSION_RATIO}")
+fi
+if [[ -n "${SQUEEZE_WAIT_REPLICAS_STEADY:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_WAIT_REPLICAS_STEADY="${SQUEEZE_WAIT_REPLICAS_STEADY}")
+fi
+if [[ -n "${SQUEEZE_UNTIL_VIOLATION_PROBE_LLM:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_UNTIL_VIOLATION_PROBE_LLM="${SQUEEZE_UNTIL_VIOLATION_PROBE_LLM}")
+fi
+if [[ -n "${STRESS_RESULTS_SUBDIR:-}" ]]; then
+  SET_ENV_CMD+=(STRESS_RESULTS_SUBDIR="${STRESS_RESULTS_SUBDIR}")
+fi
+if [[ -n "${SQUEEZE_OPTIMIZER:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_OPTIMIZER="${SQUEEZE_OPTIMIZER}")
+fi
+if [[ "${COMPARE_HPA_VS_LLM}" == "true" ]]; then
+  SET_ENV_CMD+=(
+    SQUEEZE_COMPARE_SUBDIR_HPA="${SQUEEZE_COMPARE_SUBDIR_HPA:-squeeze-compare-hpa}"
+    SQUEEZE_COMPARE_SUBDIR_LLM="${SQUEEZE_COMPARE_SUBDIR_LLM:-squeeze-compare-llm}"
+    SQUEEZE_COMPARE_PRUNE_STALE_FORMULA="${SQUEEZE_COMPARE_PRUNE_STALE_FORMULA:-1}"
+  )
+fi
+if [[ -n "${COMPARE_SYNC_MODE:-}" ]]; then
+  SET_ENV_CMD+=(COMPARE_SYNC_MODE="${COMPARE_SYNC_MODE}")
 fi
 "${SET_ENV_CMD[@]}" > "${MANIFEST}.tmp"
 mv "${MANIFEST}.tmp" "${MANIFEST}"

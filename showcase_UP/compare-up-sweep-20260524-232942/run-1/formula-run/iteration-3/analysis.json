@@ -1,0 +1,48 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "formula",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 252,
+    "provisioned_request_mem_mib": 126,
+    "provisioned_limit_cpu_m": 501,
+    "provisioned_limit_mem_mib": 252,
+    "per_pod_unit_cost": 0.079702,
+    "per_pod_unit_cost_util": 0.050781,
+    "cost_score": 0.2391,
+    "cost_score_util": 0.1523,
+    "cost_score_legacy": 0.375
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "NONE",
+  "over_provisioned": false,
+  "evidence": [
+    "formula.step_pct=0.153",
+    "formula.scaling_hint=UP",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "Under-provisioning recovery sweep: keep increasing capacity until SLO passes.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 258.6,
+    "error_rate": 0.0,
+    "latency_ms_p95": 516.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 64.1,
+    "mem_util_pct": 56.6,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.64,
+    "total_requests": 23401
+  }
+}

@@ -1,0 +1,14 @@
+round=1/1
+status=OK
+label=rps=220
+PROFILES_CSV=up_demo
+STRESS_K6_RPS=220
+STRESS_K6_DURATION=
+finished_utc=2026-05-19T20:13:20Z
+SQUEEZE_UNTIL_VIOLATION=false
+SQUEEZE_MAX_ITERATIONS=16
+SQUEEZE_COMPARE_FORMULA_MAX_ITERATIONS=16
+SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION=0
+sweep_root=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-up-sweep-20260519-155441
+run_dir=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-up-sweep-20260519-155441/run-44
+comparison_md=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-up-sweep-20260519-155441/run-44/comparison.md

@@ -13,8 +13,23 @@ ANALYZER_IMAGE_PULL_POLICY="${ANALYZER_IMAGE_PULL_POLICY:-Always}"
 BUILD_ANALYZER_IMAGE="${BUILD_ANALYZER_IMAGE:-false}"
 BUILD_PLATFORMS="${BUILD_PLATFORMS:-linux/amd64,linux/arm64}"
 STREAM_JOB_LOGS="${STREAM_JOB_LOGS:-true}"
-WAIT_TIMEOUT="${WAIT_TIMEOUT:-45m}"
+# Empty / "none" = poll until the job completes (kubectl --timeout=0 checks once; do not use it).
+WAIT_TIMEOUT="${WAIT_TIMEOUT:-}"
+WAIT_POLL_SECONDS="${WAIT_POLL_SECONDS:-60}"
+RESULTS_PVC_SYNC_LLMS_ONLY="${RESULTS_PVC_SYNC_LLMS_ONLY:-false}"
 RESULTS_DEST="${RESULTS_DEST:-./results-from-cluster}"
+# thin (default): RESULTS_DEST/run-<n>/formula-run/, llm-run/ (each holds iteration-* like a single-optimizer run),
+#   plus comparison.md (regenerated locally from the two cost-effective-boundary.json files; PVC root file is fallback only).
+# full: copy entire PVC tree to RESULTS_DEST/pvc-import-<stamp>/ (optional snapshots/ if RESULTS_PVC_SNAPSHOTS=true).
+RESULTS_PVC_SYNC_LAYOUT="${RESULTS_PVC_SYNC_LAYOUT:-thin}"
+RESULTS_PVC_SNAPSHOTS="${RESULTS_PVC_SNAPSHOTS:-false}"
+# When true, also copy run-<n>/comparison.md to RESULTS_DEST root as squeeze-optimizer-comparison.md.
+RESULTS_PVC_COPY_COMPARISON_TO_ROOT="${RESULTS_PVC_COPY_COMPARISON_TO_ROOT:-false}"
+# When true, also write squeeze-optimizer-comparison-<timestamp>.md under RESULTS_DEST (root copy only).
+RESULTS_STAMPED_COMPARISON_MD="${RESULTS_STAMPED_COMPARISON_MD:-false}"
+# When set (e.g. compare sweep round 1..N), sync copies PVC data to RESULTS_DEST/run-<round>
+# (not always run-1) so multi-RPS sweeps keep every round locally.
+COMPARE_SWEEP_ROUND="${COMPARE_SWEEP_ROUND:-}"
 READER_POD="${READER_POD:-analyzer-results-reader}"
 RESET_BASELINE_EACH_PROFILE="${RESET_BASELINE_EACH_PROFILE:-true}"
 CLEANUP_COMPLETED_JOBS="${CLEANUP_COMPLETED_JOBS:-true}"
@@ -58,7 +73,9 @@ on_error() {
 trap 'on_error $LINENO' ERR
 
 cleanup_on_exit() {
+  local rc=$?
   kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null 2>&1 || true
+  exit "${rc}"
 }
 trap cleanup_on_exit EXIT
 
@@ -86,6 +103,13 @@ log "cleanup_terminal_pods: ${CLEANUP_TERMINAL_PODS}"
 log "cleanup_failed_jobs: ${CLEANUP_FAILED_JOBS}"
 log "deploy_analyzer_mongodb: ${DEPLOY_ANALYZER_MONGODB}"
 log "up_demo_stabilize_user: ${UP_DEMO_STABILIZE_USER}"
+log "results_pvc_sync_layout: ${RESULTS_PVC_SYNC_LAYOUT}"
+log "results_pvc_snapshots: ${RESULTS_PVC_SNAPSHOTS}"
+log "results_pvc_copy_comparison_to_root: ${RESULTS_PVC_COPY_COMPARISON_TO_ROOT}"
+log "results_stamped_comparison_md: ${RESULTS_STAMPED_COMPARISON_MD}"
+if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+  log "compare_sweep_round: ${COMPARE_SWEEP_ROUND}"
+fi
 if [[ "$#" -gt 0 ]]; then
   log "extra args for analyzer job: $*"
 fi
@@ -106,6 +130,335 @@ save_job_logs() {
     kubectl -n "${NAMESPACE}" logs "job/${job_name}" --all-containers=true --tail=500 > "${out_file}" 2>&1 || true
   fi
 }
+
+job_condition_status() {
+  local job_name="$1"
+  local cond="$2"
+  kubectl -n "${NAMESPACE}" get "job/${job_name}" \
+    -o "jsonpath={.status.conditions[?(@.type==\"${cond}\")].status}" 2>/dev/null || true
+}
+
+wait_for_analyzer_job() {
+  local job_name="$1"
+  if [[ -n "${WAIT_TIMEOUT}" && "${WAIT_TIMEOUT}" != "none" ]]; then
+    log "waiting for ${job_name} (timeout=${WAIT_TIMEOUT})"
+    kubectl -n "${NAMESPACE}" wait --for=condition=complete --timeout="${WAIT_TIMEOUT}" "job/${job_name}"
+    return $?
+  fi
+  log "waiting for ${job_name} (poll every ${WAIT_POLL_SECONDS}s, no overall timeout)"
+  while true; do
+    if [[ "$(job_condition_status "${job_name}" Complete)" == "True" ]]; then
+      return 0
+    fi
+    if [[ "$(job_condition_status "${job_name}" Failed)" == "True" ]]; then
+      return 1
+    fi
+    if ! kubectl -n "${NAMESPACE}" get "job/${job_name}" >/dev/null 2>&1; then
+      return 1
+    fi
+    sleep "${WAIT_POLL_SECONDS}"
+  done
+}
+
+latest_numbered_run_dir() {
+  local parent="$1"
+  local best=""
+  local best_n=-1
+  local d b n
+  if [[ ! -d "${parent}" ]]; then
+    return 0
+  fi
+  for d in "${parent}"/run-*; do
+    [[ -d "${d}" ]] || continue
+    b="$(basename "${d}")"
+    if [[ "${b}" =~ ^run-([0-9]+)$ ]]; then
+      n="${BASH_REMATCH[1]}"
+      if (( n > best_n )); then
+        best_n="${n}"
+        best="${d}"
+      fi
+    fi
+  done
+  if [[ -n "${best}" ]]; then
+    printf "%s" "${best}"
+  fi
+}
+
+# Copy analyzer PVC to RESULTS_DEST after every profile job (success or failure) so partial runs are not lost.
+# Compare (--compare-squeeze-optimizers): one folder run-<n>/formula-run, run-<n>/llm-run (iteration-* inside), plus
+#   comparison.md (rebuilt from those trees' cost-effective-boundary.json on sync).
+# Other jobs: copy latest top-level PVC run-<n>/ only (no latest/, no snapshots/, no duplicate run/ bundle).
+sync_results_pvc_to_local() {
+  local reason="${1:-sync}"
+  log "copy results PVC to local ${RESULTS_DEST} (${reason}) ..."
+  kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null
+  kubectl -n "${NAMESPACE}" apply -f - >/dev/null <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${READER_POD}
+spec:
+  restartPolicy: Never
+  containers:
+  - name: reader
+    image: busybox
+    command: ["sh","-c","sleep 3600"]
+    volumeMounts:
+    - name: results
+      mountPath: /results
+  volumes:
+  - name: results
+    persistentVolumeClaim:
+      claimName: analyzer-results-pvc
+EOF
+
+  if ! kubectl -n "${NAMESPACE}" wait --for=condition=Ready "pod/${READER_POD}" --timeout=120s >/dev/null; then
+    log "WARNING: reader pod not Ready; skipping PVC copy for this sync"
+    kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null || true
+    return 0
+  fi
+
+  local RUN_STAMP
+  RUN_STAMP="$(date +%Y%m%d-%H%M%S)"
+  local SNAPSHOT_DIR TMP_COPY_DIR COPIED_ROOT FORMULA_SRC LLM_SRC SINGLE_RUN
+  SNAPSHOT_DIR="${RESULTS_DEST}/snapshots/${RUN_STAMP}"
+  TMP_COPY_DIR="$(mktemp -d)"
+
+  if ! kubectl -n "${NAMESPACE}" cp "${READER_POD}:/results" "${TMP_COPY_DIR}"; then
+    log "WARNING: kubectl cp from PVC failed; skipping layout for this sync"
+    rm -rf "${TMP_COPY_DIR}"
+    kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null || true
+    return 0
+  fi
+
+  COPIED_ROOT="${TMP_COPY_DIR}/results"
+  if [[ ! -d "${COPIED_ROOT}" ]]; then
+    COPIED_ROOT="${TMP_COPY_DIR}"
+  fi
+
+  # Drop legacy mirror dirs this script used to create (avoid stale duplicates next to run-<n>/).
+  rm -rf "${RESULTS_DEST}/latest" "${RESULTS_DEST}/run" 2>/dev/null || true
+  if [[ "${RESULTS_PVC_SNAPSHOTS}" != "true" ]]; then
+    rm -rf "${RESULTS_DEST}/snapshots" 2>/dev/null || true
+  fi
+
+  if [[ "${RESULTS_PVC_SYNC_LAYOUT}" == "full" ]]; then
+    local IMPORT_DIR
+    IMPORT_DIR="${RESULTS_DEST}/pvc-import-${RUN_STAMP}"
+    mkdir -p "${IMPORT_DIR}"
+    cp -R "${COPIED_ROOT}/." "${IMPORT_DIR}/"
+    if [[ "${RESULTS_PVC_SNAPSHOTS}" == "true" ]]; then
+      mkdir -p "${SNAPSHOT_DIR}"
+      cp -R "${COPIED_ROOT}/." "${SNAPSHOT_DIR}/"
+    fi
+    log "PVC sync done (${reason}, layout=full): import=${IMPORT_DIR}"
+    kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null
+    rm -rf "${TMP_COPY_DIR}"
+    return 0
+  fi
+
+  # --- thin ---
+  if [[ "${RESULTS_PVC_SYNC_LLMS_ONLY}" == "true" && -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
+    LLM_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-llm")"
+    if [[ -n "${LLM_SRC}" ]]; then
+      run_label="$(basename "${LLM_SRC}")"
+      run_out="${RESULTS_DEST}/${run_label}"
+      rm -rf "${run_out}"
+      cp -R "${LLM_SRC}" "${run_out}"
+      log "PVC sync done (${reason}, layout=thin, llm-only): ${run_out}"
+    else
+      log "WARNING: squeeze-compare-llm present but no run-* found"
+    fi
+  elif [[ "${COMPARE_SYNC_MODE:-}" == "hpa" ]] \
+    && [[ ! -d "${COPIED_ROOT}/squeeze-compare-hpa" || ! -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
+    if [[ -d "${COPIED_ROOT}/squeeze-compare-formula" && -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
+      log "ERROR: COMPARE_SYNC_MODE=hpa but PVC has formula+llm only (stale method-1 or job ran --compare-squeeze-optimizers)"
+      log "  Rebuild analyzer image and run: ./scripts/run_down_demo_hpa_vs_llm_sweep.sh with BUILD_ANALYZER_IMAGE=true"
+    else
+      log "WARNING: COMPARE_SYNC_MODE=hpa but PVC missing squeeze-compare-hpa and/or squeeze-compare-llm"
+    fi
+  elif [[ "${COMPARE_SYNC_MODE:-}" == "hpa" ]] \
+    && [[ -d "${COPIED_ROOT}/squeeze-compare-hpa" && -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
+    HPA_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-hpa")"
+    LLM_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-llm")"
+    if [[ -z "${HPA_SRC}" || -z "${LLM_SRC}" ]]; then
+      log "WARNING: compare layout expected squeeze-compare hpa+llm runs on PVC; skipping bundle"
+    else
+      local h_base l_base run_label run_out n_h n_l
+      h_base="$(basename "${HPA_SRC}")"
+      l_base="$(basename "${LLM_SRC}")"
+      run_label="${h_base}"
+      if [[ "${h_base}" =~ ^run-([0-9]+)$ ]]; then
+        n_h="${BASH_REMATCH[1]}"
+      else
+        n_h=-1
+      fi
+      if [[ "${l_base}" =~ ^run-([0-9]+)$ ]]; then
+        n_l="${BASH_REMATCH[1]}"
+      else
+        n_l=-1
+      fi
+      if [[ "${n_h}" -ge 0 && "${n_l}" -ge 0 && "${n_h}" != "${n_l}" ]]; then
+        log "ERROR: hpa ${h_base} vs llm ${l_base} run index mismatch — stale PVC bundle; skipping compare copy"
+      else
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        run_label="run-${COMPARE_SWEEP_ROUND}"
+      fi
+      run_out="${RESULTS_DEST}/${run_label}"
+      rm -rf "${run_out}"
+      mkdir -p "${run_out}"
+      cp -R "${HPA_SRC}" "${run_out}/hpa-run"
+      cp -R "${LLM_SRC}" "${run_out}/llm-run"
+      _repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+      if PYTHONPATH="${_repo_root}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "
+from pathlib import Path
+from analysis.compare_squeeze_methods import compare
+run_out = Path(r'''${run_out}''')
+fa = run_out / 'hpa-run' / 'cost-effective-boundary.json'
+fb = run_out / 'llm-run' / 'cost-effective-boundary.json'
+if not fa.is_file() or not fb.is_file():
+    raise SystemExit('missing boundary json')
+run_out.joinpath('comparison.md').write_text(
+    compare(fa, fb, label_a='hpa', label_b='llm')
+)
+"; then
+        log "wrote comparison.md from bundled boundary JSON (hpa vs llm)"
+      else
+        log "WARNING: could not regenerate comparison.md from boundary JSON"
+        if [[ -f "${COPIED_ROOT}/squeeze-optimizer-comparison.md" ]]; then
+          cp "${COPIED_ROOT}/squeeze-optimizer-comparison.md" "${run_out}/comparison.md"
+        fi
+      fi
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        printf '%s\n' "${run_label}" > "${RESULTS_DEST}/.last_sync_r${COMPARE_SWEEP_ROUND}.txt"
+      fi
+      if [[ "${RESULTS_PVC_COPY_COMPARISON_TO_ROOT}" == "true" ]]; then
+        cp "${run_out}/comparison.md" "${RESULTS_DEST}/squeeze-optimizer-comparison.md"
+      fi
+      log "PVC sync done (${reason}, layout=thin, hpa-compare): ${run_out}"
+      fi
+    fi
+  elif [[ "${COMPARE_SYNC_MODE:-}" != "hpa" ]] \
+    && [[ -d "${COPIED_ROOT}/squeeze-compare-formula" && -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
+    FORMULA_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-formula")"
+    LLM_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-llm")"
+    if [[ -z "${FORMULA_SRC}" || -z "${LLM_SRC}" ]]; then
+      log "WARNING: compare layout expected squeeze-compare formula+llm runs on PVC; skipping bundle"
+    else
+      local f_base l_base run_label run_out n_f n_l
+      f_base="$(basename "${FORMULA_SRC}")"
+      l_base="$(basename "${LLM_SRC}")"
+      run_label="${f_base}"
+      if [[ "${f_base}" =~ ^run-([0-9]+)$ ]]; then
+        n_f="${BASH_REMATCH[1]}"
+      else
+        n_f=-1
+      fi
+      if [[ "${l_base}" =~ ^run-([0-9]+)$ ]]; then
+        n_l="${BASH_REMATCH[1]}"
+      else
+        n_l=-1
+      fi
+      if [[ "${n_f}" -ge 0 && "${n_l}" -ge 0 && "${n_f}" != "${n_l}" ]]; then
+        log "ERROR: formula ${f_base} vs llm ${l_base} run index mismatch — stale PVC bundle; skipping compare copy"
+        log "  Re-run with BUILD_ANALYZER_IMAGE=true and SQUEEZE_COMPARE_PRUNE_PRIOR=1 (see squeeze_up_demo_env.sh)"
+      else
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        run_label="run-${COMPARE_SWEEP_ROUND}"
+      fi
+      run_out="${RESULTS_DEST}/${run_label}"
+      rm -rf "${run_out}"
+      mkdir -p "${run_out}"
+      cp -R "${FORMULA_SRC}" "${run_out}/formula-run"
+      cp -R "${LLM_SRC}" "${run_out}/llm-run"
+      # Regenerate comparison.md from the bundled boundary JSON. PVC root
+      # squeeze-optimizer-comparison.md can lag another run or stale job output;
+      # formula-run/ and llm-run/ are always the latest run-* we just copied.
+      _repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+      if PYTHONPATH="${_repo_root}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "
+from pathlib import Path
+from analysis.compare_squeeze_methods import compare
+run_out = Path(r'''${run_out}''')
+fa = run_out / 'formula-run' / 'cost-effective-boundary.json'
+fb = run_out / 'llm-run' / 'cost-effective-boundary.json'
+if not fa.is_file() or not fb.is_file():
+    raise SystemExit('missing boundary json')
+run_out.joinpath('comparison.md').write_text(
+    compare(fa, fb, label_a='formula', label_b='llm')
+)
+"; then
+        log "wrote comparison.md from bundled boundary JSON (formula vs llm)"
+      else
+        log "WARNING: could not regenerate comparison.md from boundary JSON; using PVC squeeze-optimizer-comparison.md if present"
+        if [[ -f "${COPIED_ROOT}/squeeze-optimizer-comparison.md" ]]; then
+          cp "${COPIED_ROOT}/squeeze-optimizer-comparison.md" "${run_out}/comparison.md"
+        fi
+      fi
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        printf '%s\n' "${run_label}" > "${RESULTS_DEST}/.last_sync_r${COMPARE_SWEEP_ROUND}.txt"
+      fi
+      if [[ "${RESULTS_PVC_COPY_COMPARISON_TO_ROOT}" == "true" ]]; then
+        cp "${run_out}/comparison.md" "${RESULTS_DEST}/squeeze-optimizer-comparison.md"
+        if [[ "${RESULTS_STAMPED_COMPARISON_MD}" == "true" ]]; then
+          cp "${run_out}/comparison.md" "${RESULTS_DEST}/squeeze-optimizer-comparison-${RUN_STAMP}.md"
+        fi
+      fi
+      rm -f "${run_out}/squeeze-optimizer-comparison.txt" "${run_out}/squeeze-optimizer-comparison.md" \
+            "${RESULTS_DEST}/squeeze-optimizer-comparison.txt"
+      log "PVC sync done (${reason}, layout=thin, compare): ${run_out}"
+      fi
+    fi
+  elif [[ -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
+    LLM_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-llm")"
+    if [[ -n "${LLM_SRC}" ]]; then
+      run_label="$(basename "${LLM_SRC}")"
+      run_out="${RESULTS_DEST}/${run_label}"
+      mkdir -p "${run_out}"
+      rm -rf "${run_out}"
+      cp -R "${LLM_SRC}" "${run_out}"
+      log "PVC sync done (${reason}, layout=thin, llm-only): ${run_out}"
+    else
+      log "WARNING: squeeze-compare-llm present but no run-* found"
+    fi
+  else
+    SINGLE_RUN="$(latest_numbered_run_dir "${COPIED_ROOT}")"
+    if [[ -n "${SINGLE_RUN}" ]]; then
+      local copy_base
+      copy_base="$(basename "${SINGLE_RUN}")"
+      mkdir -p "${RESULTS_DEST}"
+      rm -rf "${RESULTS_DEST}/${copy_base}"
+      cp -R "${SINGLE_RUN}" "${RESULTS_DEST}/${copy_base}"
+      log "PVC sync done (${reason}, layout=thin, run=${copy_base})"
+    else
+      log "WARNING: no top-level run-* directory found on PVC under ${COPIED_ROOT}; nothing copied"
+    fi
+  fi
+
+  if [[ "${RESULTS_PVC_SNAPSHOTS}" == "true" ]]; then
+    mkdir -p "${SNAPSHOT_DIR}"
+    cp -R "${COPIED_ROOT}/." "${SNAPSHOT_DIR}/"
+    log "PVC snapshot written: ${SNAPSHOT_DIR}"
+  fi
+
+  kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null
+  rm -rf "${TMP_COPY_DIR}"
+}
+
+# Strip --sync-pvc-only for job launch; handle copy-only after sync_results_pvc_to_local exists.
+SYNC_PVC_ONLY=false
+PROFILE_ARGS=()
+for arg in "$@"; do
+  if [[ "${arg}" == "--sync-pvc-only" ]]; then
+    SYNC_PVC_ONLY=true
+  else
+    PROFILE_ARGS+=("${arg}")
+  fi
+done
+if [[ "${SYNC_PVC_ONLY}" == "true" ]]; then
+  sync_results_pvc_to_local "sync_pvc_only"
+  exit 0
+fi
+set -- "${PROFILE_ARGS[@]}"
 
 reset_managed_web_yaml_to_baseline() {
   cp "${BASELINE_DEPLOYMENT_YAML}" "${DEPLOYMENT_YAML}"
@@ -235,9 +588,8 @@ for profile in "${PROFILE_LIST[@]}"; do
   ANALYZER_IMAGE="${ANALYZER_IMAGE}" \
   ANALYZER_IMAGE_PULL_POLICY="${ANALYZER_IMAGE_PULL_POLICY}" \
   JOB_NAME="${job_name}" \
-  ./scripts/run_analyzer_job.sh "${EXTRA_ARGS[@]}"
+  ./scripts/run_analyzer_job.sh ${EXTRA_ARGS+"${EXTRA_ARGS[@]}"}
 
-  log "waiting for ${job_name} (timeout=${WAIT_TIMEOUT})"
   log_pid=""
   if [[ "${STREAM_JOB_LOGS}" == "true" ]]; then
     (
@@ -264,22 +616,35 @@ for profile in "${PROFILE_LIST[@]}"; do
     ) &
     log_pid="$!"
   fi
-  if kubectl -n "${NAMESPACE}" wait --for=condition=complete --timeout="${WAIT_TIMEOUT}" "job/${job_name}"; then
+  wait_ok=0
+  job_still_running=0
+  if wait_for_analyzer_job "${job_name}"; then
+    wait_ok=1
+  elif [[ "$(job_condition_status "${job_name}" Complete)" != "True" \
+      && "$(job_condition_status "${job_name}" Failed)" != "True" ]]; then
+    job_still_running=1
+  fi
+  if [[ "${wait_ok}" -eq 1 ]]; then
     log "${job_name} completed"
   else
-    log "${job_name} failed or timed out; collecting diagnostics"
+    if [[ "${job_still_running}" -eq 1 ]]; then
+      log "${job_name} still running after wait ended; collecting diagnostics (job not deleted)"
+    else
+      log "${job_name} failed; collecting diagnostics"
+    fi
     kubectl -n "${NAMESPACE}" get job "${job_name}" || true
     kubectl -n "${NAMESPACE}" describe "job/${job_name}" || true
     kubectl -n "${NAMESPACE}" get pods -l job-name="${job_name}" -o wide || true
     save_job_logs "${job_name}" "${job_log}"
     log "saved failure logs to ${job_log}"
-    if [[ "${CLEANUP_FAILED_JOBS}" == "true" ]]; then
+    if [[ "${CLEANUP_FAILED_JOBS}" == "true" && "${job_still_running}" -eq 0 ]]; then
       kubectl -n "${NAMESPACE}" delete job "${job_name}" --ignore-not-found >/dev/null || true
     fi
     if [[ -n "${log_pid}" ]]; then
       kill "${log_pid}" >/dev/null 2>&1 || true
       wait "${log_pid}" 2>/dev/null || true
     fi
+    sync_results_pvc_to_local "job_failed_or_timeout profile=${p} job=${job_name}"
     exit 1
   fi
 
@@ -292,36 +657,11 @@ for profile in "${PROFILE_LIST[@]}"; do
   if [[ "${CLEANUP_COMPLETED_JOBS}" == "true" ]]; then
     kubectl -n "${NAMESPACE}" delete job "${job_name}" --ignore-not-found >/dev/null || true
   fi
+  sync_results_pvc_to_local "profile_ok profile=${p} job=${job_name}"
 done
 
-log "copy results PVC to local ${RESULTS_DEST} ..."
-kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null
-kubectl -n "${NAMESPACE}" apply -f - >/dev/null <<EOF
-apiVersion: v1
-kind: Pod
-metadata:
-  name: ${READER_POD}
-spec:
-  restartPolicy: Never
-  containers:
-  - name: reader
-    image: busybox
-    command: ["sh","-c","sleep 3600"]
-    volumeMounts:
-    - name: results
-      mountPath: /results
-  volumes:
-  - name: results
-    persistentVolumeClaim:
-      claimName: analyzer-results-pvc
-EOF
+log "cluster-run finished (PVC was synced after each profile job, success or failure)"
 
-kubectl -n "${NAMESPACE}" wait --for=condition=Ready "pod/${READER_POD}" --timeout=120s >/dev/null
-rm -rf "${RESULTS_DEST}"
-kubectl -n "${NAMESPACE}" cp "${READER_POD}:/results" "${RESULTS_DEST}"
-kubectl -n "${NAMESPACE}" delete pod "${READER_POD}" --ignore-not-found >/dev/null
-
-log "done. local artifacts: ${RESULTS_DEST}"
 if [[ "${CLEANUP_TERMINAL_PODS}" == "true" ]]; then
   kubectl -n "${NAMESPACE}" delete pod --field-selector=status.phase==Succeeded --ignore-not-found >/dev/null || true
   kubectl -n "${NAMESPACE}" delete pod --field-selector=status.phase==Failed --ignore-not-found >/dev/null || true

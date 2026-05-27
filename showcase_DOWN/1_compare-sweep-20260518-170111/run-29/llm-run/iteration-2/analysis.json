@@ -1,0 +1,43 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 90,
+    "provisioned_request_mem_mib": 45,
+    "provisioned_limit_cpu_m": 180,
+    "provisioned_limit_mem_mib": 90,
+    "cost_score": 0.1339
+  },
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "LOW",
+  "over_provisioned": false,
+  "evidence": [
+    "observed.cpu_util_pct: 98.4% indicates high CPU utilization.",
+    "cpu_util_to_limit ratio of 0.98 shows significant CPU load nearing limit.",
+    "cost.cost_score: 0.1339 suggests cost-effective optimization is possible with adjusted resources.",
+    "last SLO status was PASS with lower CPU utilization (~83.5%) indicating room for resource configuration change.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1"
+  ],
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 30.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 98.4,
+    "mem_util_pct": 61.7,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.98,
+    "total_requests": 2251
+  }
+}

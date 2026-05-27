@@ -1,0 +1,45 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 138,
+    "provisioned_request_mem_mib": 70,
+    "provisioned_limit_cpu_m": 280,
+    "provisioned_limit_mem_mib": 210,
+    "cost_score": 0.2064
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "cost.cost_score: 0.2064",
+    "provisioned_request_cpu_m: 138",
+    "provisioned_request_mem_mib: 70",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1",
+    "guard.coerce_up_recovery: cpu_req=200m mem_req=140Mi (formula_floor cpu=159 mem=81; mem_util=58%)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "HOLD",
+  "scaling_rationale": "SLO pass with mid-range utilization; prefer small or no moves.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 219.6,
+    "error_rate": 0.0,
+    "latency_ms_p95": 240.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 69.5,
+    "mem_util_pct": 57.7,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.7,
+    "total_requests": 19801
+  }
+}

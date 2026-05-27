@@ -1,0 +1,254 @@
+\documentclass[twocolumn]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{needspace}
+\setlength{\abovedisplayskip}{5pt plus 2pt minus 2pt}
+\setlength{\belowdisplayskip}{5pt plus 2pt minus 2pt}
+\setlength{\abovedisplayshortskip}{3pt plus 2pt minus 2pt}
+\setlength{\belowdisplayshortskip}{3pt plus 2pt minus 2pt}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinelanguage{json}{
+    basicstyle=\ttfamily\scriptsize,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    stepnumber=1,
+    numbersep=5pt,
+    showstringspaces=false,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{backcolour},
+    stringstyle=\color{teal},
+    keywordstyle=\color{blue},
+    commentstyle=\color{codegreen}
+}
+
+% Canonical title (keep until explicitly changed):
+\title{\textbf{Efficiency Mapping: Cost-Optimal Microservice Configuration via Iterative LLM-Guided Stress Testing}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Cloud microservices are often deployed with excess CPU, memory, and replica count to avoid SLO violations under peak load.
+We study \textit{bidirectional} right-sizing: scaling \textbf{down} from an over-provisioned baseline until the first SLO failure (upper-bound / cost-effective frontier), and scaling \textbf{up} from an under-provisioned baseline until recovery (lower-bound / minimum viable provisioning).
+We compare two decision engines on the same closed loop (k6 load, Prometheus telemetry, Kubernetes apply): \textbf{Method~1}, a deterministic formula controller, and \textbf{Method~2}, a large language model (LLM) that reads the same structured experiment record and emits full Deployment/HPA YAML.
+On Robot Shop \texttt{web} at 25\,RPS (DOWN), the LLM arm reaches a lower-cost passing configuration in fewer iterations than the formula arm (e.g.\ cost score 0.22 vs.\ 0.37 at the last PASS before \texttt{first\_fail}).
+At 220\,RPS (UP recovery from a thin 50\,mCPU / 25\,MiB pod), the LLM arm recovers in three iterations at cost 0.14 vs.\ formula's four iterations at cost 0.18.
+Formula sizing is computed entirely in Python; the LLM is not invoked for YAML during formula runs.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+Operating microservice fleets is expensive when capacity is chosen conservatively.
+Horizontal Pod Autoscaler (HPA) reacts to utilization but does not, by itself, answer: \textit{what is the cheapest Deployment and HPA configuration that still meets SLO at a fixed target load?}
+
+We frame this as \textbf{efficiency mapping} along two directions:
+\begin{itemize}
+    \item \textbf{DOWN (over-provisioned start):} begin with generous resources; iteratively reduce CPU, memory, and replicas while SLOs pass; stop at \textbf{first fail}. The last PASS is the \textit{upper-bound / cost-effective} configuration for that workload intensity.
+    \item \textbf{UP (under-provisioned start):} begin with intentionally thin resources; iteratively increase capacity while SLOs fail; stop at \textbf{first pass}. The first PASS is the \textit{lower-bound / recovery} configuration.
+\end{itemize}
+
+Both directions share the same observables---achieved RPS, error rate, $p_{95}$ latency, CPU and memory utilization vs.\ requests---and the same objective \texttt{cost\_score} (replica-weighted sum of CPU and memory \textit{requests}).
+The research question is whether an LLM can match or beat a transparent formula policy on \textbf{iterations to the boundary} and \textbf{cost at the boundary}, without coupling the two arms at decision time.
+
+\section{Related Work}
+\label{sec:related}
+\textbf{Kubernetes autoscaling.} HPA and VPA adjust replicas or resources from utilization signals; they optimize reactivity, not a fixed-workload cost frontier.
+\textbf{Performance testing and SLO-driven tuning.} Load generators (e.g.\ k6) plus observability backends are standard; our contribution is the \textit{closed-loop} policy that proposes the \textit{next} YAML from telemetry, not a one-shot recommendation.
+\textbf{ML/LLM for operations.} Recent work uses LLMs for incident triage and config suggestions; we isolate a controlled compare: same cluster protocol, same JSON schema, two optimizers.
+\textbf{Baselines.} Method~1 (formula) is our primary baseline; HPA-at-fixed-target is the implicit production comparator the squeeze loop is meant to improve upon.
+\textit{[TODO: cite 2--4 public papers on right-sizing, SLO-aware autoscaling, and LLM-for-Ops.]}
+
+\section{Methodology}
+\label{sec:method}
+
+\subsection{System architecture}
+The pipeline (\autoref{fig:placeholder}) is:
+(1)~apply workload via k6 constant-arrival-rate profile;
+(2)~collect Prometheus metrics into \texttt{experiment.json};
+(3)~compute SLO PASS/FAIL and \texttt{cost\_score};
+(4)~run the optimizer (formula \textit{or} LLM);
+(5)~write \texttt{recommended.diff} via \texttt{difflib} against repo YAML, apply to cluster, settle, repeat.
+
+\subsection{Method 1: Formula controller}
+\textbf{No LLM} is called for sizing when \texttt{squeeze\_optimizer=formula}.
+Each iteration:
+\begin{enumerate}
+    \item Python computes \texttt{scaling\_hint} $\in \{\mathrm{UP},\mathrm{DOWN},\mathrm{HOLD}\}$ from SLO status, utilization, and squeeze mode.
+    \item \texttt{step\_pct} is computed from observed pressure (Section~\ref{sec:unified-step}).
+    \item \texttt{\_maybe\_apply\_deterministic\_efficiency\_yaml} scales requests/limits (and HPA bounds on DOWN) on the on-disk Deployment/HPA files.
+    \item \texttt{recommended.diff} is the unified diff of old vs.\ new YAML (pure Python).
+\end{enumerate}
+
+\subsection{Method 2: LLM controller}
+\textbf{LLM} receives the same \texttt{experiment.json} fields plus current YAML text.
+It returns JSON with \texttt{deployment\_yaml\_new}, \texttt{hpa\_yaml\_new}, and a short report.
+Post-processing enforces safety (e.g.\ veto scale-down on FAIL+UP, replica one-step clamps on DOWN, metric-based UP recovery guards when memory is saturated or $p_{95}$ is near SLO).
+\textit{Design principle:} compare arms do not read each other's outputs; the LLM is not given the formula's numeric recommendation as an oracle (early prototypes that floored LLM steps to formula steps were removed as unfair).
+
+\subsection{Objective and cost}
+\begin{equation}
+    \texttt{cost\_score} = N_{\mathrm{eff}} (w_1 R_{\mathrm{cpu}} + w_2 R_{\mathrm{mem}})
+\end{equation}
+with $R_{\mathrm{cpu}}, R_{\mathrm{mem}}$ in millicores and MiB requests, $N_{\mathrm{eff}}$ effective replicas.
+SLO: $p_{95} \le 500$\,ms, error rate $\le 1\%$.
+
+\subsection{Unified fractional step (formula)}
+\label{sec:unified-step}
+\medskip
+\noindent One bounded \texttt{step\_pct} per iteration scales vertical resources:
+\begin{align}
+    \text{DOWN:}\quad & x' = (1-\texttt{step\_pct})\,x, \\
+    \text{UP:}\quad & x' = (1+\texttt{step\_pct})\,x.
+\end{align}
+
+\medskip\noindent\textbf{DOWN (PASS):}
+\begin{align}
+    \texttt{slack} &= \max\!\left(0,\frac{60-\max(u_{cpu},u_{mem})}{60}\right), \nonumber\\
+    \texttt{step\_pct} &= \texttt{bound}(b + 0.25\,\texttt{slack},\, f,\, 0.30),
+\end{align}
+\noindent with $(b,f)=(0.10,0.10)$ or $(0.05,0.05)$ if utilization $\ge 60\%$.
+
+\medskip\noindent\textbf{UP (FAIL):}
+\begin{align}
+    \sigma &= \max\bigl(\tfrac{err}{err_{SLO}}-1,\,
+        \tfrac{p95}{p95_{SLO}}-1,\nonumber\\
+    &\quad\,\tfrac{rps_{target}}{rps_{achieved}}-1\bigr), \\
+    \texttt{step\_pct} &= \texttt{bound}(0.15 + 0.08\min(\sigma,3),\, 0.15,\, 0.40).
+\end{align}
+\noindent HPA replica step:
+$\Delta=\max(1,\lceil maxReplicas\cdot\texttt{step\_pct}/2\rceil)$.
+
+\subsection{Compare protocol (formula vs.\ LLM)}
+Each showcase run executes \textbf{two sequential arms} on the cluster:
+\begin{enumerate}
+    \item Reset to profile baseline (DOWN: managed web baseline; UP: thin 1\,pod, 50\,mCPU, 25\,MiB, HPA max\,=\,1).
+    \item Run full squeeze with \texttt{optimizer=formula} $\rightarrow$ \texttt{squeeze-compare-formula/}.
+    \item Reset baseline again.
+    \item Run full squeeze with \texttt{optimizer=llm} $\rightarrow$ \texttt{squeeze-compare-llm/}.
+    \item Emit \texttt{comparison.md} aligned by iteration index.
+\end{enumerate}
+Both arms share \texttt{SQUEEZE\_MAX\_ITERATIONS=16} on UP; DOWN LLM uses \texttt{SQUEEZE\_LLM\_PURE=1} (no deterministic YAML fallback).
+
+\subsection{Decision policy sketch (from notes)}
+\needspace{6\baselineskip}
+\noindent\footnotesize Pseudocode (boundary-seeking squeeze):
+\begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}
+    \item \texttt{obs} $\leftarrow$ Prometheus + k6; \texttt{fail} $\leftarrow$ ($p_{95}\!>\!$SLO) $\lor$ (err) $\lor$ (cpu\_util $>\! 95\%$).
+    \item \texttt{DOWN}: fail $\Rightarrow$ STOP (boundary $\leftarrow$ prev PASS); else scale DOWN.
+    \item \texttt{UP}: $\neg$fail $\Rightarrow$ STOP (boundary $\leftarrow$ PASS); else scale UP.
+    \item M1: \texttt{step\_pct} $\leftarrow f_{\mathrm{formula}}$; M2: YAML $\leftarrow$ LLM + guards; apply(diff).
+\end{itemize}
+
+\noindent\textbf{Notes vision (future).}
+Exponential steps, explicit bounds, error-aware termination, and few-shot exemplars remain future work; the deployed system uses conservative fractional steps and HOLD gating.
+
+\clearpage
+\section{Experimental Setup}
+\begin{itemize}
+    \item \textbf{Service:} Robot Shop \texttt{web}, namespace \texttt{svastik}, login workload (\texttt{POST /api/user/login}).
+    \item \textbf{down\_demo:} 25\,RPS, 90\,s, SLO $p_{95}\le 500$\,ms; stop at \texttt{first\_fail}.
+    \item \textbf{up\_demo:} 220\,RPS, 90\,s, same SLO; thin baseline then UP recovery until \texttt{recovered\_from\_underprovisioning}.
+    \item \textbf{up\_demo\_strict:} 260\,RPS (ongoing sweeps).
+    \item \textbf{Telemetry:} Prometheus CPU/memory utilization vs.\ requests; k6 $p_{95}$ and achieved RPS.
+    \item \textbf{Settle:} post-rollout delay before each iteration k6 run.
+\end{itemize}
+
+\section{Results}
+\label{sec:results}
+We highlight curated \texttt{showcase\_DOWN} and \texttt{showcase\_UP} compares.
+Iteration rows are \textit{not} simultaneous A/B tests---formula runs first, then LLM on a fresh reset---so row-aligned $p_{95}$ differences include run-to-run variance.
+
+\subsection{DOWN: over-provisioned frontier (25 RPS)}
+Table~\ref{tab:down} summarizes best PASS before \texttt{first\_fail}.
+
+\begin{table}[t]
+\centering
+\caption{DOWN demo: boundary compare (showcase runs).}
+\label{tab:down}
+\scriptsize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Run & Opt. & Iters to fail & Last PASS iter & Cost at last PASS \\
+\midrule
+run-34 & formula & 11 & 10 & 0.369 \\
+run-34 & LLM     &  7 &  6 & 0.223 \\
+run-38 & formula & 11 & 10 & 0.373 \\
+run-38 & LLM     &  6 &  5 & 0.238 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Findings.}
+The LLM arm consistently reaches a \textbf{lower-cost} last PASS with \textbf{fewer iterations} (e.g.\ run-34: 7 vs.\ 11 iterations; $\approx$40\% lower cost score).
+Both arms monotonically reduced CPU/memory requests while utilization rose---the joint signal of real slack consumption, not monotonic $p_{95}$ (latency can fall as caches warm).
+Pure-LLM DOWN uses prompt + replica clamps only; formula uses deterministic DOWN steps only.
+
+\subsection{UP: under-provisioned recovery (220 RPS)}
+Table~\ref{tab:up} summarizes recovery to first PASS.
+
+\begin{table}[t]
+\centering
+\caption{UP demo @ 220 RPS (showcase runs).}
+\label{tab:up}
+\scriptsize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Run & Opt. & Iters to PASS & CPU@PASS (m) & Cost@PASS \\
+\midrule
+run-44 & formula & 4 & 121 & 0.181 \\
+run-44 & LLM     & 3 &  94 & 0.140 \\
+run-40 & formula & 4 & 114 & 0.170 \\
+run-40 & LLM     & 2 & 100 & 0.163 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Primary showcase (run-44).}
+Iter.\,1--2: both FAIL on thin 50/25 (severe $p_{95}$).
+Iter.\,3: formula still FAIL at 98/49\,m ($p_{95}\!\approx\!1024$\,ms); LLM PASS at 94/47\,m ($p_{95}\!\approx\!423$\,ms).
+Iter.\,4: formula PASS at 121/61\,m.
+LLM wins on \textbf{iteration count} and \textbf{cost at PASS} with a single replica throughout.
+
+\noindent\textbf{Interpretation caveat.}
+At iter.\,2 both arms used 70/35\,m requests but LLM saw much lower $p_{95}$ (1633 vs.\ 3674\,ms) before the arms diverged---sequential runs, not locked-step coupling.
+The comparison table shows \textit{requests}, not limits; LLM PASS configs often set higher limits relative to requests.
+Metric guards (memory saturation, near-SLO cap) act on the LLM arm only and are derived from \texttt{experiment.json}, not from formula output.
+
+\subsection{What we measured vs.\ open questions}
+\textbf{Measured:} iterations to boundary, \texttt{cost\_score} at boundary, utilization trajectory, replica count.
+\textbf{Open (from notes):} reward/penalty training loop; providing formula as \textit{hint} vs.\ independent LLM; exponential steps; explicit upper/lower bound bracketing; error-rate-terminated vs.\ latency-only FAIL.
+
+\section{Discussion}
+\textbf{When formula wins.} UP runs with tied iterations can still favor formula on cost if the LLM overshoots steps (showcase run-43, pre-guard fix).
+\textbf{When LLM wins.} DOWN frontier and run-44 UP show fewer steps and lower provisioned cost at SLO.
+\textbf{Fairness.} Formula \texttt{recommended.diff} is always Python-generated; LLM diff is LLM YAML after guards---neither arm depends on the other for per-iteration numbers.
+
+\section{Conclusion}
+We presented a bidirectional stress-test loop for microservice right-sizing and compared a deterministic formula controller to an LLM controller on equal telemetry and workloads.
+On Robot Shop demos, the LLM arm finds cheaper passing configurations in fewer iterations on both DOWN (25\,RPS) and UP recovery (220\,RPS), while the formula arm remains a reproducible, auditable baseline.
+Future work includes stricter UP loads (260+ RPS), multi-run variance bands, policies from your notes (exponential steps, explicit bounds, error-aware termination), and ablations on how much formula guidance may be given to the LLM without invalidating the comparison.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=1\linewidth]{research-pivot-1-april-14.jpeg}
+    \caption{Closed-loop workflow: load test $\rightarrow$ telemetry $\rightarrow$ optimizer (formula or LLM) $\rightarrow$ apply YAML $\rightarrow$ repeat until boundary.}
+    \label{fig:placeholder}
+\end{figure}
+
+\end{document}

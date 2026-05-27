@@ -1,0 +1,40 @@
+{
+  "stopped_reason": "recovered_from_underprovisioning",
+  "best_pass_dir": "/app/results/squeeze-compare-llm/run-1/iteration-2",
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "/app/results/squeeze-compare-llm/run-1/iteration-1",
+      "status": "FAIL",
+      "target_rps": 260,
+      "achieved_rps": 173.9,
+      "achieved_rps_target_window": 178.5,
+      "dropped_iterations": 7336,
+      "p95_ms": 5689.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 307.6,
+      "mem_util_pct": 155.1,
+      "replicas": 1,
+      "cpu_request_m": 50,
+      "mem_request_mib": 25,
+      "cost_score": 0.0744
+    },
+    {
+      "run_dir": "/app/results/squeeze-compare-llm/run-1/iteration-2",
+      "status": "PASS",
+      "target_rps": 260,
+      "achieved_rps": 259.2,
+      "achieved_rps_target_window": 260.0,
+      "dropped_iterations": 0,
+      "p95_ms": 316.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 52.6,
+      "mem_util_pct": 51.5,
+      "replicas": 2,
+      "cpu_request_m": 70,
+      "mem_request_mib": 35,
+      "cost_score": 0.2084
+    }
+  ],
+  "squeeze_optimizer": "llm"
+}
