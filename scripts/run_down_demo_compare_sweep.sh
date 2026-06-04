@@ -21,6 +21,7 @@
 #   COMPARE_SWEEP_PARENT=...
 #   COMPARE_SWEEP_RPS=25,35,45,55          (default when not using COMPARE_SWEEP_PROFILES)
 #   COMPARE_SWEEP_BASE_PROFILE=down_demo   (default)
+#   COMPARE_SWEEP_LOADS=20,25,35,45,55 COMPARE_SWEEP_REPEATS_PER_LOAD=10
 #   COMPARE_SWEEP_ROUNDS=N                 (first N entries from RPS or profile list)
 #   SQUEEZE_MAX_ITERATIONS / SQUEEZE_COMPARE_FORMULA_MAX_ITERATIONS / SQUEEZE_COMPARE_FORMULA_UNTIL_VIOLATION / etc.
 #
@@ -69,28 +70,11 @@ if [[ -n "${COMPARE_SWEEP_PROFILES:-}" ]]; then
     ROUND_LABELS+=("${CLEAN_PROFILES[i]}")
   done
 else
-  IFS=',' read -r -a RPS_LIST <<< "${COMPARE_SWEEP_RPS:-25,35,45,55}"
-  CLEAN_RPS=()
-  for _r in "${RPS_LIST[@]}"; do
-    _q="$(echo "${_r}" | xargs)"
-    [[ -n "${_q}" ]] && CLEAN_RPS+=("${_q}")
-  done
-  if ((${#CLEAN_RPS[@]} == 0)); then
-    echo "COMPARE_SWEEP_RPS produced an empty RPS list" >&2
+  # shellcheck source=scripts/lib/expand_compare_sweep_matrix.sh
+  source "${ROOT}/scripts/lib/expand_compare_sweep_matrix.sh"
+  if ! parse_compare_sweep_rps_matrix "${COMPARE_SWEEP_RPS:-25,35,45,55}"; then
     exit 1
   fi
-  ROUNDS="${COMPARE_SWEEP_ROUNDS:-${#CLEAN_RPS[@]}}"
-  if ! [[ "${ROUNDS}" =~ ^[0-9]+$ ]] || ((ROUNDS < 1)); then
-    echo "COMPARE_SWEEP_ROUNDS must be a positive integer" >&2
-    exit 1
-  fi
-  if ((ROUNDS > ${#CLEAN_RPS[@]})); then
-    echo "COMPARE_SWEEP_ROUNDS=${ROUNDS} exceeds COMPARE_SWEEP_RPS length ${#CLEAN_RPS[@]}" >&2
-    exit 1
-  fi
-  for ((i = 0; i < ROUNDS; i++)); do
-    ROUND_LABELS+=("rps=${CLEAN_RPS[i]}")
-  done
 fi
 
 if [[ -f ".env" ]]; then

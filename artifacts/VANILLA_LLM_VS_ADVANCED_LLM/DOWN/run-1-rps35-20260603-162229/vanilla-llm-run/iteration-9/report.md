@@ -1,0 +1,4 @@
+- Stress test resulted in a FAIL due to CPU utilization exceeding limits.
+- p95 latency was well within SLO, but error rate was zero.
+- Achieved desired throughput of 35 RPS with 2 replicas observed.
+- Configuration needs increased CPU requests and limits, as well as additional replicas.

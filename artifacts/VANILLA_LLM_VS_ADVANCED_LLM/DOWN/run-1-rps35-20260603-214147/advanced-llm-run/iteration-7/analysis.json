@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 132,
+    "provisioned_request_mem_mib": 62,
+    "provisioned_limit_cpu_m": 252,
+    "provisioned_limit_mem_mib": 134,
+    "per_pod_unit_cost": 0.062427,
+    "per_pod_unit_cost_util": 0.061001,
+    "cost_score": 0.1249,
+    "cost_score_util": 0.122,
+    "cost_score_legacy": 0.1925
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying updated deployment and HPA YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "cpu_util_pct: 110.6 exceeds 95% threshold, indicating need for more replicas",
+    "achieved_requests_per_second: 35.0 matched target, confirming workload consistency",
+    "p95_latency: 6.0ms is significantly below SLO of 500ms, but CPU saturation causes failures",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress with high CPU vs limits; increase CPU and/or replicas.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 110.6,
+    "mem_util_pct": 52.9,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.11,
+    "total_requests": 2101
+  }
+}

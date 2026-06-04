@@ -1,0 +1,5 @@
+- Stress test passed with a p95 latency of 6.0 ms versus a 500 ms SLO limit.
+- No errors were recorded during the test.
+- Current replicas observed were 3, efficiently handling the load.
+- Reducing capacity is required due to large latency slack.
+- Trimming CPU and memory requests/limits as well as HPA maxReplicas.

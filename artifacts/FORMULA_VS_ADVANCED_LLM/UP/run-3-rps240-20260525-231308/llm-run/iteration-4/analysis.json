@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 129,
+    "provisioned_request_mem_mib": 66,
+    "provisioned_limit_cpu_m": 450,
+    "provisioned_limit_mem_mib": 300,
+    "per_pod_unit_cost": 0.040848,
+    "per_pod_unit_cost_util": 0.024952,
+    "cost_score": 0.1225,
+    "cost_score_util": 0.0749,
+    "cost_score_legacy": 0.1935
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "cost.cost_score: 0.1225",
+    "provisioned_request_cpu_m: 129",
+    "provisioned_request_mem_mib: 66",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3",
+    "guard.up_recovery: cpu_req=50m mem_req=26Mi axes=cpu,mem,replica (metric_step cpu=50 mem=26; mem_util=37% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 239.2,
+    "error_rate": 0.0,
+    "latency_ms_p95": 442.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 62.4,
+    "mem_util_pct": 37.4,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.62,
+    "total_requests": 21600
+  }
+}

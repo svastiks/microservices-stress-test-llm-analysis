@@ -1,0 +1,5 @@
+- Stress test passed with p95 latency of 6.0 ms, well below SLO of 500 ms.
+- Achieved throughput of 35.0 RPS, meeting target load.
+- Current replicas observed were 4, while configured was 3.
+- Scaling down recommended due to significant latency slack.
+- Reducing CPU/memory by ~10-20% and HPA maxReplicas by 1.

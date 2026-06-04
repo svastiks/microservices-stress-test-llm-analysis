@@ -1,0 +1,52 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 140,
+    "provisioned_request_mem_mib": 70,
+    "provisioned_limit_cpu_m": 300,
+    "provisioned_limit_mem_mib": 150,
+    "per_pod_unit_cost": 0.066418,
+    "per_pod_unit_cost_util": 0.028477,
+    "cost_score": 0.1328,
+    "cost_score_util": 0.057,
+    "cost_score_legacy": 0.2084
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "observed.cpu_util_pct: 42.7%",
+    "observed.mem_util_pct: 46.1%",
+    "cost.cost_score: 0.1328",
+    "latency.ms.p95: 269.0ms \u2264 SLO.p95: 500.0ms",
+    "error_rate: 0.0 \u2264 SLO.error_rate: 0.01",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2",
+    "guard.up_recovery: cpu_req=70m mem_req=35Mi axes=cpu,mem (metric_step cpu=81 mem=41; mem_util=46% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "HOLD",
+  "scaling_rationale": "SLO pass with mid-range utilization; prefer small or no moves.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 219.3,
+    "error_rate": 0.0,
+    "latency_ms_p95": 269.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 42.7,
+    "mem_util_pct": 46.1,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.43,
+    "total_requests": 19801
+  }
+}

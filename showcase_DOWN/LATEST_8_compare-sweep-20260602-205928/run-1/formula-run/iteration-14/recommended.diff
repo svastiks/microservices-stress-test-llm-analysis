@@ -1,0 +1,8 @@
+--- infra/k8s/spark/robot-shop-web-deployment.yaml
++++ infra/k8s/spark/robot-shop-web-deployment.yaml
+@@ -28,4 +28,4 @@
+           requests:
+             cpu: 50m
+             memory: 32Mi
+-      restartPolicy: Always
++      restartPolicy: Always

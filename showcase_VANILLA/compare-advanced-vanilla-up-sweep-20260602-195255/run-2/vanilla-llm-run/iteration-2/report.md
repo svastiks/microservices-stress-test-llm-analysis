@@ -1,0 +1,5 @@
+- Target load: 240 RPS for 90s
+- Result: PASS with comfortable latency
+- p95 latency: 297.0 ms (SLO limit: 500 ms)
+- Achieved throughput: 239.3 RPS
+- CPU and memory limits appear adequate, so a cautious scale down is proposed.

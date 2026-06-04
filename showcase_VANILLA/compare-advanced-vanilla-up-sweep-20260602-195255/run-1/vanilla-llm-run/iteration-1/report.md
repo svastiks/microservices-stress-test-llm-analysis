@@ -1,0 +1,5 @@
+- Stress test failed due to p95 latency exceeding SLO limit.
+- p95 latency recorded at 2011.0 ms (SLO limit: 500 ms).
+- Achieved throughput was 217.6 RPS, but not within acceptable latency.
+- Configuration currently has only 1 replica, which is insufficient for the load.
+- Recommendations: Increase CPU/memory requests and limits, as well as replicas for better performance.

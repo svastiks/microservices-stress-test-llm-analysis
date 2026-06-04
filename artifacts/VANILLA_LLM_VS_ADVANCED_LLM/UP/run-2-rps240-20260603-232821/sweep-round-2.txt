@@ -1,0 +1,16 @@
+round=2/3
+status=OK
+label=rps=240
+STRESS_K6_RPS=240
+STRESS_K6_DURATION=60s
+PROFILES_CSV=up_demo
+SQUEEZE_UNTIL_VIOLATION=false
+SQUEEZE_MAX_ITERATIONS=16
+SQUEEZE_LLM_PURE=1
+COMPARE_SYNC_MODE=advanced-vanilla
+sweep_root=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-advanced-vanilla-up-sweep-20260603-232821
+run_dir=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-advanced-vanilla-up-sweep-20260603-232821/run-2
+advanced_run=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-advanced-vanilla-up-sweep-20260603-232821/run-2/advanced-llm-run
+vanilla_run=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-advanced-vanilla-up-sweep-20260603-232821/run-2/vanilla-llm-run
+comparison_md=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-advanced-vanilla-up-sweep-20260603-232821/run-2/comparison.md
+finished_utc=2026-06-04T03:49:22Z

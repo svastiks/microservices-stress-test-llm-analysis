@@ -1,0 +1,20 @@
+--- infra/k8s/spark/robot-shop-web-deployment.yaml
++++ infra/k8s/spark/robot-shop-web-deployment.yaml
+@@ -6,7 +6,7 @@
+   labels:
+     service: web
+ spec:
+-  replicas: 1
++  replicas: 2
+   selector:
+     matchLabels:
+       service: web
+@@ -23,7 +23,7 @@
+             - containerPort: 8080
+           resources:
+             limits:
+-              cpu: 250m
++              cpu: 325m
+               memory: 150Mi
+             requests:
+               cpu: 125m

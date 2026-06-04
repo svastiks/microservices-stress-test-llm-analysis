@@ -1,0 +1,5 @@
+- The SLO for p95 latency is met with an observed p95 latency of 91ms, well below the 500ms threshold.
+- The error rate is 0.0% during the stress test, indicating no failures.
+- However, utilization metrics are not trustworthy.
+- Cost score indicates low operating cost (0.1488) with sufficient provisioned resources for current requirements.
+- Next step is to rerun the same workload after any proposed changes.

@@ -1,0 +1,53 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 176,
+    "provisioned_request_mem_mib": 84,
+    "provisioned_limit_cpu_m": 356,
+    "provisioned_limit_mem_mib": 150,
+    "per_pod_unit_cost": 0.083302,
+    "per_pod_unit_cost_util": 0.069668,
+    "cost_score": 0.1666,
+    "cost_score_util": 0.1393,
+    "cost_score_legacy": 0.258
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "observed.cpu_util_pct: 85.5%",
+    "observed.mem_util_pct: 47.6%",
+    "cost.cost_score: 0.1666",
+    "previous replica count: 2",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2",
+    "guard.llm_replica_step (deployment.replicas_clamp: llm=2 -> 1 (live=2); hpa.maxReplicas: 2 -> 1 (match deployment=1))",
+    "guard.veto_replica_down:back_to_back_replica,resource_phase_gate",
+    "squeeze_down_axis=resources"
+  ],
+  "squeeze_down_axis": "resources",
+  "resource_pass_streak": 1,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass in squeeze DOWN boundary search; continue reducing despite elevated utilization.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 5.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 85.5,
+    "mem_util_pct": 47.6,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.86,
+    "total_requests": 2101
+  }
+}

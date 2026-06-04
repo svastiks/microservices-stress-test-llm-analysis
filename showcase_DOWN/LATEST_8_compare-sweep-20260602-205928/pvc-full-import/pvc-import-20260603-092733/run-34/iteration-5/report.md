@@ -1,0 +1,5 @@
+- The stress test achieved SLO: p95 latency was 72 ms (SLO is 500 ms) and error rate was 0.0%. 
+- Current resource utilization is high: CPU at 98.4% and memory at 89.4%, indicating potential over-provisioning. 
+- Cost score is low at 0.1426, suggesting a favorable operating expense. 
+- Given the SLO compliance and high utilization, further reductions are not recommended at this time. 
+- Next step: rerun the same workload after applying any changes.

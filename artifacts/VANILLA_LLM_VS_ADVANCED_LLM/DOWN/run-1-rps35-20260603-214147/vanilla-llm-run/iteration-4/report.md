@@ -1,0 +1,5 @@
+- The test passed with a p95 latency of 6.0 ms, far below the SLO of 500 ms.
+- Achieved throughput was exactly at the target of 35 RPS.
+- Currently, there are 3 replicas with CPU and memory requests at 100m and 45 MiB respectively.
+- Resource usage showed significant slack, indicating over-provisioning.
+- Scaling down resources is mandatory as per the testing guidelines.

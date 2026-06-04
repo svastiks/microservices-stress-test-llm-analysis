@@ -1,0 +1,53 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 5,
+    "provisioned_request_cpu_m": 610,
+    "provisioned_request_mem_mib": 310,
+    "provisioned_limit_cpu_m": 1350,
+    "provisioned_limit_mem_mib": 675,
+    "per_pod_unit_cost": 0.115855,
+    "per_pod_unit_cost_util": 0.03939,
+    "cost_score": 0.5793,
+    "cost_score_util": 0.197,
+    "cost_score_legacy": 0.9127
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML (unless SLO failed and you need no change)",
+  "optimization_headroom": "LOW",
+  "over_provisioned": true,
+  "evidence": [
+    "observed.cpu_util_pct: 34.7%",
+    "observed.mem_util_pct: 21.3%",
+    "cost.cost_score: 0.5793",
+    "provisioned_request_cpu_m: 610",
+    "provisioned_request_mem_mib: 310",
+    "observed.replicas: 5",
+    "observed.replicas_max: 5",
+    "guard.veto_replica_down:back_to_back_replica,resource_phase_gate",
+    "squeeze_down_axis=resources"
+  ],
+  "squeeze_down_axis": "resources",
+  "resource_pass_streak": 1,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with low CPU and memory vs limits; candidate for modest right-sizing down.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 34.7,
+    "mem_util_pct": 21.3,
+    "replicas": 5,
+    "replicas_max": 5,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.35,
+    "total_requests": 3151
+  }
+}

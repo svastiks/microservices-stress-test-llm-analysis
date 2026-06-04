@@ -1,0 +1,53 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 200,
+    "provisioned_request_mem_mib": 100,
+    "provisioned_limit_cpu_m": 800,
+    "provisioned_limit_mem_mib": 400,
+    "per_pod_unit_cost": 0.047441,
+    "per_pod_unit_cost_util": 0.021032,
+    "cost_score": 0.1898,
+    "cost_score_util": 0.0841,
+    "cost_score_legacy": 0.2977
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "Observed cpu_util_pct: 45.3, mem_util_pct: 26.5 suggest over-provisioning.",
+    "Current cost.score: 0.1898 indicates potential for reduction based on resource utilization.",
+    "Previous iterations confirm ongoing PASS status allowing safe resource downscaling.",
+    "observed.replicas: 4",
+    "observed.replicas_max: 4",
+    "guard.clear_yaml_live_drift: live=4 config_rep=3",
+    "guard.pure_llm_reconcile_drift:target_replicas=3",
+    "guard.veto_replica_down:back_to_back_replica",
+    "squeeze_down_axis=resources"
+  ],
+  "squeeze_down_axis": "resources",
+  "resource_pass_streak": 1,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 45.3,
+    "mem_util_pct": 26.5,
+    "replicas": 4,
+    "replicas_max": 4,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.45,
+    "total_requests": 3151
+  }
+}

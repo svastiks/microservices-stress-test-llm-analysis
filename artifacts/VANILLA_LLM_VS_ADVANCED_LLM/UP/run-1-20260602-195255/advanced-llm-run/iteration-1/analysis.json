@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 50,
+    "provisioned_request_mem_mib": 25,
+    "provisioned_limit_cpu_m": 100,
+    "provisioned_limit_mem_mib": 50,
+    "per_pod_unit_cost": 0.047441,
+    "per_pod_unit_cost_util": 0.046941,
+    "cost_score": 0.0474,
+    "cost_score_util": 0.0469,
+    "cost_score_legacy": 0.0744
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "Achieved 218.3 RPS while targeting 220 RPS with a CPU utilization of 104.5% (observed.cpu_util_pct) and p95 latency of 1542ms (latency.ms.p95) vs SLO of 500ms (slo.p95_latency_ms).",
+    "Provisioned CPU is currently 50m with limits of 100m, identified as under-provisioned based on CPU utilization surpassing the target.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1",
+    "guard.up_recovery: cpu_req=68m mem_req=34Mi axes=cpu,mem,replica (metric_step cpu=68 mem=34; mem_util=80% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress while replicas are at HPA max; scale up CPU/memory limits and/or raise HPA max to recover headroom.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 218.3,
+    "error_rate": 0.0,
+    "latency_ms_p95": 1542.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 104.5,
+    "mem_util_pct": 79.5,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.05,
+    "total_requests": 19801
+  }
+}

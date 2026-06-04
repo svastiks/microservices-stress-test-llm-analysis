@@ -20,6 +20,8 @@ from .prompts import (
     EFFICIENCY_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     build_user_prompt,
+    build_vanilla_user_prompt,
+    VANILLA_LLM_SQUEEZE_PROMPT,
 )
 from .results_paths import results_dir as _results_dir_for_repo
 from .scaling_policy import attach_scaling_hint
@@ -51,6 +53,26 @@ def _coerce_report_markdown(value) -> str:
     if isinstance(value, dict):
         return json.dumps(value, indent=2)
     return str(value)
+
+
+def _strip_markdown_yaml_fences(text: str) -> str:
+    """Remove ```yaml ... ``` wrappers the LLM sometimes puts in JSON string fields."""
+    s = (text or "").strip()
+    if not s.startswith("```"):
+        return s
+    lines = s.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def _normalize_llm_yaml_fields(result: dict) -> None:
+    for key in ("deployment_yaml_new", "hpa_yaml_new"):
+        raw = result.get(key)
+        if isinstance(raw, str) and raw.strip():
+            result[key] = _strip_markdown_yaml_fences(raw)
 
 
 def _observed_summary_from_experiment(experiment: dict) -> dict:
@@ -365,6 +387,16 @@ def _llm_pure_squeeze() -> bool:
     )
 
 
+def _llm_vanilla_squeeze() -> bool:
+    """When true, LLM gets coarse summary only (no full experiment JSON / scaling_hint)."""
+    return os.environ.get("SQUEEZE_LLM_VANILLA", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def _llm_squeeze_down_boundary_active(experiment: dict) -> bool:
     """True when LLM squeeze is seeking the DOWN cost-effective boundary (compare / down_demo)."""
     if os.environ.get("SQUEEZE_LLM_DOWN_BOUNDARY", "1").strip().lower() in (
@@ -385,8 +417,83 @@ def _llm_squeeze_down_boundary_active(experiment: dict) -> bool:
     return True
 
 
+def _llm_live_replicas(experiment: dict) -> int:
+    obs = experiment.get("observed") or {}
+    live_rep = int(obs.get("replicas") or 0)
+    live_max = int(obs.get("replicas_max") or 0)
+    return max(live_rep, live_max) if live_rep > 0 else live_max
+
+
+def _llm_max_util_pct(experiment: dict) -> float:
+    obs = experiment.get("observed") or {}
+    return max(
+        float(obs.get("cpu_util_pct") or 0.0),
+        float(obs.get("mem_util_pct") or 0.0),
+    )
+
+
+def _llm_hot_replica_drop_required(experiment: dict) -> bool:
+    """PASS with 3+ hot pods — must drop one replica this iteration."""
+    if bool(((experiment.get("failure") or {}).get("failed"))):
+        return False
+    if _llm_live_replicas(experiment) < 3:
+        return False
+    threshold = float(os.environ.get("SQUEEZE_LLM_HOT_REPLICA_UTIL_PCT", "65"))
+    return _llm_max_util_pct(experiment) >= threshold
+
+
+def _llm_hot_multi_replica_burst(experiment: dict) -> bool:
+    """Hot with 3+ pods — allow consecutive replica drops (match vanilla DOWN speed)."""
+    return _llm_hot_replica_drop_required(experiment) or (
+        _llm_live_replicas(experiment) >= 3 and _llm_max_util_pct(experiment) >= 55.0
+    )
+
+
+def _llm_at_down_boundary_stop(experiment: dict) -> bool:
+    """PASS at ≤2 pods near saturation — frontier reached; stop proposing further DOWN."""
+    if bool(((experiment.get("failure") or {}).get("failed"))):
+        return False
+    if _llm_live_replicas(experiment) > 2:
+        return False
+    threshold = float(os.environ.get("SQUEEZE_LLM_HOT_BOUNDARY_UTIL_PCT", "85"))
+    return _llm_max_util_pct(experiment) >= threshold
+
+
+def _llm_over_replicated_replica_required(experiment: dict) -> bool:
+    """PASS squeeze-down should drop one replica this iteration (fat-start / over-provisioned)."""
+    if bool(((experiment.get("failure") or {}).get("failed"))):
+        return False
+    prev = experiment.get("_prev_iteration") or {}
+    prev_axis = (prev.get("squeeze_down_axis") or "").strip().lower()
+    live = _llm_live_replicas(experiment)
+    max_util = _llm_max_util_pct(experiment)
+    if prev_axis == "replica" and not _llm_hot_multi_replica_burst(experiment):
+        return False
+    if live < 2:
+        return False
+    if max_util >= 55.0:
+        return live >= 3
+    cost = experiment.get("cost") or {}
+    cost_score = float(cost.get("cost_score") or 0.0)
+    if live >= 4 and max_util < 50.0:
+        return True
+    if live >= 3 and cost_score > 0.25:
+        return True
+    if (
+        float((experiment.get("observed") or {}).get("cpu_util_pct") or 0.0) < 35.0
+        and float((experiment.get("observed") or {}).get("mem_util_pct") or 0.0) < 35.0
+        and live >= 3
+    ):
+        return True
+    if live >= 3:
+        return True
+    return False
+
+
 def _llm_replica_down_allowed(experiment: dict) -> bool:
-    """Replica DOWN allowed when CPU is already trimmed or enough resource-only PASSes."""
+    """Replica DOWN allowed when CPU is already trimmed, enough resource-only PASSes, or over-replicated."""
+    if _llm_over_replicated_replica_required(experiment):
+        return True
     cfg = experiment.get("config") or {}
     cpu_m = int(cfg.get("cpu_request_m") or 0)
     ceiling = int(os.environ.get("SQUEEZE_LLM_REPLICA_CPU_REQUEST_CEILING_M", "100"))
@@ -395,9 +502,45 @@ def _llm_replica_down_allowed(experiment: dict) -> bool:
     )
     prev = experiment.get("_prev_iteration") or {}
     streak = int(prev.get("resource_pass_streak") or 0)
+    max_util = _llm_max_util_pct(experiment)
+    live = _llm_live_replicas(experiment)
+    if max_util >= 55.0:
+        return live >= 3
     if cpu_m > 0 and cpu_m <= ceiling:
         return True
     return streak >= min_passes
+
+
+def _down_cap_experiment(experiment: dict) -> dict:
+    """cap_squeeze_down_replicas_and_hpa requires scaling_hint DOWN/HOLD."""
+    hint = experiment.get("scaling_hint")
+    if hint in {"DOWN", "HOLD"}:
+        return experiment
+    return {**experiment, "scaling_hint": "DOWN"}
+
+
+def _apply_down_boundary_stop(
+    result: dict,
+    experiment: dict,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+) -> bool:
+    """Clear DOWN YAML when hot at ≤2 pods so the squeeze loop stops at best_pass."""
+    if not _llm_at_down_boundary_stop(experiment):
+        return False
+    had_change = bool(
+        (result.get("deployment_yaml_new") or "").strip()
+        or (result.get("hpa_yaml_new") or "").strip()
+    )
+    result["deployment_yaml_new"] = ""
+    result["hpa_yaml_new"] = ""
+    ev = list(result.get("evidence") or [])
+    ev.append(
+        f"guard.hot_boundary_stop: live={_llm_live_replicas(experiment)} "
+        f"max_util={_llm_max_util_pct(experiment):.0f}%"
+    )
+    result["evidence"] = ev
+    return True
 
 
 def _container_requests(doc: dict) -> tuple[dict, dict]:
@@ -649,7 +792,9 @@ def _veto_llm_pure_squeeze_down(
     ).strip().lower()
     intends_replica = _llm_intends_replica_down(result, experiment)
     veto_reasons: list[str] = []
-    if intends_replica and prev_axis == "replica":
+    if intends_replica and prev_axis == "replica" and not _llm_hot_multi_replica_burst(
+        experiment
+    ):
         veto_reasons.append("back_to_back_replica")
     if intends_replica and not _llm_replica_down_allowed(experiment):
         veto_reasons.append("resource_phase_gate")
@@ -660,9 +805,10 @@ def _veto_llm_pure_squeeze_down(
         ev.append(f"guard.veto_replica_down:{','.join(veto_reasons)}")
         result["evidence"] = ev
         if not _yaml_lowers_resources_vs_file(result, deployment_yaml_path):
-            _pure_llm_resource_nudge(
-                result, experiment, deployment_yaml_path, hpa_yaml_path
-            )
+            if not _llm_at_down_boundary_stop(experiment):
+                _pure_llm_resource_nudge(
+                    result, experiment, deployment_yaml_path, hpa_yaml_path
+                )
 
     if _yaml_noop_vs_managed_paths(result, deployment_yaml_path, hpa_yaml_path):
         repaired_ok = False
@@ -792,6 +938,28 @@ def _finalize_llm_squeeze_down(
                     (result.get("deployment_yaml_new") or "").strip()
                     or (result.get("hpa_yaml_new") or "").strip()
                 )
+        if _llm_hot_replica_drop_required(experiment):
+            if cap_squeeze_down_replicas_and_hpa(
+                result,
+                _down_cap_experiment(experiment),
+                deployment_yaml_path=deployment_yaml_path,
+                hpa_yaml_path=hpa_yaml_path,
+            ):
+                ev = list(result.get("evidence") or [])
+                ev.append("guard.enforce_hot_replica_drop")
+                result["evidence"] = ev
+        elif _llm_over_replicated_replica_required(experiment) and not _llm_intends_replica_down(
+            result, experiment
+        ):
+            if cap_squeeze_down_replicas_and_hpa(
+                result,
+                _down_cap_experiment(experiment),
+                deployment_yaml_path=deployment_yaml_path,
+                hpa_yaml_path=hpa_yaml_path,
+            ):
+                ev = list(result.get("evidence") or [])
+                ev.append("guard.enforce_over_replicated_replica")
+                result["evidence"] = ev
         if (result.get("deployment_yaml_new") or "").strip():
             clamp_llm_squeeze_replicas_to_one_step(
                 result,
@@ -818,12 +986,15 @@ def _finalize_llm_squeeze_down(
             _veto_llm_pure_squeeze_down(
                 result, experiment, deployment_yaml_path, hpa_yaml_path
             )
+        _apply_down_boundary_stop(
+            result, experiment, deployment_yaml_path, hpa_yaml_path
+        )
         return
 
     if drift or _squeeze_should_cap_replicas(experiment, result):
         cap_squeeze_down_replicas_and_hpa(
             result,
-            experiment,
+            _down_cap_experiment(experiment),
             deployment_yaml_path=deployment_yaml_path,
             hpa_yaml_path=hpa_yaml_path,
         )
@@ -898,6 +1069,7 @@ def _postprocess_llm_result(result: dict, experiment: dict) -> dict:
     """
     Apply deterministic safety checks so the output cannot contradict the input metrics.
     """
+    _normalize_llm_yaml_fields(result)
     down_boundary = _llm_squeeze_down_boundary_active(experiment)
 
     if (
@@ -1244,24 +1416,84 @@ def _up_recovery_replica_eligible(experiment: dict) -> bool:
     return True
 
 
-def _up_recovery_throughput_near_target(experiment: dict) -> bool:
+def _up_recovery_throughput_ratio_floor() -> float:
+    return float(os.environ.get("SQUEEZE_UP_THROUGHPUT_RATIO_FLOOR", "0.85"))
+
+
+def _up_recovery_ratios(experiment: dict) -> dict[str, float]:
+    """Load-normalized signals (work for any target RPS)."""
     obs = experiment.get("observed") or {}
-    target = float((experiment.get("workload") or {}).get("target_requests_per_second") or 0)
-    if target <= 0:
-        return True
+    slo = experiment.get("slo") or {}
+    wl = experiment.get("workload") or {}
+    target = float(wl.get("target_requests_per_second") or 0)
     ach = float(
         obs.get("achieved_requests_per_second_target_window")
         or obs.get("achieved_requests_per_second")
         or 0
     )
-    return ach >= 0.85 * target
+    p95 = float((obs.get("latency_ms") or {}).get("p95") or 0)
+    slo_p95 = float(slo.get("p95_latency_ms") or 500)
+    throughput_ratio = (ach / target) if target > 0 else 1.0
+    latency_ratio = (p95 / slo_p95) if slo_p95 > 0 and p95 > 0 else 0.0
+    return {
+        "target_rps": target,
+        "achieved_rps": ach,
+        "throughput_ratio": throughput_ratio,
+        "latency_ratio": latency_ratio,
+        "p95_ms": p95,
+        "slo_p95_ms": slo_p95,
+        "cpu_util_pct": float(obs.get("cpu_util_pct") or 0.0),
+        "mem_util_pct": float(obs.get("mem_util_pct") or 0.0),
+        "cpu_util_to_limit": float(obs.get("cpu_util_to_limit") or 0.0),
+    }
+
+
+def _up_recovery_bottleneck(experiment: dict) -> str:
+    """Primary UP axis from observed ratios (not hardcoded RPS)."""
+    r = _up_recovery_ratios(experiment)
+    thr_floor = _up_recovery_throughput_ratio_floor()
+    if r["throughput_ratio"] < thr_floor:
+        return "throughput"
+    if r["mem_util_pct"] >= 100.0:
+        return "memory"
+    if r["cpu_util_pct"] >= 85.0 or r["cpu_util_to_limit"] >= 0.85:
+        return "cpu"
+    if r["latency_ratio"] > 1.0:
+        return "latency"
+    return "balanced"
+
+
+def _attach_up_recovery_signals(experiment: dict) -> None:
+    if not _in_up_recovery_path(experiment):
+        return
+    ratios = _up_recovery_ratios(experiment)
+    bottleneck = _up_recovery_bottleneck(experiment)
+    prefer_replica = _up_recovery_prefers_replica_step(experiment)
+    experiment["up_recovery_signals"] = {
+        **ratios,
+        "bottleneck": bottleneck,
+        "prefer_replica_step": prefer_replica,
+        "throughput_ratio_floor": _up_recovery_throughput_ratio_floor(),
+    }
+
+
+def _up_recovery_throughput_near_target(experiment: dict) -> bool:
+    return _up_recovery_ratios(experiment)["throughput_ratio"] >= _up_recovery_throughput_ratio_floor()
 
 
 def _up_recovery_prefers_replica_step(experiment: dict) -> bool:
-    """Explicit +1 replica when still at one pod and load is near target (incl. mem/CPU saturated)."""
+    """+1 replica when single-pod UP recovery needs horizontal headroom (any target RPS)."""
     if not _up_recovery_replica_eligible(experiment):
         return False
-    return _up_recovery_throughput_near_target(experiment)
+    if not bool(((experiment.get("failure") or {}).get("failed"))):
+        return False
+    r = _up_recovery_ratios(experiment)
+    thr_floor = _up_recovery_throughput_ratio_floor()
+    # Throughput already near target but latency still failing → scale out.
+    if r["throughput_ratio"] >= thr_floor:
+        return True
+    # Throughput collapse at single pod → scale out before oversized vertical-only jumps.
+    return r["throughput_ratio"] < thr_floor
 
 
 def _sync_up_recovery_hpa_after_vertical(
@@ -1271,7 +1503,7 @@ def _sync_up_recovery_hpa_after_vertical(
     hpa_doc: dict | None,
     step: float,
 ) -> None:
-    """After vertical UP: raise HPA max and sync deployment replicas (formula/LLM shared)."""
+    """After vertical UP: raise HPA max/min headroom only (do not pin deployment replicas)."""
     if not hpa_doc or hpa_doc.get("kind") != "HorizontalPodAutoscaler":
         return
     if not _in_up_recovery_path(experiment):
@@ -1293,11 +1525,7 @@ def _sync_up_recovery_hpa_after_vertical(
     floor = max(min_r, obs_rep, obs_max, min_r + 1)
     hspec["minReplicas"] = min(new_max, floor)
     result["hpa_yaml_new"] = yaml.safe_dump(hpa_doc, sort_keys=False)
-    spec = dep_doc.setdefault("spec", {})
-    dep_rep = int(spec.get("replicas") or 1)
-    if new_max > dep_rep:
-        spec["replicas"] = new_max
-        result["deployment_yaml_new"] = yaml.safe_dump(dep_doc, sort_keys=False)
+    # Do not set deployment.spec.replicas = maxReplicas (cost blow-up; let HPA scale).
 
 
 def _apply_up_recovery_replica_step(
@@ -1353,79 +1581,13 @@ def _apply_up_recovery_replica_step(
     return True
 
 
-def _compute_up_recovery_resource_targets(
-    experiment: dict,
-    deployment_yaml_path: Path,
-    *,
-    req: dict,
-    lim: dict,
-    llm_cpu: int,
-    llm_mem: int,
-) -> tuple[int, int, dict, bool]:
-    """CPU/mem requests for one UP step; returns (cpu_req, mem_req, metric, near_pass)."""
-    metric = _metric_up_step_from_file(experiment, deployment_yaml_path)
-    if not metric:
-        return llm_cpu, llm_mem, {}, False
-
-    obs = experiment.get("observed") or {}
-    failure = experiment.get("failure") or {}
-    slo = experiment.get("slo") or {}
-    mem_util = float(obs.get("mem_util_pct") or 0.0)
-    p95 = float((obs.get("latency_ms") or {}).get("p95") or 0.0)
-    slo_p95 = float(slo.get("p95_latency_ms") or 500.0)
-    near_pass = bool(failure.get("failed")) and p95 > 0 and p95 <= slo_p95 * 1.2
-
-    cfg = experiment.get("config") or {}
-    file_cpu = int(cfg.get("cpu_request_m") or _millicpu_value(req.get("cpu")))
-    file_mem = int(cfg.get("mem_request_mib") or _mib_value(req.get("memory")))
-
-    if mem_util >= 100.0:
-        cpu_req = metric["cpu_req"]
-        mem_req = metric["mem_req"]
-    elif near_pass:
-        near_step = min(
-            _compute_step_pct({**experiment, "scaling_hint": "UP"}),
-            float(os.environ.get("SQUEEZE_LLM_UP_NEAR_PASS_STEP_PCT", "0.15")),
-        )
-        near_metric = _metric_up_step_from_file(
-            experiment, deployment_yaml_path, step_override=near_step
-        )
-        cap_cpu = near_metric["cpu_req"] if near_metric else metric["cpu_req"]
-        cap_mem = near_metric["mem_req"] if near_metric else metric["mem_req"]
-        cpu_req = max(file_cpu, min(llm_cpu, cap_cpu))
-        mem_req = max(file_mem, min(llm_mem, cap_mem))
-    else:
-        cpu_req = llm_cpu
-        mem_req = llm_mem
-        target = float((experiment.get("workload") or {}).get("target_requests_per_second") or 0)
-        ach = float(
-            obs.get("achieved_requests_per_second_target_window")
-            or obs.get("achieved_requests_per_second")
-            or 0
-        )
-        if (
-            target > 0
-            and ach >= 0.85 * target
-            and file_cpu > 0
-            and (
-                llm_cpu > int(math.ceil(file_cpu * 1.35))
-                or llm_mem > int(math.ceil(file_mem * 1.35))
-            )
-        ):
-            cpu_req = min(llm_cpu, metric["cpu_req"])
-            mem_req = min(llm_mem, metric["mem_req"])
-    if mem_util >= 100.0 and mem_req < cpu_req:
-        mem_req = max(mem_req, int(math.ceil(cpu_req * 0.5)))
-    return cpu_req, mem_req, metric, near_pass
-
-
 def _guard_llm_up_recovery_yaml(
     result: dict,
     experiment: dict,
     deployment_yaml_path: Path,
     hpa_yaml_path: Path,
 ) -> None:
-    """LLM UP recovery: multi-axis (CPU, mem, replicas/HPA) from metrics; no formula coupling."""
+    """UP recovery safety clamp only — LLM owns sizing via prompts (replica step ≤1 vs live)."""
     if experiment.get("analysis_goal") != "efficiency":
         return
     if experiment.get("squeeze_optimizer") != "llm":
@@ -1435,96 +1597,61 @@ def _guard_llm_up_recovery_yaml(
     if not _in_up_recovery_path(experiment):
         return
 
-    metric = _metric_up_step_from_file(experiment, deployment_yaml_path)
-    if not metric:
+    dep_new = (result.get("deployment_yaml_new") or "").strip()
+    if not dep_new:
+        return
+    try:
+        dep_doc = yaml.safe_load(dep_new)
+    except Exception:
+        return
+    if not isinstance(dep_doc, dict) or dep_doc.get("kind") != "Deployment":
         return
 
-    dep_doc = _load_deployment_doc(deployment_yaml_path)
-    if not dep_doc:
-        return
-    blocks = _deployment_container_blocks(dep_doc)
-    if not blocks:
-        return
-    _, req, lim = blocks
-
-    llm_text = (result.get("deployment_yaml_new") or "").strip()
-    if llm_text:
-        try:
-            llm_doc = yaml.safe_load(llm_text)
-        except Exception:
-            llm_doc = None
-        if isinstance(llm_doc, dict) and llm_doc.get("kind") == "Deployment":
-            dep_doc = llm_doc
-            blocks = _deployment_container_blocks(dep_doc)
-            if not blocks:
-                return
-            _, req, lim = blocks
-
-    obs = experiment.get("observed") or {}
-    mem_util = float(obs.get("mem_util_pct") or 0.0)
     cfg = experiment.get("config") or {}
-
-    llm_cpu = _millicpu_value(req.get("cpu"))
-    llm_mem = _mib_value(req.get("memory"))
-    cpu_req, mem_req, metric, near_pass = _compute_up_recovery_resource_targets(
-        experiment, deployment_yaml_path, req=req, lim=lim, llm_cpu=llm_cpu, llm_mem=llm_mem
+    obs = experiment.get("observed") or {}
+    file_repl = int(cfg.get("deployment_replicas") or 1)
+    live = max(
+        int(obs.get("replicas") or 0),
+        int(obs.get("replicas_max") or 0),
+        file_repl,
     )
+    max_rep = int(os.environ.get("SQUEEZE_UP_RECOVERY_MAX_REPLICAS", "6"))
+    spec = dep_doc.setdefault("spec", {})
+    proposed = int(spec.get("replicas") or file_repl)
+    cap = min(max_rep, max(live, file_repl) + 1)
+    changed = False
+    notes: list[str] = []
+    if proposed > cap:
+        spec["replicas"] = cap
+        changed = True
+        notes.append(f"replicas_clamp: llm={proposed} -> {cap} (live={live})")
+        result["deployment_yaml_new"] = yaml.safe_dump(dep_doc, sort_keys=False)
 
-    cpu_lim = max(
-        _millicpu_value(lim.get("cpu")),
-        int(math.ceil(cpu_req * 1.5)),
-    )
-    mem_lim = max(
-        _mib_value(lim.get("memory")),
-        int(math.ceil(mem_req * 1.5)),
-        mem_req + 1,
-    )
-
-    req["cpu"] = format_cpu_millicores(cpu_req)
-    req["memory"] = format_memory_mib(mem_req)
-    lim["cpu"] = format_cpu_millicores(cpu_lim)
-    lim["memory"] = format_memory_mib(mem_lim)
-
-    file_repl = int(cfg.get("deployment_replicas") or metric.get("replicas") or 1)
-    dep_rep = int((dep_doc.get("spec") or {}).get("replicas") or file_repl)
-    if file_repl <= 1 and dep_rep > 1:
-        live_max = max(
-            int(obs.get("replicas") or 0),
-            int(obs.get("replicas_max") or 0),
-        )
-        if dep_rep > live_max + 1:
-            dep_doc.setdefault("spec", {})["replicas"] = max(1, live_max + 1)
-
-    result["deployment_yaml_new"] = yaml.safe_dump(dep_doc, sort_keys=False)
-
+    hpa_new = (result.get("hpa_yaml_new") or "").strip()
     hpa_doc = None
-    if hpa_yaml_path.exists():
+    if hpa_new:
         try:
-            hpa_doc = yaml.safe_load(hpa_yaml_path.read_text())
+            hpa_doc = yaml.safe_load(hpa_new)
         except Exception:
             hpa_doc = None
-    step = _compute_step_pct({**experiment, "scaling_hint": "UP"})
-    _sync_up_recovery_hpa_after_vertical(result, experiment, dep_doc, hpa_doc, step)
+    dep_rep = int((dep_doc.get("spec") or {}).get("replicas") or cap)
+    if isinstance(hpa_doc, dict) and hpa_doc.get("kind") == "HorizontalPodAutoscaler":
+        hspec = hpa_doc.setdefault("spec", {})
+        max_r = int(hspec.get("maxReplicas") or dep_rep)
+        new_max = min(max(max_r, dep_rep), max_rep)
+        if new_max > cap:
+            new_max = cap
+        if new_max != max_r:
+            changed = True
+            notes.append(f"hpa.maxReplicas_clamp: {max_r} -> {new_max}")
+        hspec["maxReplicas"] = new_max
+        hspec["minReplicas"] = min(int(hspec.get("minReplicas") or 1), new_max)
+        result["hpa_yaml_new"] = yaml.safe_dump(hpa_doc, sort_keys=False)
 
-    dep_after = yaml.safe_load((result.get("deployment_yaml_new") or "").strip()) or {}
-    repl_after = int((dep_after.get("spec") or {}).get("replicas") or file_repl)
-    if repl_after <= file_repl and _up_recovery_prefers_replica_step(experiment):
-        _apply_up_recovery_replica_step(
-            result, experiment, deployment_yaml_path, hpa_yaml_path, evidence_tag="guard.llm"
-        )
-
-    axes: list[str] = ["cpu", "mem"]
-    dep_out = yaml.safe_load((result.get("deployment_yaml_new") or "").strip()) or {}
-    if int((dep_out.get("spec") or {}).get("replicas") or 1) > file_repl:
-        axes.append("replica")
-    ev = list(result.get("evidence") or [])
-    ev.append(
-        "guard.up_recovery: "
-        f"cpu_req={cpu_req}m mem_req={mem_req}Mi axes={','.join(axes)} "
-        f"(metric_step cpu={metric.get('cpu_req')} mem={metric.get('mem_req')}; "
-        f"mem_util={mem_util:.0f}% near_pass={near_pass})"
-    )
-    result["evidence"] = ev
+    if changed:
+        ev = list(result.get("evidence") or [])
+        ev.append("guard.up_recovery: " + "; ".join(notes))
+        result["evidence"] = ev
 
 
 def _compute_step_pct(experiment: dict) -> float:
@@ -1567,6 +1694,10 @@ def _compute_step_pct(experiment: dict) -> float:
         lat_pressure = max(0.0, (p95 / max(slo_p95, 1e-6)) - 1.0)
         throughput_pressure = max(0.0, (target / max(achieved, 1e-6)) - 1.0) if target > 0 else 0.0
         severity = max(err_pressure, lat_pressure, throughput_pressure)
+        thr_floor = _up_recovery_throughput_ratio_floor()
+        if target > 0 and achieved >= thr_floor * target and lat_pressure > 0:
+            # Per-pod latency bound while meeting RPS: stronger vertical steps (any load).
+            severity = max(severity, min(3.0, lat_pressure + 0.5))
         return round(_bound(0.15 + (0.08 * min(severity, 3.0)), 0.15, 0.40), 3)
 
     return 0.0
@@ -1888,6 +2019,8 @@ def load_summary() -> tuple[dict, Path, dict | None]:
     iteration_index = (meta or {}).get("iteration_index")
     if run_label and iteration_index is not None:
         run_dir = results_dir / str(run_label) / f"iteration-{int(iteration_index)}"
+    elif run_label:
+        run_dir = results_dir / str(run_label)
     else:
         today_str = date.today().strftime("%Y-%m-%d")
         idx = 1
@@ -2166,14 +2299,23 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
                 exp_data[k] = meta[k]
     squeeze_opt = _resolve_squeeze_optimizer(meta, experiment_config)
     exp_data["squeeze_optimizer"] = squeeze_opt
-    if squeeze_opt == "llm" and _llm_pure_squeeze():
+    if squeeze_opt == "llm" and _llm_vanilla_squeeze():
+        exp_data["llm_vanilla_squeeze"] = True
+        exp_data["scaling_rationale"] = (
+            "Vanilla LLM squeeze: coarse outcome summary + current YAML only "
+            "(no detailed telemetry in the prompt)."
+        )
+    elif squeeze_opt == "llm" and _llm_pure_squeeze():
         exp_data["llm_pure_squeeze"] = True
         exp_data["scaling_rationale"] = (
-            "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics "
-            "in this JSON (no formula fallback; scaling_hint not precomputed)."
+            "Advanced LLM squeeze: full experiment metrics in prompt; "
+            "decide UP/DOWN and step sizes from observed.* (no formula fallback)."
         )
+        attach_scaling_hint(exp_data)
     else:
         attach_scaling_hint(exp_data)
+    if _in_up_recovery_path(exp_data):
+        _attach_up_recovery_signals(exp_data)
     _attach_previous_iteration_context(exp_data, meta)
     (run_dir / "experiment.json").write_text(json.dumps(exp_data, indent=2))
     _log(
@@ -2224,25 +2366,32 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             f"has_hpa_yaml_new={bool((result.get('hpa_yaml_new') or '').strip())}"
         )
     else:
-        if use_efficiency and squeeze_opt == "llm":
+        if use_efficiency and squeeze_opt == "llm" and _llm_vanilla_squeeze():
+            system_prompt = VANILLA_LLM_SQUEEZE_PROMPT
+            user_prompt = build_vanilla_user_prompt(
+                exp_data, yaml_str, mode=user_mode
+            )
+        elif use_efficiency and squeeze_opt == "llm":
             system_prompt = EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT
         else:
             system_prompt = EFFICIENCY_SYSTEM_PROMPT if use_efficiency else SYSTEM_PROMPT
         _log(
             f"llm_analyze_start mode={user_mode} analysis_goal={analysis_goal} "
-            f"optimizer={squeeze_opt} user_prompt_chars={len(user_prompt)}"
+            f"optimizer={squeeze_opt} vanilla={_llm_vanilla_squeeze()} "
+            f"user_prompt_chars={len(user_prompt)}"
         )
         result = analyze_with_llm(system_prompt, user_prompt)
         result = _postprocess_llm_result(result, exp_data)
-        if use_efficiency and squeeze_opt == "llm" and _in_up_recovery_path(exp_data):
-            _guard_llm_up_recovery_yaml(
-                result, exp_data, deployment_yaml_path, hpa_yaml_path
-            )
+        if use_efficiency and squeeze_opt == "llm" and not _llm_vanilla_squeeze():
+            if _in_up_recovery_path(exp_data):
+                _guard_llm_up_recovery_yaml(
+                    result, exp_data, deployment_yaml_path, hpa_yaml_path
+                )
         if use_efficiency and squeeze_opt == "hybrid":
             _maybe_apply_deterministic_efficiency_yaml(
                 result, exp_data, deployment_yaml_path, hpa_yaml_path
             )
-        if _llm_squeeze_down_boundary_active(exp_data):
+        if _llm_squeeze_down_boundary_active(exp_data) and not _llm_vanilla_squeeze():
             _finalize_llm_squeeze_down(
                 result, exp_data, deployment_yaml_path, hpa_yaml_path
             )
@@ -2265,6 +2414,7 @@ def write_outputs(
     import difflib
 
     report = _coerce_report_markdown(result.get("report", ""))
+    _normalize_llm_yaml_fields(result)
     deployment_yaml_new = (result.get("deployment_yaml_new") or "").strip()
     hpa_yaml_new = (result.get("hpa_yaml_new") or "").strip()
 

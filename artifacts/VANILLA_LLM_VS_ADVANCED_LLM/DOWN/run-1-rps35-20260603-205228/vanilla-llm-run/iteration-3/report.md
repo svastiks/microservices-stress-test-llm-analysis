@@ -1,0 +1,5 @@
+- Stress test result: PASS
+- p95 latency: 6.0 ms (SLO: 500 ms)
+- Achieved throughput: 35.0 RPS
+- Suggest scaling down resources due to large latency slack.
+- Reducing CPU and memory requests and limits by ~10-20%.

@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 40,
+    "provisioned_request_mem_mib": 20,
+    "provisioned_limit_cpu_m": 100,
+    "provisioned_limit_mem_mib": 50,
+    "per_pod_unit_cost": 0.037953,
+    "per_pod_unit_cost_util": 0.036811,
+    "cost_score": 0.038,
+    "cost_score_util": 0.0368,
+    "cost_score_legacy": 0.0595
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "Observed CPU utilization at 100.4% with limit of 100m. (cost.cost_score = 0.038)",
+    "Memory utilization at 41.5% and it's being increased to ensure better balance.",
+    "Achieved requests per second is 45, which matches the target of 45.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress with high CPU vs limits; increase CPU and/or replicas.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 45.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 81.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 100.4,
+    "mem_util_pct": 41.5,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.0,
+    "total_requests": 4051
+  }
+}

@@ -1,0 +1,5 @@
+- The SLO was violated with p95 latency at 1013ms against the target of 500ms.
+- No errors were recorded during the experiment, indicating successful request handling.
+- Current resource requests are likely under-provisioned given the load, but particularly the p95 latency indicates capacity issues during peak load.
+- Suggesting a modest increase in both replicas and resource limits to prevent further SLO violations, while managing costs.
+- Recommend running the same fixed workload after adjustments to validate stability.

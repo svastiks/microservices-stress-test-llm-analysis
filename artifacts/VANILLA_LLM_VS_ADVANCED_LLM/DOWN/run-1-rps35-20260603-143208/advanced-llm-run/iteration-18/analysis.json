@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 38,
+    "provisioned_request_mem_mib": 41,
+    "provisioned_limit_cpu_m": 132,
+    "provisioned_limit_mem_mib": 114,
+    "per_pod_unit_cost": 0.038204,
+    "per_pod_unit_cost_util": 0.030533,
+    "cost_score": 0.0382,
+    "cost_score_util": 0.0305,
+    "cost_score_legacy": 0.078
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "cpu_util_pct: 87.3",
+    "cost_score: 0.0382",
+    "provisioned_request_cpu_m: 38",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1",
+    "squeeze_down_axis=resources"
+  ],
+  "squeeze_down_axis": "resources",
+  "resource_pass_streak": 8,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass in squeeze DOWN boundary search; continue reducing despite elevated utilization.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 4.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 87.3,
+    "mem_util_pct": 16.9,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.87,
+    "total_requests": 3151
+  }
+}

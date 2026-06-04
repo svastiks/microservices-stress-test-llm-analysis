@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "formula",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 56,
+    "provisioned_request_mem_mib": 32,
+    "provisioned_limit_cpu_m": 109,
+    "provisioned_limit_mem_mib": 56,
+    "per_pod_unit_cost": 0.053525,
+    "per_pod_unit_cost_util": 0.053488,
+    "cost_score": 0.0535,
+    "cost_score_util": 0.0535,
+    "cost_score_legacy": 0.0872
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "NONE",
+  "over_provisioned": false,
+  "evidence": [
+    "formula.step_pct=0.15",
+    "formula.scaling_hint=UP",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1",
+    "formula.up_recovery_replica_step:replicas=2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress with memory pressure or OOM; increase memory and/or replicas.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 54.9,
+    "error_rate": 0.0,
+    "latency_ms_p95": 53.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 148.4,
+    "mem_util_pct": 98.8,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.48,
+    "total_requests": 4950
+  }
+}

@@ -1,0 +1,5 @@
+- Stress test result: PASS
+- p95 latency: 21.0 ms, well below SLO of 500 ms
+- Error rate: 0.0%
+- Achieved throughput: 35.0 RPS
+- Scaling down resources is now appropriate for optimized performance.

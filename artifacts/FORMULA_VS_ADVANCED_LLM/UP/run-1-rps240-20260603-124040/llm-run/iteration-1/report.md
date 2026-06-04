@@ -1,0 +1,8 @@
+- The workload was under-provisioned with significant CPU (162.7%) and memory (143.7%) utilization above safe limits.
+- The SLO was not met due to a p95 latency of 2388ms exceeding the threshold of 500ms, resulting in a failure status.
+- Given the high bottleneck in memory and the prefer_replica_step indication, a replica has been added to scale horizontally.
+- The configuration was kept intact since the cost-effective adjustments can only be made after the initial scaling-up step.
+- The next step towards recovery involves allowing the system increased load-handling capacity through replicas.
+- After adding a replica, subsequent iterations will focus on vertical scaling based on observed utilization metrics.
+- Cost optimization will remain a priority, ensuring each incremental increase in resources keeps the cost score to a minimum.
+- Evidence includes observed CPU utilization of 162.7%, memory utilization of 143.7%, and the substantial latency indicating the need for resource adjustments.

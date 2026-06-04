@@ -1,0 +1,102 @@
+DOWN, FORMULA VS LLM
+
+Best-pass prov cost (lower wins)
+Run	RPS	Formula	LLM	Winner	Formula iters	LLM iters
+1
+25
+0.0481
+0.1153
+Formula
+19
+7
+2
+35
+0.1089
+0.0200
+LLM
+10
+12
+3
+45
+0.1997
+0.0849
+LLM
+13
+9
+4
+55
+0.1925
+0.3556
+Formula
+16
+4
+5
+25
+0.1687
+0.0190
+LLM
+11
+10
+6
+35
+0.1925
+0.1423
+LLM
+14
+8
+Overall: LLM 4/6, formula 2/6 on prov cost. p95: LLM wins most runs (often much better at 25/45/55).
+
+By load (with replicates)
+25: split (1–1) — high variance (0.048 vs 0.169 formula across reps).
+35: LLM 2/2 — strongest signal.
+45: LLM 1/1.
+55: formula 1/1 only — LLM overshot cost badly once.
+Verdict
+Encouraging but incomplete — good enough to finish runs 7–10, not enough for a paper claim. LLM looks strong at 35–45 RPS; 25 and 55 are noisy; formula often needs more iterations.
+
+Next: re-run missing rounds 7–10 (45,55,25,35), then aggregate the full 10.
+
+
+
+Same LLM and same squeeze loop; only the prompt input differs.
+
+Advanced gets the full experiment.json — CPU/mem util, scaling_hint, up_recovery_signals, prior-iteration context, and squeeze UP/DOWN rules — plus Python guards on UP recovery YAML.
+
+Vanilla gets a short text summary (PASS/FAIL, p95, error rate, achieved RPS, replica count, config from YAML) and the current Deployment/HPA — no util series, no bottleneck/ratio signals.
+
+So advanced is “rich telemetry + policy context (+ guards)”; vanilla is “minimal outcome + YAML only,” which is what Method 3 is meant to isolate.
+
+
+
+Present now (4 slides worth):
+
+Method 1 — Formula vs LLM (post-fix reruns ✅)
+Scenario	Load	Winner	Best prov cost	Iters
+UP
+240 RPS
+LLM
+0.0949 vs 0.1336
+2 vs 4
+DOWN
+55 RPS
+LLM
+0.0335 vs 0.1108
+18 vs 13
+Files: artifacts/FORMULA_VS_ADVANCED_LLM/UP/run-1-rps240-20260603-124040/ and .../DOWN/run-1-rps55-20260603-130930/
+
+Pilot backup: LLM 4/6 on DOWN (6-run partial) — RESULTS.txt
+
+Method 3 — Advanced vs Vanilla UP ✅
+Advanced 3/3 @ 220/240/260 — same 2 iters, lower cost (~0.13 vs ~0.19)
+
+Files: artifacts/VANILLA_LLM_VS_ADVANCED_LLM/UP/run-{1,2,3}-20260602-195255/
+
+Method 3 — Advanced vs Vanilla DOWN ⚠️
+Don’t lead with this — current artifact is broken run (vanilla no-op @ iter 1, known bug). Say: “DOWN rerun in progress after fence-strip + cold-util fix.”
+
+If you need something today: show advanced only from 143208 — 0.0382 in 19 iters (38m/41Mi/1 repl), footnote vanilla infra bug.
+
+One-liner for the deck
+Fixed-workload squeeze: LLM beats formula on cost at matched SLO (UP @240, DOWN @55); rich telemetry beats coarse summary on UP (3/3); DOWN head-to-head pending fair rerun.
+
+Skip for now: static baseline (Method 2), full 10-round aggregates, incomplete DOWN pilot runs 7–10.

@@ -15,6 +15,8 @@ SQUEEZE_MAX_ITERATIONS="${SQUEEZE_MAX_ITERATIONS:-8}"
 SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS:-30}"
 COMPARE_SQUEEZE_OPTIMIZERS="${COMPARE_SQUEEZE_OPTIMIZERS:-false}"
 COMPARE_HPA_VS_LLM="${COMPARE_HPA_VS_LLM:-false}"
+COMPARE_ADVANCED_VS_VANILLA_LLM="${COMPARE_ADVANCED_VS_VANILLA_LLM:-false}"
+STATIC_BASELINE="${STATIC_BASELINE:-false}"
 SQUEEZE_FINAL_REPORT_LLM="${SQUEEZE_FINAL_REPORT_LLM:-false}"
 
 for arg in "$@"; do
@@ -24,9 +26,23 @@ for arg in "$@"; do
   if [[ "${arg}" == "--compare-hpa-vs-llm" ]]; then
     COMPARE_HPA_VS_LLM="true"
   fi
+  if [[ "${arg}" == "--compare-advanced-vs-vanilla-llm" ]]; then
+    COMPARE_ADVANCED_VS_VANILLA_LLM="true"
+  fi
+  if [[ "${arg}" == "--static-baseline" ]]; then
+    STATIC_BASELINE="true"
+  fi
 done
-if [[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" && "${COMPARE_HPA_VS_LLM}" == "true" ]]; then
-  echo "[analyzer] cannot use --compare-squeeze-optimizers and --compare-hpa-vs-llm together" >&2
+_compare_count=0
+[[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" ]] && _compare_count=$((_compare_count + 1))
+[[ "${COMPARE_HPA_VS_LLM}" == "true" ]] && _compare_count=$((_compare_count + 1))
+[[ "${COMPARE_ADVANCED_VS_VANILLA_LLM}" == "true" ]] && _compare_count=$((_compare_count + 1))
+if (( _compare_count > 1 )); then
+  echo "[analyzer] use only one compare mode flag at a time" >&2
+  exit 1
+fi
+if [[ "${STATIC_BASELINE}" == "true" && "${_compare_count}" -gt 0 ]]; then
+  echo "[analyzer] --static-baseline cannot be combined with compare flags" >&2
   exit 1
 fi
 SUT_BASE_URL="${SUT_BASE_URL:-http://web.${NAMESPACE}.svc.cluster.local:8080}"
@@ -38,7 +54,7 @@ echo "[analyzer] namespace: ${NAMESPACE}"
 echo "[analyzer] job: ${JOB_NAME}"
 echo "[analyzer] profile: ${PROFILE}"
 echo "[analyzer] script: ${ANALYZER_SCRIPT}"
-echo "[analyzer] squeeze: until_violation=${SQUEEZE_UNTIL_VIOLATION} max_iterations=${SQUEEZE_MAX_ITERATIONS} settle_seconds=${SQUEEZE_SETTLE_SECONDS} compare_optimizers=${COMPARE_SQUEEZE_OPTIMIZERS} compare_hpa_vs_llm=${COMPARE_HPA_VS_LLM} final_report_llm=${SQUEEZE_FINAL_REPORT_LLM}"
+echo "[analyzer] squeeze: until_violation=${SQUEEZE_UNTIL_VIOLATION} max_iterations=${SQUEEZE_MAX_ITERATIONS} settle_seconds=${SQUEEZE_SETTLE_SECONDS} compare_optimizers=${COMPARE_SQUEEZE_OPTIMIZERS} compare_hpa_vs_llm=${COMPARE_HPA_VS_LLM} compare_advanced_vs_vanilla=${COMPARE_ADVANCED_VS_VANILLA_LLM} static_baseline=${STATIC_BASELINE} final_report_llm=${SQUEEZE_FINAL_REPORT_LLM}"
 
 if [[ ! -f "${JOB_YAML}" ]]; then
   echo "[analyzer] job yaml not found: ${JOB_YAML}" >&2
@@ -187,6 +203,84 @@ elif [[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" ]]; then
     }
   }" -o yaml > "${MANIFEST}.tmp"
   mv "${MANIFEST}.tmp" "${MANIFEST}"
+elif [[ "${COMPARE_ADVANCED_VS_VANILLA_LLM}" == "true" ]]; then
+  kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
+    \"spec\":{
+      \"template\":{
+        \"spec\":{
+          \"containers\":[
+            {
+              \"name\":\"runner\",
+              \"command\":[
+                \"python3\",
+                \"start.py\",
+                \"--compare-advanced-vs-vanilla-llm\",
+                \"--profile\",
+                \"${PROFILE}\",
+                \"--script\",
+                \"${ANALYZER_SCRIPT}\",
+                ${DYNAMIC_SQUEEZE_FLAGS},
+                \"--settle-seconds\",
+                \"${SQUEEZE_SETTLE_SECONDS}\",
+                \"--efficiency\",
+                \"--k8s-namespace\",
+                \"${NAMESPACE}\",
+                \"--k8s-deployment\",
+                \"web\",
+                \"--base-url\",
+                \"${SUT_BASE_URL}\",
+                \"--deployment-yaml\",
+                \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
+                \"--hpa-yaml\",
+                \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
+                \"--prometheus-url\",
+                \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }" -o yaml > "${MANIFEST}.tmp"
+  mv "${MANIFEST}.tmp" "${MANIFEST}"
+elif [[ "${STATIC_BASELINE}" == "true" ]]; then
+  kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
+    \"spec\":{
+      \"template\":{
+        \"spec\":{
+          \"containers\":[
+            {
+              \"name\":\"runner\",
+              \"command\":[
+                \"python3\",
+                \"start.py\",
+                \"--profile\",
+                \"${PROFILE}\",
+                \"--script\",
+                \"${ANALYZER_SCRIPT}\",
+                \"--efficiency\",
+                \"--k8s-namespace\",
+                \"${NAMESPACE}\",
+                \"--k8s-deployment\",
+                \"web\",
+                \"--base-url\",
+                \"${SUT_BASE_URL}\",
+                \"--deployment-yaml\",
+                \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
+                \"--hpa-yaml\",
+                \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
+                \"--prometheus-url\",
+                \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\",
+                \"--squeeze-optimizer\",
+                \"formula\"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }" -o yaml > "${MANIFEST}.tmp"
+  mv "${MANIFEST}.tmp" "${MANIFEST}"
 else
   kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
     \"spec\":{
@@ -277,8 +371,31 @@ if [[ "${COMPARE_HPA_VS_LLM}" == "true" ]]; then
     SQUEEZE_COMPARE_PRUNE_STALE_FORMULA="${SQUEEZE_COMPARE_PRUNE_STALE_FORMULA:-1}"
   )
 fi
+if [[ "${COMPARE_ADVANCED_VS_VANILLA_LLM}" == "true" ]]; then
+  SET_ENV_CMD+=(
+    SQUEEZE_COMPARE_SUBDIR_ADVANCED="${SQUEEZE_COMPARE_SUBDIR_ADVANCED:-squeeze-compare-advanced-llm}"
+    SQUEEZE_COMPARE_SUBDIR_VANILLA="${SQUEEZE_COMPARE_SUBDIR_VANILLA:-squeeze-compare-vanilla-llm}"
+    SQUEEZE_COMPARE_CONTINUE_ON_ADVANCED_FAIL="${SQUEEZE_COMPARE_CONTINUE_ON_ADVANCED_FAIL:-1}"
+    SQUEEZE_COMPARE_PRUNE_PRIOR="${SQUEEZE_COMPARE_PRUNE_PRIOR:-1}"
+    SQUEEZE_COMPARE_PRUNE_STALE_FORMULA="${SQUEEZE_COMPARE_PRUNE_STALE_FORMULA:-1}"
+    SQUEEZE_LLM_PURE="${SQUEEZE_LLM_PURE:-1}"
+    SQUEEZE_LLM_DOWN_BOUNDARY="${SQUEEZE_LLM_DOWN_BOUNDARY:-0}"
+    SQUEEZE_UP_RECOVERY_MAX_REPLICAS="${SQUEEZE_UP_RECOVERY_MAX_REPLICAS:-6}"
+    SQUEEZE_ROLLOUT_TIMEOUT_S="${SQUEEZE_ROLLOUT_TIMEOUT_S:-600}"
+    SQUEEZE_CPU_UTIL_FAIL_PCT="${SQUEEZE_CPU_UTIL_FAIL_PCT:-95}"
+    SQUEEZE_UNTIL_VIOLATION="${SQUEEZE_UNTIL_VIOLATION}"
+    SQUEEZE_MAX_ITERATIONS="${SQUEEZE_MAX_ITERATIONS}"
+    SQUEEZE_SETTLE_SECONDS="${SQUEEZE_SETTLE_SECONDS}"
+  )
+fi
 if [[ -n "${COMPARE_SYNC_MODE:-}" ]]; then
   SET_ENV_CMD+=(COMPARE_SYNC_MODE="${COMPARE_SYNC_MODE}")
+fi
+if [[ "${STATIC_BASELINE}" == "true" ]]; then
+  SET_ENV_CMD+=(STRESS_RESULTS_SUBDIR="${STRESS_RESULTS_SUBDIR:-static-baseline}")
+  if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+    SET_ENV_CMD+=(STRESS_RESULTS_RUN_LABEL="run-${COMPARE_SWEEP_ROUND}")
+  fi
 fi
 "${SET_ENV_CMD[@]}" > "${MANIFEST}.tmp"
 mv "${MANIFEST}.tmp" "${MANIFEST}"

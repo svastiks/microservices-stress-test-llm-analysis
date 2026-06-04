@@ -1,0 +1,5 @@
+- The stress test resulted in a failure due to p95 latency exceeding SLO.
+- p95 latency recorded at 2978.0 ms, while SLO limit is 500 ms.
+- Current configuration has only 1 replica.
+- Recommended to scale up CPU and memory resources.
+- HPA current limits are insufficient for auto-scaling under load.

@@ -1,0 +1,8 @@
+- Current SLO failure due to high p95 latency (2914 ms) exceeding the threshold (500 ms).
+- Observed CPU utilization is at 96.9%, close to limit, indicating under-provisioning.
+- Achieved RPS of 168.5 is below the target RPS of 220, with a throughput ratio of 0.77.
+- Latency is impacting the service, significantly higher than the desired SLO with a ratio of 5.83.
+- Scaling insights suggest that adding replicas will help alleviate the throughput bottleneck alongside increasing CPU and memory due to high utilization.
+- Proposed changes aim to raise the HPA max and existing CPU/memory requests/limits to improve throughput without exceeding cost-score significantly.
+- Memory requests are low; scaling them at least equal to CPU requests is necessary for balanced resource allocation.
+- Target to reach SLO compliance not only via scaling but also ensuring cost-effectiveness in the scaling approach.

@@ -1,0 +1,5 @@
+- Test passed comfortably under load.
+- p95 latency well below SLO limit.
+- No errors recorded during the test.
+- Achieved throughput slightly below the target.
+- Current configuration appears to be over-provisioned.

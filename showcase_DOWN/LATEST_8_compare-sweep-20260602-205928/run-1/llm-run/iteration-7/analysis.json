@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 60,
+    "provisioned_request_mem_mib": 40,
+    "provisioned_limit_cpu_m": 160,
+    "provisioned_limit_mem_mib": 80,
+    "per_pod_unit_cost": 0.028953,
+    "per_pod_unit_cost_util": 0.028791,
+    "cost_score": 0.0579,
+    "cost_score_util": 0.0576,
+    "cost_score_legacy": 0.0991
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "cpu_util_pct = 146.9%, indicating under-provisioning.",
+    "mem_util_pct = 91.7%, high but not exceeding limits; thus potential memory adjustments necessary.",
+    "SLO p95 latency is 94ms, which is well under the target of 500ms.",
+    "Cost score was previously calculated at 0.0579; increasing replicas with a cost-effective resource request should lower this score.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress with memory pressure or OOM; increase memory and/or replicas.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 94.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 146.9,
+    "mem_util_pct": 91.7,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.47,
+    "total_requests": 2251
+  }
+}

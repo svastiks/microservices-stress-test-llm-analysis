@@ -1,0 +1,5 @@
+- Stress test result was PASS with comfortable latency.
+- Achieved throughput was close to the target RPS with no errors.
+- P95 latency was below SLO limits, indicating room for cost reduction.
+- Current configuration runs 2 replicas at specified resource limits.
+- Proposing a cautious scale down to optimize resource usage.

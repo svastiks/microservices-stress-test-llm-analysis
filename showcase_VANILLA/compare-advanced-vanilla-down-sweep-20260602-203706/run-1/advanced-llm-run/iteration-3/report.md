@@ -1,0 +1,10 @@
+- The experiment experienced a CPU utilization failure, indicating under-provisioning.
+- Current achieved RPS is equal to target (25.0), but CPU utilization is excessively high (116.5%).
+- Latency of 60ms is well below the SLO of 500ms, and the error rate is 0.0%.
+- Utilization metrics are trustworthy, paving the way for a resource and replica scale-up.
+- Recommended to increase CPU/memory specifications and add replicas to mitigate CPU bottleneck while maintaining latency and error metrics.
+- Previous deployment had 5 replicas, suggesting some flexibility to scale back down as performance improves.
+- Aim to minimize cost score while achieving adequate resource provisioning.
+- Further increases in memory are recommended since memory utilization is below limits, alongside a replica increase to distribute load more evenly.
+- Proposing updated deployment YAML to adjust CPU requests and memory values as well as increasing replicas to ensure SLO compliance.
+- Next step should be to evaluate the effects of the scaling adjustments on performance metrics post-deployment.

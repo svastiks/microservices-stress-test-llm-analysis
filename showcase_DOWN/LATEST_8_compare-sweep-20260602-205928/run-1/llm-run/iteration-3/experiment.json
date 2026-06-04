@@ -1,0 +1,101 @@
+{
+  "experiment_id": "down_demo-20260603T015144Z-ffa8a432",
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "service": "robot-shop-web",
+  "endpoint": "POST /api/user/login",
+  "config": {
+    "cpu_request_m": 90,
+    "cpu_limit_m": 180,
+    "mem_request_mib": 45,
+    "mem_limit_mib": 90,
+    "deployment_replicas": 4,
+    "hpa": {
+      "min_replicas": 1,
+      "max_replicas": 4,
+      "target_cpu_util_pct": 60
+    }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate",
+    "target_requests_per_second": 25,
+    "duration_s": 90,
+    "scenario": "normal_login_with_headroom"
+  },
+  "slo": {
+    "p95_latency_ms": 500,
+    "error_rate": 0.01
+  },
+  "observed": {
+    "total_requests": 2251,
+    "observed_duration_s": 90.1,
+    "achieved_requests_per_second": 25.0,
+    "achieved_requests_per_second_target_window": 25.0,
+    "dropped_iterations": 0,
+    "latency_ms": {
+      "p95": 6.0,
+      "p99": 0
+    },
+    "error_rate": 0.0,
+    "replicas": 5,
+    "replicas_max": 5,
+    "cpu_util_pct": 52.7,
+    "mem_util_pct": 27.0,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.53,
+    "telemetry": {
+      "window_start_ts": 1780451369.1504738,
+      "window_end_ts": 1780451549.6175187,
+      "replicas_series_matched": true,
+      "replicas_inferred_from_config": false,
+      "cpu_series_matched": true,
+      "mem_series_matched": true,
+      "cpu_query_attempts": 1,
+      "mem_query_attempts": 1,
+      "cpu_collection_mode": "aggregate_query",
+      "mem_collection_mode": "aggregate_query",
+      "utilization_trustworthy": true
+    }
+  },
+  "failure": {
+    "failed": false,
+    "reason": ""
+  },
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 5,
+    "provisioned_request_cpu_m": 450,
+    "provisioned_request_mem_mib": 225,
+    "provisioned_limit_cpu_m": 900,
+    "provisioned_limit_mem_mib": 450,
+    "per_pod_unit_cost": 0.085395,
+    "per_pod_unit_cost_util": 0.043874,
+    "cost_score": 0.427,
+    "cost_score_util": 0.2194,
+    "cost_score_legacy": 0.6697
+  },
+  "start_ts": 1780451414.1504738,
+  "end_ts": 1780451504.6175187,
+  "prometheus": true,
+  "base_url": "http://web.svastik.svc.cluster.local:8080",
+  "k8s_namespace": "svastik",
+  "k8s_deployment": "web",
+  "deployment_yaml": "infra/k8s/spark/robot-shop-web-deployment.yaml",
+  "hpa_yaml": "infra/k8s/spark/robot-shop-web-hpa.yaml",
+  "prometheus_url": "http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090",
+  "squeeze_optimizer": "llm",
+  "llm_pure_squeeze": true,
+  "scaling_rationale": "SLO pass with slack on at least one resource; small reduction may be safe.",
+  "scaling_hint": "DOWN",
+  "_prev_iteration": {
+    "slo_status": "PASS",
+    "latency_ms_p95": 6.0,
+    "cpu_util_pct": 44.9,
+    "mem_util_pct": 21.0,
+    "deployment_replicas": 5,
+    "cpu_request_m": 100,
+    "mem_request_mib": 50,
+    "squeeze_down_axis": "replica",
+    "resource_pass_streak": 0
+  }
+}

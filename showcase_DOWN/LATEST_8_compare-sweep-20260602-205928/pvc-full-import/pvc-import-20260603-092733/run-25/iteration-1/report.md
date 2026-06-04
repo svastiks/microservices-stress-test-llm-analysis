@@ -1,0 +1,5 @@
+- The workload failed to meet SLO due to high latency (p95 = 60000ms).
+- Current cost score suggests some optimization potential (0.4465).
+- Resource utilization is trustworthy, but observed requests were well below target.
+- Suggest modest increases to CPU/memory requests/limits to support higher replica counts and improve SLO.
+- Recommended next step: re-run the same workload after applying changes.

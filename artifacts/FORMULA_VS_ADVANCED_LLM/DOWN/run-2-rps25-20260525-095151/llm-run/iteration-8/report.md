@@ -1,0 +1,11 @@
+### Analysis of Scaling Experiment
+- The SLO was met with a p95 latency of 6ms, well below the threshold of 500ms.
+- CPU utilization was at 72.6%, indicating potential over-provisioning.
+- Memory utilization was only at 35.4%, suggesting further headroom for requests.
+- Previous resource-only DOWN step was successful with a current resource request of 20m for CPU.
+- Observed CPU utilization indicates a safe trim: reducing requests from 20m to 15m and limits from 200m to 150m.
+- With 2 replicas currently, the next step involves scaling down to 1 replica, minimizing cost without sacrificing performance.
+- Cost efficiency can improve through reduced resources given the current low utilization metrics.
+- The deployment and HPA yield room for tighter CPU/memory bounds, maintaining a safety margin on resource requests.
+- Overall optimization headroom is categorized as 'MEDIUM', as resource utilization is far below the limits.
+- Previous iterations confirm reliability and safety in scaling actions.

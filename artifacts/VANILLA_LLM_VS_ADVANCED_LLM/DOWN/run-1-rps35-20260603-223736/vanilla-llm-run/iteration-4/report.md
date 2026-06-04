@@ -1,0 +1,5 @@
+- Target load successfully met at 35 RPS.
+- p95 latency of 5.0 ms with no errors.
+- Current configuration has capacity to be scaled down.
+- Reducing resources for optimization and efficiency.
+- Next step is to re-run the same workload with updated configuration.

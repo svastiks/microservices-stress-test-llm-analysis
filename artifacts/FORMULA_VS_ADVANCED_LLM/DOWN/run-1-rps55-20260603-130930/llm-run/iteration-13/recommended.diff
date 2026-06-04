@@ -1,0 +1,14 @@
+--- infra/k8s/spark/robot-shop-web-deployment.yaml
++++ infra/k8s/spark/robot-shop-web-deployment.yaml
+@@ -24,9 +24,9 @@
+         - containerPort: 8080
+         resources:
+           limits:
+-            cpu: 180m
++            cpu: 162m
+             memory: 90Mi
+           requests:
+-            cpu: 45m
++            cpu: 40m
+             memory: 30Mi
+       restartPolicy: Always

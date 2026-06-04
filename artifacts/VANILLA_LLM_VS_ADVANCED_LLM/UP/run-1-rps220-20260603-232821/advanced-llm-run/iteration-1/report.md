@@ -1,0 +1,7 @@
+- The current deployment is under-provisioned as indicated by a CPU utilization of 103.7% and a p95 latency of 1636ms, which exceeds the SLO of 500ms.
+- The system has been executing a fixed workload with a target of 220 RPS but achieved only 219.9 RPS, showing a throughput ratio of nearly 1.00.
+- The latency ratio of 3.27 implies significant latency issues, indicating the service is unable to meet the specified SLO.
+- Given the single replica setup and the observed CPU utilization exceeding the defined limit, there is a need to scale out horizontally.
+- Scaling up to 2 replicas while maintaining current resource requests/limits is necessary to begin addressing the SLO violations.
+- The deployment YAML will reflect an increase in replicas to 2, aligning with the current HPA configuration that also needs adjustment accordingly.
+- The evidence for actions taken includes `p95 latency=1636ms`, `slo.p95=500ms`, `cpu_util_pct=103.7%`, and the current configuration which is at a thin baseline.

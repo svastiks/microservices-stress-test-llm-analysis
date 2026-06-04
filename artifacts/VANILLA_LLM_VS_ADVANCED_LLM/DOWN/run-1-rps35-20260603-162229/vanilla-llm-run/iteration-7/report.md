@@ -1,0 +1,6 @@
+- Stress test passed with significant latency slack.
+- p95 latency was 5.0 ms compared to SLO of 500 ms.
+- No errors recorded during the test.
+- Achieved target load of 35 RPS successfully.
+- Current resources observed were sufficient.
+- Scaling down resources is advised as per guidelines.

@@ -1,0 +1,23 @@
+{
+  "stopped_reason": "up_demo_first_pass_overprovisioned",
+  "best_pass_dir": "/app/results/run-48/iteration-1",
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "/app/results/run-48/iteration-1",
+      "status": "PASS",
+      "target_rps": 220,
+      "achieved_rps": 219.7,
+      "achieved_rps_target_window": 220.0,
+      "dropped_iterations": 0,
+      "p95_ms": 219.0,
+      "error_rate": 0.0,
+      "cpu_util_pct": 56.7,
+      "mem_util_pct": 32.1,
+      "replicas": 1,
+      "cpu_request_m": 100,
+      "mem_request_mib": 50,
+      "cost_score": 0.1488
+    }
+  ]
+}

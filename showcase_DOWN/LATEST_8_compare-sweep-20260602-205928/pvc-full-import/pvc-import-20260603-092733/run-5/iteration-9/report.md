@@ -1,0 +1,6 @@
+- SLO compliance achieved: p95 latency was 7ms vs 500ms threshold.
+- No errors were encountered during the test.
+- Current cost score is low at 0.0267, indicating potential for savings.
+- Observed CPU and memory utilization were both at 0%, showing over-provisioning.
+- Recommend reducing CPU/MEM requests by 10% and reducing replicas to maintain efficiency.
+- Next step: re-run the same workload after applying the updated configurations.

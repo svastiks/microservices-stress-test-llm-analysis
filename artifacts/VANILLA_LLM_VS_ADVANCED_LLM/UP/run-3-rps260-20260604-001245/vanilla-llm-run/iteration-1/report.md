@@ -1,0 +1,5 @@
+- Stress test failed due to p95 latency exceeding SLO.
+- Achieved 231.5 RPS versus the target 260 RPS.
+- Only 1 replica observed during the test.
+- Recommendations: Increase resources and replicas to handle the load.
+- Adjusted CPU and memory requests/limits, and increased replicas in HPA.

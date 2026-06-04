@@ -1,0 +1,5 @@
+- Test failed due to p95 latency (2683.0 ms) exceeding the SLO limit (500 ms).
+- Achieved throughput was slightly below the target (237.0 RPS vs 240 RPS).
+- Only 1 replica was observed during the test, which suggests a need for scaling up.
+- Recommendations include increasing resources and replicas to improve performance.
+- Error rate was 0.0, indicating no request failures despite high latency.

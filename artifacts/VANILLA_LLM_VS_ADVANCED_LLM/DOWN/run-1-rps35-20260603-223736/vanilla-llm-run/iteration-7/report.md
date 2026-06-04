@@ -1,0 +1,5 @@
+- Target load was 35 RPS for 60s
+- Result: FAIL due to cpu_utilization_exceeded
+- Achieved throughput: 35.0 RPS
+- p95 latency: 53.0 ms (well below SLO)
+- It is necessary to increase resource limits and replica count.

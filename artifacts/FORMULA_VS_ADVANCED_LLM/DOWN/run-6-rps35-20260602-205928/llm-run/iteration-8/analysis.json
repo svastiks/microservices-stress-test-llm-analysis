@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 80,
+    "provisioned_request_mem_mib": 40,
+    "provisioned_limit_cpu_m": 200,
+    "provisioned_limit_mem_mib": 100,
+    "per_pod_unit_cost": 0.037953,
+    "per_pod_unit_cost_util": 0.037506,
+    "cost_score": 0.0759,
+    "cost_score_util": 0.075,
+    "cost_score_legacy": 0.1191
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "LOW",
+  "over_provisioned": false,
+  "evidence": [
+    "CPU utilization exceeds threshold at 113.7%, suggesting under-provisioning (observed.cpu_util_pct).",
+    "Current configuration limits are causing performance issues, necessitating increased CPU and memory requests/limits.",
+    "Latency under current load is p95=24 ms, significantly below the SLO target of 500 ms, demonstrating acceptable performance despite strain on resources.",
+    "Cost score of 0.0759 indicates that while the system is operational, there are further savings opportunities as overhead increases with resource usage.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress with high CPU vs limits; increase CPU and/or replicas.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 24.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 113.7,
+    "mem_util_pct": 77.1,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.14,
+    "total_requests": 3151
+  }
+}

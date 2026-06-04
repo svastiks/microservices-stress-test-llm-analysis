@@ -1,0 +1,9 @@
+- The current deployment is under-provisioned, resulting in SLO failure due to high p95 latency (1010ms > 500ms).
+- The observed CPU utilization is at 43.6%, which indicates headroom for scaling CPU and memory.
+- Memory utilization is at 56.2%, which is manageable, but increases may be required to meet the latency requirements.
+- Cost score of current provisioned configuration is 0.1328, which we aim to lower while achieving SLO PASS.
+- Recommended actions include adjusting CPU requests and limits along with scaling replicas by 1 to appropriately manage the throughput and latency.
+- Scaling up must be handled cautiously to ensure we don't overspend while meeting performance criteria.
+- Scaling CPU to 90m and memory to 45Mi, while increasing replicas to 3 to improve capacity and meet the SLO requirement.
+- Ensured that while scaling, memory requests are increased in accordance with CPU increases to adhere to observed utilization.
+- This proposed configuration aims to strike a balance between performance and cost-effectiveness, aiming for a lower cost score on autoscaling.

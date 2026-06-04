@@ -1,0 +1,8 @@
+- Current workload achieved an optimal request rate of 35 RPS with a latency of 6ms, well below SLO of 500ms.
+- Observed CPU utilization was at 24% and memory utilization at 11.5%, indicating significant over-provisioning.
+- Existing configuration includes 5 replicas, but we can optimize down to 4 replicas while still maintaining performance.
+- Due to FAT-START conditions, resource limits should be reduced by 10-15% to align with lower utilization, alongside the reduction in replicas.
+- The cost score of 0.6392 reflects inefficiency; therefore, reducing resources and replicas is justified for cost optimization.
+- HPA's maxReplicas will be adjusted to match the reduced replica count to maintain scalability.
+- Proposed adjustments will ensure efficient resource utilization while meeting service SLOs.
+- Next steps will involve observation post-deployment to ensure stability at lower resource levels.

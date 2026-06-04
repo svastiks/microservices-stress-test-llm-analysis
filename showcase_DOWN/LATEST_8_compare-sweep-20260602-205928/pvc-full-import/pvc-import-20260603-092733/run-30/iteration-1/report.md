@@ -1,0 +1,6 @@
+- The workload ran with a maximum of 3 replicas, which is the set limit of HPA.
+- The p95 latency of 1478ms exceeded the SLO of 500ms, indicating SLO violation.
+- Cost analysis shows a provisioned CPU of 300m and memory of 150Mi; these are high given the low utilization of CPU (54.4%) and memory (53.8%).
+- Optimization headroom is identified as HIGH due to the significant SLO violation while effectively using only 3 replicas.
+- Recommended to scale up CPU and memory resources modestly to meet SLO compliance, while overprovisioned resources indicate a need for a conservative right-sizing approach.
+- Next step: re-run the same fixed workload after increasing resource requests to ensure compliance.

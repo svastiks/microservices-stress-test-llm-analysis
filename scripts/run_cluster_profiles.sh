@@ -184,6 +184,57 @@ latest_numbered_run_dir() {
   fi
 }
 
+latest_child_dir_any() {
+  local parent="$1"
+  if [[ ! -d "${parent}" ]]; then
+    return 0
+  fi
+  local numbered best="" best_n=-1 d b n
+  numbered="$(latest_numbered_run_dir "${parent}")"
+  if [[ -n "${numbered}" ]]; then
+    printf '%s' "${numbered}"
+    return 0
+  fi
+  for d in "${parent}"/*; do
+    [[ -d "${d}" ]] || continue
+    b="$(basename "${d}")"
+    if [[ "${b}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-([0-9]+)$ ]]; then
+      n="${BASH_REMATCH[1]}"
+      if (( n > best_n )); then
+        best_n="${n}"
+        best="${d}"
+      fi
+    fi
+  done
+  if [[ -n "${best}" ]]; then
+    printf '%s' "${best}"
+    return 0
+  fi
+  ls -td "${parent}"/*/ 2>/dev/null | head -n 1 | sed 's:/*$::'
+}
+
+# Static baseline PVC dirs are run-<n> (preferred) or YYYY-MM-DD-<n>; pick by sweep round, not mtime.
+static_baseline_run_dir_for_round() {
+  local parent="$1" round="$2"
+  if [[ ! -d "${parent}" ]]; then
+    return 0
+  fi
+  if [[ -d "${parent}/run-${round}" ]]; then
+    printf '%s' "${parent}/run-${round}"
+    return 0
+  fi
+  local d b
+  for d in "${parent}"/*; do
+    [[ -d "${d}" ]] || continue
+    b="$(basename "${d}")"
+    if [[ "${b}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}-${round}$ ]]; then
+      printf '%s' "${d}"
+      return 0
+    fi
+  done
+  latest_child_dir_any "${parent}"
+}
+
 # Copy analyzer PVC to RESULTS_DEST after every profile job (success or failure) so partial runs are not lost.
 # Compare (--compare-squeeze-optimizers): one folder run-<n>/formula-run, run-<n>/llm-run (iteration-* inside), plus
 #   comparison.md (rebuilt from those trees' cost-effective-boundary.json on sync).
@@ -258,7 +309,30 @@ EOF
   fi
 
   # --- thin ---
-  if [[ "${RESULTS_PVC_SYNC_LLMS_ONLY}" == "true" && -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
+  if [[ "${COMPARE_SYNC_MODE:-}" == "static" ]]; then
+    local static_sub static_src run_label run_out
+    static_sub="${STRESS_RESULTS_SUBDIR:-static-baseline}"
+    if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+      static_src="$(static_baseline_run_dir_for_round "${COPIED_ROOT}/${static_sub}" "${COMPARE_SWEEP_ROUND}")"
+    else
+      static_src="$(latest_child_dir_any "${COPIED_ROOT}/${static_sub}")"
+    fi
+    if [[ -n "${static_src}" ]]; then
+      run_label="$(basename "${static_src}")"
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        run_label="run-${COMPARE_SWEEP_ROUND}"
+      fi
+      run_out="${RESULTS_DEST}/${run_label}"
+      rm -rf "${run_out}"
+      cp -R "${static_src}" "${run_out}"
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        printf '%s\n' "${run_label}" > "${RESULTS_DEST}/.last_sync_r${COMPARE_SWEEP_ROUND}.txt"
+      fi
+      log "PVC sync done (${reason}, layout=thin, static): ${run_out} (pvc=$(basename "${static_src}"))"
+    else
+      log "WARNING: static mode expected ${COPIED_ROOT}/${static_sub}/* but found none"
+    fi
+  elif [[ "${RESULTS_PVC_SYNC_LLMS_ONLY}" == "true" && -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
     LLM_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-llm")"
     if [[ -n "${LLM_SRC}" ]]; then
       run_label="$(basename "${LLM_SRC}")"
@@ -338,7 +412,65 @@ run_out.joinpath('comparison.md').write_text(
       log "PVC sync done (${reason}, layout=thin, hpa-compare): ${run_out}"
       fi
     fi
-  elif [[ "${COMPARE_SYNC_MODE:-}" != "hpa" ]] \
+  elif [[ "${COMPARE_SYNC_MODE:-}" == "advanced-vanilla" ]] \
+    && [[ -d "${COPIED_ROOT}/squeeze-compare-advanced-llm" && -d "${COPIED_ROOT}/squeeze-compare-vanilla-llm" ]]; then
+    ADV_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-advanced-llm")"
+    VAN_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-vanilla-llm")"
+    if [[ -z "${ADV_SRC}" || -z "${VAN_SRC}" ]]; then
+      log "WARNING: advanced-vanilla compare expected both subdirs on PVC; skipping bundle"
+    else
+      local a_base v_base run_label run_out n_a n_v
+      a_base="$(basename "${ADV_SRC}")"
+      v_base="$(basename "${VAN_SRC}")"
+      run_label="${a_base}"
+      if [[ "${a_base}" =~ ^run-([0-9]+)$ ]]; then
+        n_a="${BASH_REMATCH[1]}"
+      else
+        n_a=-1
+      fi
+      if [[ "${v_base}" =~ ^run-([0-9]+)$ ]]; then
+        n_v="${BASH_REMATCH[1]}"
+      else
+        n_v=-1
+      fi
+      if [[ "${n_a}" -ge 0 && "${n_v}" -ge 0 && "${n_a}" != "${n_v}" ]]; then
+        log "ERROR: advanced ${a_base} vs vanilla ${v_base} run index mismatch — skipping compare copy"
+      else
+        if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+          run_label="run-${COMPARE_SWEEP_ROUND}"
+        fi
+        run_out="${RESULTS_DEST}/${run_label}"
+        rm -rf "${run_out}"
+        mkdir -p "${run_out}"
+        cp -R "${ADV_SRC}" "${run_out}/advanced-llm-run"
+        cp -R "${VAN_SRC}" "${run_out}/vanilla-llm-run"
+        _repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+        if PYTHONPATH="${_repo_root}${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "
+from pathlib import Path
+from analysis.compare_squeeze_methods import compare
+run_out = Path(r'''${run_out}''')
+fa = run_out / 'advanced-llm-run' / 'cost-effective-boundary.json'
+fb = run_out / 'vanilla-llm-run' / 'cost-effective-boundary.json'
+if not fa.is_file() or not fb.is_file():
+    raise SystemExit('missing boundary json')
+run_out.joinpath('comparison.md').write_text(
+    compare(fa, fb, label_a='advanced-llm', label_b='vanilla-llm')
+)
+"; then
+          log "wrote comparison.md from bundled boundary JSON (advanced-llm vs vanilla-llm)"
+        else
+          log "WARNING: could not regenerate comparison.md from boundary JSON"
+          if [[ -f "${COPIED_ROOT}/squeeze-optimizer-comparison.md" ]]; then
+            cp "${COPIED_ROOT}/squeeze-optimizer-comparison.md" "${run_out}/comparison.md"
+          fi
+        fi
+        if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+          printf '%s\n' "${run_label}" > "${RESULTS_DEST}/.last_sync_r${COMPARE_SWEEP_ROUND}.txt"
+        fi
+        log "PVC sync done (${reason}, layout=thin, advanced-vanilla): ${run_out}"
+      fi
+    fi
+  elif [[ "${COMPARE_SYNC_MODE:-}" == "formula" ]] \
     && [[ -d "${COPIED_ROOT}/squeeze-compare-formula" && -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
     FORMULA_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-formula")"
     LLM_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-llm")"
@@ -425,9 +557,15 @@ run_out.joinpath('comparison.md').write_text(
     if [[ -n "${SINGLE_RUN}" ]]; then
       local copy_base
       copy_base="$(basename "${SINGLE_RUN}")"
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        copy_base="run-${COMPARE_SWEEP_ROUND}"
+      fi
       mkdir -p "${RESULTS_DEST}"
       rm -rf "${RESULTS_DEST}/${copy_base}"
       cp -R "${SINGLE_RUN}" "${RESULTS_DEST}/${copy_base}"
+      if [[ -n "${COMPARE_SWEEP_ROUND:-}" ]]; then
+        printf '%s\n' "${copy_base}" > "${RESULTS_DEST}/.last_sync_r${COMPARE_SWEEP_ROUND}.txt"
+      fi
       log "PVC sync done (${reason}, layout=thin, run=${copy_base})"
     else
       log "WARNING: no top-level run-* directory found on PVC under ${COPIED_ROOT}; nothing copied"

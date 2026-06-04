@@ -1,0 +1,5 @@
+- Test passed with low p95 latency (6.0 ms vs SLO 500 ms).
+- Error rate was 0.0.
+- Achieved throughput met the target load of 35 RPS.
+- Current replica count was 3.
+- Resources can be reduced for efficiency.

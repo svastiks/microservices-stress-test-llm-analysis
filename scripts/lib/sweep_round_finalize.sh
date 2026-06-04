@@ -8,6 +8,11 @@ sweep_round_has_local_bundle() {
       && ! [[ -d "${run_dir}/formula-run" ]]
     return
   fi
+  if [[ "${COMPARE_SYNC_MODE:-}" == "advanced-vanilla" ]]; then
+    [[ -f "${run_dir}/comparison.md" && -f "${run_dir}/advanced-llm-run/cost-effective-boundary.json" ]] \
+      && [[ -f "${run_dir}/vanilla-llm-run/cost-effective-boundary.json" ]]
+    return
+  fi
   [[ -f "${run_dir}/comparison.md" ]] \
     || [[ -f "${run_dir}/formula-run/cost-effective-boundary.json" ]] \
     || [[ -f "${run_dir}/hpa-run/cost-effective-boundary.json" ]]

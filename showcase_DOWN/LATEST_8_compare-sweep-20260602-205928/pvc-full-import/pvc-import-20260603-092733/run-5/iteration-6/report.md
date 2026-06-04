@@ -1,0 +1,5 @@
+- The SLO for p95 latency (500 ms) is easily met at 7 ms with a 0% error rate.
+- Current CPU and memory utilization is very low (0% for both), indicating significant over-provisioning.
+- Proposed changes include reducing CPU and memory requests/limits by 20% and scaling down replicas to 1 to maintain efficiency.
+- The cost score is also low (0.0495), suggesting room for cost reductions while preserving performance.
+- Next action: Rerun the same fixed workload after applying the leaner YAML.

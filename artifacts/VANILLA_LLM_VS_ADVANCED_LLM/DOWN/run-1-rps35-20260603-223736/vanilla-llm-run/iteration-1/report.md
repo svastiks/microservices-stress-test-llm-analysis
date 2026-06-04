@@ -1,0 +1,6 @@
+- Target load: 35 RPS for 60s
+- Result: PASS
+- p95 latency: 6.0 ms (SLO limit: 500 ms)
+- Error rate: 0.0
+- Achieved throughput: 35.0 RPS
+- Scaling down resources after successful test.

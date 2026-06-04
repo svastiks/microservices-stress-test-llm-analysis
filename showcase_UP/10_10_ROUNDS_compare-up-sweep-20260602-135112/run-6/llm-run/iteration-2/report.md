@@ -1,0 +1,8 @@
+- Achieved requests per second is meeting the target of 260 RPS with a throughput ratio of 1.00, indicating balanced capacity.
+- SLO requirements are currently being met with p95 latency at 466ms against a threshold of 500ms and an error rate of 0%.
+- However, both CPU and memory utilization are significantly below target, with observed CPU utilization at 33% and memory at 27%.
+- To minimize cost, a vertical scaling approach is suggested by increasing CPU and memory requests, while maintaining the replica count initially.
+- Current cost score of 0.1328 provides a baseline for comparing optimization; the objective will be to reduce this score through careful adjustments.
+- The deployment currently holds 2 replicas, which cannot be reduced during the UP recovery phase.
+- Metrics indicate room to increase `cpu_request_m` and `mem_request_mib`, keeping in mind that memory should be increased by at least as much as CPU to ensure stability and performance.
+- Scaling limits for CPU and memory should also be considered to allow for unforeseen spikes.

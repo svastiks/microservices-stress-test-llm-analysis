@@ -1,0 +1,30 @@
+--- infra/k8s/spark/robot-shop-web-deployment.yaml
++++ infra/k8s/spark/robot-shop-web-deployment.yaml
+@@ -6,7 +6,7 @@
+   labels:
+     service: web
+ spec:
+-  replicas: 2
++  replicas: 1
+   selector:
+     matchLabels:
+       service: web
+@@ -26,6 +26,6 @@
+             cpu: 200m
+             memory: 90Mi
+           requests:
+-            cpu: 65m
++            cpu: 58m
+             memory: 30Mi
+       restartPolicy: Always
+--- infra/k8s/spark/robot-shop-web-hpa.yaml
++++ infra/k8s/spark/robot-shop-web-hpa.yaml
+@@ -9,7 +9,7 @@
+     kind: Deployment
+     name: web
+   minReplicas: 1
+-  maxReplicas: 2
++  maxReplicas: 1
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0

@@ -1,0 +1,5 @@
+- Test passed comfortably with p95 latency at 6.0 ms, well below the SLO of 500 ms.
+- Error rate was 0.0%, achieving target throughput of 35.0 RPS.
+- Replicas observed were 5, indicating excess capacity.
+- Scaling down CPU and memory requests/limits is appropriate to optimize resource usage.
+- Reducing maxReplicas from HPA to better match the load.

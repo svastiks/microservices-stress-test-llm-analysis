@@ -1,0 +1,6 @@
+- Test outcome: PASS
+- p95 latency: 6.0 ms
+- Error rate: 0.0
+- Achieved throughput: 25.0 RPS
+- Current replica count: 5
+- No need for capacity adjustments.

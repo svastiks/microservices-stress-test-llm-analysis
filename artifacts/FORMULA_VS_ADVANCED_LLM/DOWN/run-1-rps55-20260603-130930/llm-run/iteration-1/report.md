@@ -1,0 +1,9 @@
+- The experiment achieved SLO compliance with a p95 latency of 6ms, significantly lower than the required 500ms.
+- Observed CPU utilization was at 20.5% with memory utilization at 12.3%, indicating under-provisioning.
+- Cost score was 0.7116, suggesting room for optimization in resource allocation without affecting performance.
+- Given CPU and memory requests, the deployment can be downsized further while aiming for 55–65% utilization.
+- As telemetry is trustworthy, a more aggressive resource cut is recommended due to low observed utilization, specifically on CPU.
+- Current deployment is over-provisioned, indicated by the substantial gap between provisioned and utilized resources.
+- Proposing a CPU request reduction by approximately 15% and a 10% cut in memory requests as a conservative measure.
+- Replicas will remain unchanged at 5, with HPA maxReplicas also adjusted accordingly to ensure they match.
+- Successful deployment of proposed changes will be assessed in the next iteration to confirm resource adequacy.

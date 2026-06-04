@@ -1,0 +1,5 @@
+- The SLO was met with a p95 latency of 42ms, well below the threshold of 500ms.
+- The error rate was 0%, indicating stable performance under load.
+- CPU utilization was high at 99.2%, denoting some over-provisioning risk.
+- Memory utilization was also elevated at 91.8%, just below OOM risk, suggesting potential for a modest reduction.
+- Given the successful SLO compliance and the absence of failures, the next action should be to re-run the same workload after applying the leaner configuration.

@@ -1,0 +1,5 @@
+- The service violated the p95 SLO with a latency of 6303 ms (exceeding 500 ms).
+- The error rate was at 42.26%, indicating stress under load.
+- Currently provisioned resource requests (300m CPU, 150Mi memory) exceed demands indicated by 47.8% CPU utilization and 36.4% memory utilization.
+- With the current high cost score of 0.4465, optimization opportunities exist.
+- Next action is to rerun the same workload after increasing resource limits to recover from SLO violation.

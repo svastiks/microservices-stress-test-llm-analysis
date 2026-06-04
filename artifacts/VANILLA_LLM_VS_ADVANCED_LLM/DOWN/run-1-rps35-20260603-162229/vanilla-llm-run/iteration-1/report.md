@@ -1,0 +1,5 @@
+- SLO PASS with healthy latency (p95 6.0 ms vs SLO 500 ms)
+- No errors, achieved throughput of 35.0 RPS
+- Current config scales down as part of optimization
+- Reducing resources and replicas for efficiency
+- HPA maxReplicas adjusted down from 5 to 4

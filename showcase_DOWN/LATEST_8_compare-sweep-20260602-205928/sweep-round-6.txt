@@ -1,0 +1,9 @@
+round=6/10
+status=OK
+label=rps=35
+PROFILES_CSV=down_demo
+STRESS_K6_RPS=35
+note=recovered_from_pvc_import_20260603
+run_dir=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260602-205928/run-6
+comparison_md=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260602-205928/run-6/comparison.md
+finished_utc=2026-06-03T13:28:23Z

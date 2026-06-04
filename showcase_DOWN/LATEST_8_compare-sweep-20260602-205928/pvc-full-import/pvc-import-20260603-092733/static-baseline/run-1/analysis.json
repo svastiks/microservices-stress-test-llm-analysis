@@ -1,0 +1,48 @@
+{
+  "mode": null,
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "formula",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 5,
+    "provisioned_request_cpu_m": 250,
+    "provisioned_request_mem_mib": 125,
+    "provisioned_limit_cpu_m": 500,
+    "provisioned_limit_mem_mib": 250,
+    "per_pod_unit_cost": 0.047441,
+    "per_pod_unit_cost_util": 0.037931,
+    "cost_score": 0.2372,
+    "cost_score_util": 0.1897,
+    "cost_score_legacy": 0.3721
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "NONE",
+  "over_provisioned": false,
+  "evidence": [
+    "formula.step_pct=0.39",
+    "formula.scaling_hint=UP",
+    "observed.replicas: 5",
+    "observed.replicas_max: 5"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress while replicas are at HPA max; scale up CPU/memory limits and/or raise HPA max to recover headroom.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 166.8,
+    "error_rate": 0.0,
+    "latency_ms_p95": 2985.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 82.1,
+    "mem_util_pct": 40.4,
+    "replicas": 5,
+    "replicas_max": 5,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.82,
+    "total_requests": 15352
+  }
+}

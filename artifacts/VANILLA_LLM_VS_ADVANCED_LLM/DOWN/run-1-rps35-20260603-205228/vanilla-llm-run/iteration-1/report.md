@@ -1,0 +1,5 @@
+- Stress test was a PASS with very low p95 latency (6.0 ms vs SLO 500 ms).
+- Achieved target throughput of 35.0 RPS.
+- No errors during the test.
+- Current configuration included 5 replicas and moderate resource requests/limits.
+- Recommendations implemented to scale down resources and replicas for cost efficiency.

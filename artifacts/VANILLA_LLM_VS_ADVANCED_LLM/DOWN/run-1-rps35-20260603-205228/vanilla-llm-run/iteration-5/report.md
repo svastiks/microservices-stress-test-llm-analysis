@@ -1,0 +1,5 @@
+- Test passed with significant latency slack.
+- p95 latency was 6.0 ms, well below SLO of 500 ms.
+- Error rate was 0.0.
+- Current configuration had 3 replicas, which can be reduced.
+- Scaling down resources and replicas is necessary.

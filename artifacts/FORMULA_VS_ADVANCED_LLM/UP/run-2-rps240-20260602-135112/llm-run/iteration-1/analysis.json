@@ -1,0 +1,51 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 50,
+    "provisioned_request_mem_mib": 25,
+    "provisioned_limit_cpu_m": 100,
+    "provisioned_limit_mem_mib": 50,
+    "per_pod_unit_cost": 0.047441,
+    "per_pod_unit_cost_util": 0.047441,
+    "cost_score": 0.0474,
+    "cost_score_util": 0.0474,
+    "cost_score_legacy": 0.0744
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "LOW",
+  "over_provisioned": true,
+  "evidence": [
+    "Observed CPU utilization at 129.5% (cpu_util_pct), not meeting the threshold (95%) when telemetry is trustworthy.",
+    "Observed memory utilization at 242.4% (mem_util_pct), suggestive of exceeding memory limits.",
+    "Achieved RPS at 199.1 (throughput_ratio=0.83), indicating insufficient capacity for the target of 240 RPS.",
+    "SLO violation noted with p95 latency at 4994ms vs SLO p95 of 500ms.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1",
+    "guard.up_recovery: cpu_req=70m mem_req=35Mi axes=cpu,mem,replica (metric_step cpu=70 mem=35; mem_util=242% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress while replicas are at HPA max; scale up CPU/memory limits and/or raise HPA max to recover headroom.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 194.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 4994.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 129.5,
+    "mem_util_pct": 242.4,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.3,
+    "total_requests": 17920
+  }
+}

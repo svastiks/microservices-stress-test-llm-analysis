@@ -1,0 +1,7 @@
+achieved_a,achieved_b,error_a,error_b,iterations_a,iterations_b,label_a,label_b,p95_a,p95_b,p95_delta_b_minus_a,p95_winner,pass_a,pass_b,prov_cost_a,prov_cost_b,prov_cost_delta_b_minus_a,prov_winner,run,run_dir,stopped_a,stopped_b,stress_k6_rps,target_rps,util_cost_a,util_cost_b
+25.0,25.0,0.0,0.0,19,7,formula,llm,221.0,59.0,-162.0,b,True,True,0.0481,0.1153,0.06720000000000001,a,1,showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/run-1,first_fail,first_fail,25.0,25,0.04,0.1057
+35.0,35.0,0.0,0.0,10,12,formula,llm,67.0,69.0,2.0,a,True,True,0.1089,0.02,-0.08889999999999999,b,2,showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/run-2,first_fail,first_fail,35.0,35,0.1,0.0172
+45.0,45.0,0.0,0.0,13,9,formula,llm,64.0,7.0,-57.0,b,True,True,0.1997,0.0849,-0.11479999999999999,b,3,showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/run-3,first_fail,first_fail,45.0,45,0.1673,0.0597
+55.0,55.0,0.0,0.0,16,4,formula,llm,267.0,25.0,-242.0,b,True,True,0.1925,0.3556,0.16310000000000002,a,4,showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/run-4,first_fail,first_fail,55.0,55,0.1321,0.2167
+25.0,25.0,0.0,0.0,11,10,formula,llm,39.0,4.0,-35.0,b,True,True,0.1687,0.019,-0.1497,b,5,showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/run-5,first_fail,first_fail,25.0,25,0.1064,0.0143
+35.0,35.0,0.0,0.0,14,8,formula,llm,70.0,111.0,41.0,a,True,True,0.1925,0.1423,-0.050199999999999995,b,6,showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/run-6,first_fail,first_fail,35.0,35,0.1278,0.114

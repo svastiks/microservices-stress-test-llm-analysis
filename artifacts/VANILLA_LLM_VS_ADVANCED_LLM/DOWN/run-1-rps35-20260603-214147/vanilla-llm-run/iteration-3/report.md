@@ -1,0 +1,5 @@
+- Stress test outcome: PASS
+- p95 latency at 6.0 ms (SLO limit: 500 ms)
+- Error rate was 0.0, achieved throughput of 35.0 RPS
+- Current config had 4 replicas with CPU request 110m and memory 50 MiB
+- Recommended action: Scale down resources as the service has ample latency slack.

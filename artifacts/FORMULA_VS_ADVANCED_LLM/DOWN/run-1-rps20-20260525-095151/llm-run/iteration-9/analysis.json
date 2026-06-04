@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 10,
+    "provisioned_request_mem_mib": 5,
+    "provisioned_limit_cpu_m": 120,
+    "provisioned_limit_mem_mib": 60,
+    "per_pod_unit_cost": 0.009488,
+    "per_pod_unit_cost_util": 0.009439,
+    "cost_score": 0.0095,
+    "cost_score_util": 0.0094,
+    "cost_score_legacy": 0.0149
+  },
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "CPU utilization at 165.3% indicates CPU_THROTTLING failure.",
+    "Cost score of 0.0095 suggests room for cost-effective resource reduction.",
+    "Memory utilization at 89.9% highlights proximity to limits and need for prudent sizing.",
+    "Prior iterations showed 70.2% CPU utilization, showing potential to reduce sizes after success.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 20.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 177.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 165.3,
+    "mem_util_pct": 89.9,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.65,
+    "total_requests": 1801
+  }
+}

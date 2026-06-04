@@ -1,0 +1,5 @@
+- Test failed due to high CPU utilization.
+- p95 latency was well within SLO limits.
+- Error rate was 0.0, indicating no service disruptions.
+- Current configuration has insufficient capacity to handle stress.
+- Recommended adjustments include increasing CPU/memory requests and limits, and raising the max replicas for HPA.

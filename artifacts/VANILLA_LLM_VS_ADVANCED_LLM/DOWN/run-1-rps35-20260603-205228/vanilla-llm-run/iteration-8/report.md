@@ -1,0 +1,5 @@
+- Stress test failed due to CPU utilization exceeding limits.
+- p95 latency was well below the SLO of 500 ms.
+- Throughput achieved at 34.9 RPS for a target of 35 RPS.
+- Observed only 1 replica during the test.
+- Proposed adjustments include increasing CPU/memory requests and limits, and changing HPA configuration.

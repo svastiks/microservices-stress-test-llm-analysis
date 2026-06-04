@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 270,
+    "provisioned_request_mem_mib": 120,
+    "provisioned_limit_cpu_m": 540,
+    "provisioned_limit_mem_mib": 240,
+    "per_pod_unit_cost": 0.084906,
+    "per_pod_unit_cost_util": 0.043056,
+    "cost_score": 0.2547,
+    "cost_score_util": 0.1292,
+    "cost_score_legacy": 0.3872
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "Test passed with significant latency slack.",
+    "p95 latency was 6.0 ms, well below SLO of 500 ms.",
+    "Current configuration had 3 replicas, which can be reduced.",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Vanilla LLM squeeze: coarse outcome summary + current YAML only (no detailed telemetry in the prompt).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 51.8,
+    "mem_util_pct": 28.1,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.52,
+    "total_requests": 2101
+  }
+}

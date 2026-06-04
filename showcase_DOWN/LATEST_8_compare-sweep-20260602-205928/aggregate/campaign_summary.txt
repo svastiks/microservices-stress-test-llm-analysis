@@ -1,0 +1,12 @@
+sweep_root=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/showcase_DOWN/LATEST_8_compare-sweep-20260602-205928
+mode=formula_llm
+arms=formula-run vs llm-run
+labels=formula vs llm
+runs_included=6
+per_run_csv=showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/aggregate/per_run_metrics.csv
+by_load_csv=showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/aggregate/by_load_summary.csv
+paired_tests_csv=showcase_DOWN/LATEST_8_compare-sweep-20260602-205928/aggregate/paired_tests.csv
+
+Winner columns in per_run_metrics: prov_winner / p95_winner (a|b|tie; lower is better).
+Delta columns are b_minus_a (positive => arm B higher cost/latency).
+Install scipy for Wilcoxon p-values: pip install scipy

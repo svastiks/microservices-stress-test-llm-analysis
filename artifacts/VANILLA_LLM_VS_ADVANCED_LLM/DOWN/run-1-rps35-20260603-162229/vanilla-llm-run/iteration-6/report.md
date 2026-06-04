@@ -1,0 +1,5 @@
+- Stress test passed with latency (p95 5.0 ms) well below SLO (500 ms)
+- Achieved throughput matched target load (35 RPS)
+- Current replica count is upper than necessary (3 observed, but config has 2)
+- Scope for scaling down resources to optimize capacity
+- CPU/memory requests/limits reduced as required

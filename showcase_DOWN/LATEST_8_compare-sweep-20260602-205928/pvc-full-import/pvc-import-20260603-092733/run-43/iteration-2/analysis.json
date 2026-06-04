@@ -1,0 +1,41 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "slo_status": "PASS",
+  "cost": {
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 240,
+    "provisioned_request_mem_mib": 120,
+    "provisioned_limit_cpu_m": 480,
+    "provisioned_limit_mem_mib": 240,
+    "cost_score": 0.3572
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "For squeeze mode, always suggest rerunning same fixed workload after change, unless SLO failed",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "SLO p95 latency of 5 ms is much lower than 500 ms target, indicating performance slack.",
+    "CPU utilization at 62.1% shows room for resource reduction.",
+    "Cost score of 0.3572 indicates potential for cost optimization.",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3"
+  ],
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with slack on at least one resource; small reduction may be safe.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 5.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 62.1,
+    "mem_util_pct": 22.7,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.62,
+    "total_requests": 2250
+  }
+}

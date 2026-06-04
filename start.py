@@ -549,10 +549,13 @@ def _run_squeeze_subprocess(
     final_report_llm: bool,
     squeeze_max_iterations: int,
     squeeze_until_violation: bool,
+    llm_vanilla: bool | None = None,
 ) -> int:
     env = os.environ.copy()
     env["STRESS_RESULTS_SUBDIR"] = results_subdir
     env["SQUEEZE_OPTIMIZER"] = optimizer
+    if llm_vanilla is not None:
+        env["SQUEEZE_LLM_VANILLA"] = "1" if llm_vanilla else "0"
     pair = os.environ.get("SQUEEZE_COMPARE_PAIR_ID", "").strip()
     if pair:
         env["STRESS_RESULTS_RUN_LABEL"] = pair
@@ -600,7 +603,8 @@ def _run_squeeze_subprocess(
         cmd.append("--squeeze-final-report-llm")
     print(
         f"[squeeze-compare] subprocess optimizer={optimizer} subdir={results_subdir} "
-        f"max_iterations={cap} until_violation={squeeze_until_violation}",
+        f"max_iterations={cap} until_violation={squeeze_until_violation} "
+        f"llm_vanilla={env.get('SQUEEZE_LLM_VANILLA', '<inherit>')}",
         flush=True,
     )
     proc = subprocess.run(cmd, cwd=REPO_ROOT, env=env)
@@ -890,6 +894,122 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
             print(f"[squeeze-compare] warning: could not restore baseline YAML: {e}", flush=True)
 
 
+def _compare_advanced_vs_vanilla_llm_main(args: argparse.Namespace) -> int:
+    """Advanced LLM (full metrics) vs vanilla LLM (coarse summary) on the same squeeze loop."""
+    dep_path = REPO_ROOT / args.deployment_yaml
+    hpa_path = REPO_ROOT / args.hpa_yaml
+    sub_advanced = (
+        os.environ.get("SQUEEZE_COMPARE_SUBDIR_ADVANCED", "squeeze-compare-advanced-llm")
+        .strip()
+        .strip("/")
+        or "squeeze-compare-advanced-llm"
+    )
+    sub_vanilla = (
+        os.environ.get("SQUEEZE_COMPARE_SUBDIR_VANILLA", "squeeze-compare-vanilla-llm")
+        .strip()
+        .strip("/")
+        or "squeeze-compare-vanilla-llm"
+    )
+    try:
+        _prune_compare_run_dirs(REPO_ROOT, sub_advanced, sub_vanilla)
+        if os.environ.get("SQUEEZE_COMPARE_PRUNE_STALE_FORMULA", "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        ):
+            _prune_compare_run_dirs(REPO_ROOT, "squeeze-compare-formula")
+        pair_id = _allocate_compare_pair_label(REPO_ROOT, sub_advanced, sub_vanilla)
+        os.environ["SQUEEZE_COMPARE_PAIR_ID"] = pair_id
+        print(
+            f"[advanced-vanilla-compare] paired run label={pair_id} "
+            f"(advanced-llm + vanilla-llm)",
+            flush=True,
+        )
+
+        _apply_compare_arm_baseline(args, label="before advanced-llm arm")
+        c1 = _run_squeeze_subprocess(
+            args,
+            optimizer="llm",
+            results_subdir=sub_advanced,
+            final_report_llm=False,
+            squeeze_max_iterations=args.max_iterations,
+            squeeze_until_violation=args.until_violation,
+            llm_vanilla=False,
+        )
+        _continue = os.environ.get(
+            "SQUEEZE_COMPARE_CONTINUE_ON_ADVANCED_FAIL", "1"
+        ).strip().lower() in ("1", "true", "yes", "on")
+        if c1 != 0 and not _continue:
+            return c1
+        if c1 != 0:
+            print(
+                "[advanced-vanilla-compare] advanced arm failed; continuing to vanilla arm "
+                f"(pair={pair_id})",
+                flush=True,
+            )
+
+        _apply_compare_arm_baseline(args, label="before vanilla-llm arm")
+        c2 = _run_squeeze_subprocess(
+            args,
+            optimizer="llm",
+            results_subdir=sub_vanilla,
+            final_report_llm=False,
+            squeeze_max_iterations=args.max_iterations,
+            squeeze_until_violation=args.until_violation,
+            llm_vanilla=True,
+        )
+        if c2 != 0:
+            return c2
+
+        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
+        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
+
+        root_adv = REPO_ROOT / "results" / sub_advanced
+        root_van = REPO_ROOT / "results" / sub_vanilla
+        run_a = _latest_run_root(root_adv)
+        run_b = _latest_run_root(root_van)
+        if not run_a or not run_b:
+            print(
+                "[advanced-vanilla-compare] could not find run-* under comparison subdirs",
+                flush=True,
+            )
+            return 1
+        b_a = run_a / "cost-effective-boundary.json"
+        b_b = run_b / "cost-effective-boundary.json"
+        if not b_a.exists() or not b_b.exists():
+            print(f"[advanced-vanilla-compare] missing boundary: {b_a} {b_b}", flush=True)
+            return 1
+
+        _warn_squeeze_boundary_health(b_a, "advanced-llm")
+        _warn_squeeze_boundary_health(b_b, "vanilla-llm")
+
+        from analysis.compare_squeeze_methods import compare as compare_boundaries
+
+        text = compare_boundaries(
+            b_a, b_b, label_a="advanced-llm", label_b="vanilla-llm"
+        )
+        out = REPO_ROOT / "results" / "squeeze-optimizer-comparison.md"
+        out_versioned = (
+            REPO_ROOT
+            / "results"
+            / f"squeeze-optimizer-comparison-{run_a.name}-vs-{run_b.name}.md"
+        )
+        out.write_text(text)
+        out_versioned.write_text(text)
+        print(text, end="")
+        print(f"[advanced-vanilla-compare] wrote {out}", flush=True)
+        return 0
+    finally:
+        try:
+            reset_managed_web_yaml_to_baseline(dep_path, hpa_path)
+        except Exception as e:
+            print(
+                f"[advanced-vanilla-compare] warning: could not restore baseline YAML: {e}",
+                flush=True,
+            )
+
+
 def _compare_hpa_vs_llm_main(args: argparse.Namespace) -> int:
     dep_path = REPO_ROOT / args.deployment_yaml
     hpa_path = REPO_ROOT / args.hpa_yaml
@@ -1051,6 +1171,15 @@ if __name__ == "__main__":
             "Writes results/squeeze-optimizer-comparison.md with labels hpa vs llm."
         ),
     )
+    mode_group.add_argument(
+        "--compare-advanced-vs-vanilla-llm",
+        action="store_true",
+        help=(
+            "Compare advanced LLM squeeze (full experiment metrics in prompt) vs vanilla LLM "
+            "(coarse summary + YAML only). Subdirs squeeze-compare-advanced-llm and "
+            "squeeze-compare-vanilla-llm. Writes squeeze-optimizer-comparison.md."
+        ),
+    )
     p.add_argument(
         "--hpa-only",
         action="store_true",
@@ -1180,6 +1309,11 @@ if __name__ == "__main__":
             p.error("--compare-hpa-vs-llm cannot be used with --verify")
         sys.exit(_compare_hpa_vs_llm_main(args))
 
+    if args.compare_advanced_vs_vanilla_llm:
+        if args.verify:
+            p.error("--compare-advanced-vs-vanilla-llm cannot be used with --verify")
+        sys.exit(_compare_advanced_vs_vanilla_llm_main(args))
+
     mode: str | None = None
     if args.verify:
         mode = "verify"
@@ -1266,6 +1400,7 @@ if __name__ == "__main__":
 
         run_1_dir: Path | None = None
         if mode != "squeeze":
+            single_run_label = os.environ.get("STRESS_RESULTS_RUN_LABEL", "").strip() or None
             run_1_dir = _run_once(
                 args.profile,
                 args.script,
@@ -1279,6 +1414,7 @@ if __name__ == "__main__":
                 hpa_yaml=hpa_yaml,
                 prometheus_url=prometheus_url,
                 settle_seconds=args.settle_seconds if mode == "squeeze" else 0,
+                run_label=single_run_label,
                 squeeze_optimizer=args.squeeze_optimizer,
             )
         if run_1_dir is not None:

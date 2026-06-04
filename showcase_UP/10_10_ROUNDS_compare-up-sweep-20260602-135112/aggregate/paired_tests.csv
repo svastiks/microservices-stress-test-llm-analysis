@@ -1,0 +1,7 @@
+stress_k6_rps,metric,n_pairs,median_delta,cohens_dz,wilcoxon_p_two_sided
+220.0,prov_cost_delta_b_minus_a,4,0.023650000000000004,0.8072157435322567,
+220.0,p95_delta_b_minus_a,4,-17.5,-0.6665396855123282,
+240.0,prov_cost_delta_b_minus_a,3,0.0203,0.5415347471237595,
+240.0,p95_delta_b_minus_a,3,-114.0,-0.6210816875947476,
+260.0,prov_cost_delta_b_minus_a,3,0.0379,0.24282225481573821,
+260.0,p95_delta_b_minus_a,3,-81.0,-0.42605779147390044,

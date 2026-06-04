@@ -1,0 +1,4 @@
+- **Optimizer**: deterministic formula (no LLM for YAML this iteration).
+- **SLO**: PASS; scaling_hint=DOWN; effective_direction=DOWN; step_pct=0.265
+- **Utilization trustworthy**: True
+- Applying **DOWN** step ~26.5% on requests/limits and HPA (deterministic).

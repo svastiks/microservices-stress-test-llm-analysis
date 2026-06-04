@@ -1,0 +1,5 @@
+- Stress test outcome was a failure due to p95 latency exceeding SLO.
+- Achieved throughput was slightly below the target.
+- Current replicas and resource requests are insufficient to handle the load.
+- Recommendation is to increase resources and replicas for improved performance.
+- Error rate during the test was zero.

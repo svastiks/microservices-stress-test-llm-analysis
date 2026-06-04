@@ -1,0 +1,5 @@
+- Target load achieved: 35 RPS
+- Pass with ample latency slack (p95 6.0 ms vs SLO 500 ms)
+- Error rate: 0%
+- Current configuration has 5 replicas
+- Scaling down resources and replicas is mandated based on performance

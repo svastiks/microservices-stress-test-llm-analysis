@@ -1,0 +1,20 @@
+--- k8s/spark/robot-shop-web-deployment.yaml
++++ k8s/spark/robot-shop-web-deployment.yaml
+@@ -26,6 +26,6 @@
+               cpu: 200m
+               memory: 100Mi
+             requests:
+-              cpu: 100m
+-              memory: 50Mi
+-      restartPolicy: Always
++              cpu: 80m
++              memory: 40Mi
++      restartPolicy: Always
+--- k8s/spark/robot-shop-web-hpa.yaml
++++ k8s/spark/robot-shop-web-hpa.yaml
+@@ -26,4 +26,4 @@
+         name: cpu
+         target:
+           type: Utilization
+-          averageUtilization: 60
++          averageUtilization: 60

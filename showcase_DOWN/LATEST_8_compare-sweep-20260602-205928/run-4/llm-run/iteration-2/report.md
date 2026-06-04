@@ -1,0 +1,9 @@
+- SLO passed with a low latency of 6.0 ms, far below the target of 500 ms.
+- Observed CPU utilization at 44.4% and memory utilization at 25.0%, indicating significant headroom.
+- Previous iteration showed lower utilization (21.3% CPU and 15.3% memory), reinforcing a potential for downsizing requests and replicas.
+- Since the previous axis was resources with a streak of one pass, reducing CPU and memory requests while also scaling down replicas is safe.
+- Cost score stands at 0.4744, which calls for efficient resource usage; hence, a conservative downscale is recommended to optimize costs.
+- Proposed changes ensure a reduction but maintain performance reliability.
+- Current Kubernetes configuration needs adjustment to avoid over-provisioning while remaining in compliance with workload requirements.
+- Moving to 4 replicas consolidates the resources further, maintaining sufficient capacity given the current utilization metrics.
+- Continuous monitoring after this change will be prudent to assess impacts on performance and resource utilization post-deployment.

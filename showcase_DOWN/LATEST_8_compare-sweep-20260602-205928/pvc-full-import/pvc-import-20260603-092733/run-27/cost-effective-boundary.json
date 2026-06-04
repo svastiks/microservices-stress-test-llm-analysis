@@ -1,0 +1,49 @@
+{
+  "stopped_reason": "up_recovery_max_iterations_reached",
+  "best_pass_dir": null,
+  "first_fail_dir": null,
+  "rows": [
+    {
+      "run_dir": "/app/results/run-27/iteration-1",
+      "status": "FAIL",
+      "target_rps": 800,
+      "achieved_rps": 121.3,
+      "p95_ms": 6883.0,
+      "error_rate": 0.6074,
+      "cpu_util_pct": 56.7,
+      "mem_util_pct": 37.2,
+      "replicas": 1,
+      "cpu_request_m": 100,
+      "mem_request_mib": 50,
+      "cost_score": 0.4465
+    },
+    {
+      "run_dir": "/app/results/run-27/iteration-2",
+      "status": "FAIL",
+      "target_rps": 800,
+      "achieved_rps": 56.9,
+      "p95_ms": 60000.0,
+      "error_rate": 0.217,
+      "cpu_util_pct": 29.6,
+      "mem_util_pct": 26.1,
+      "replicas": 1,
+      "cpu_request_m": 125,
+      "mem_request_mib": 75,
+      "cost_score": 0.793
+    },
+    {
+      "run_dir": "/app/results/run-27/iteration-3",
+      "status": "FAIL",
+      "target_rps": 800,
+      "achieved_rps": 24.5,
+      "p95_ms": 60001.0,
+      "error_rate": 0.5233,
+      "cpu_util_pct": 67.0,
+      "mem_util_pct": 48.4,
+      "replicas": 2,
+      "cpu_request_m": 200,
+      "mem_request_mib": 100,
+      "cost_score": 0.5953
+    }
+  ]
+}

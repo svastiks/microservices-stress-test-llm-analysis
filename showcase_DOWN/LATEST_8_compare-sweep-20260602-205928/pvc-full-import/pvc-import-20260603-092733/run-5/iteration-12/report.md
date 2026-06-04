@@ -1,0 +1,5 @@
+- SLO p95 latency achieved at 7ms, well below 500ms target.
+- 0% CPU and memory utilization indicates significant over-provisioning.
+- Cost score is low at 0.0158, showing potential for resource savings.
+- Recommend reducing CPU and memory requests/limits by 25% for efficiency.
+- Next step: re-run the same workload after applying the new resource settings.

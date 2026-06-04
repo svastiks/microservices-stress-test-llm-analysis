@@ -22,6 +22,8 @@
 # Optional:
 #   COMPARE_SWEEP_PARENT=...
 #   COMPARE_SWEEP_RPS=160,190,220,260
+#   COMPARE_SWEEP_LOADS=200,220,240,260,280  COMPARE_SWEEP_REPEATS_PER_LOAD=10  (5×10 matrix)
+#   COMPARE_SWEEP_SHUFFLE_ROUNDS=1  COMPARE_SWEEP_SHUFFLE_SEED=42  (vanilla vs advanced drift control)
 #   COMPARE_SWEEP_BASE_PROFILE=up_demo
 #   COMPARE_SWEEP_ROUNDS=N
 #   COMPARE_SWEEP_K6_DURATION=90s
@@ -70,28 +72,11 @@ if [[ -n "${COMPARE_SWEEP_PROFILES:-}" ]]; then
     ROUND_LABELS+=("${CLEAN_PROFILES[i]}")
   done
 else
-  IFS=',' read -r -a RPS_LIST <<< "${COMPARE_SWEEP_RPS}"
-  CLEAN_RPS=()
-  for _r in "${RPS_LIST[@]}"; do
-    _q="$(echo "${_r}" | xargs)"
-    [[ -n "${_q}" ]] && CLEAN_RPS+=("${_q}")
-  done
-  if ((${#CLEAN_RPS[@]} == 0)); then
-    echo "COMPARE_SWEEP_RPS produced an empty RPS list" >&2
+  # shellcheck source=scripts/lib/expand_compare_sweep_matrix.sh
+  source "${ROOT}/scripts/lib/expand_compare_sweep_matrix.sh"
+  if ! parse_compare_sweep_rps_matrix "${COMPARE_SWEEP_RPS}"; then
     exit 1
   fi
-  ROUNDS="${COMPARE_SWEEP_ROUNDS:-${#CLEAN_RPS[@]}}"
-  if ! [[ "${ROUNDS}" =~ ^[0-9]+$ ]] || ((ROUNDS < 1)); then
-    echo "COMPARE_SWEEP_ROUNDS must be a positive integer" >&2
-    exit 1
-  fi
-  if ((ROUNDS > ${#CLEAN_RPS[@]})); then
-    echo "COMPARE_SWEEP_ROUNDS=${ROUNDS} exceeds COMPARE_SWEEP_RPS length ${#CLEAN_RPS[@]}" >&2
-    exit 1
-  fi
-  for ((i = 0; i < ROUNDS; i++)); do
-    ROUND_LABELS+=("rps=${CLEAN_RPS[i]}")
-  done
   first_rps="${CLEAN_RPS[0]}"
   if [[ "${first_rps}" =~ ^[0-9]+$ ]] && ((first_rps < 120)); then
     echo "[compare-up-sweep] WARNING: first RPS=${first_rps} is low for up_demo; iteration 1 may PASS (thin baseline)" \

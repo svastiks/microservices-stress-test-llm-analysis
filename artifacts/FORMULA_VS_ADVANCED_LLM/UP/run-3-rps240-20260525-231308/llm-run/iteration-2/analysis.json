@@ -1,0 +1,51 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 25,
+    "provisioned_request_mem_mib": 12,
+    "provisioned_limit_cpu_m": 50,
+    "provisioned_limit_mem_mib": 25,
+    "per_pod_unit_cost": 0.023672,
+    "per_pod_unit_cost_util": 0.023672,
+    "cost_score": 0.0237,
+    "cost_score_util": 0.0237,
+    "cost_score_legacy": 0.0367
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "LOW",
+  "over_provisioned": false,
+  "evidence": [
+    "p95 latency of 60001ms vs target of 500ms indicates severe workload issue.",
+    "CPU utilization is at 400.9%, significantly above 95%, suggesting critical resource exhaustion.",
+    "Ongoing OOM kills indicate memory requests are insufficient for operational needs.",
+    "Cost score of 0.0237 reflects a cost-efficient deployment under current configurations.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1",
+    "guard.up_recovery: cpu_req=35m mem_req=18Mi axes=cpu,mem,replica (metric_step cpu=35 mem=17; mem_util=260% near_pass=False)"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Pure LLM squeeze: decide UP/DOWN and step sizes from observed.* metrics in this JSON (no formula fallback; scaling_hint not precomputed).",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 29.8,
+    "error_rate": 0.4603,
+    "latency_ms_p95": 60001.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 400.9,
+    "mem_util_pct": 259.6,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 1,
+    "cpu_util_to_limit": 4.01,
+    "total_requests": 3061
+  }
+}

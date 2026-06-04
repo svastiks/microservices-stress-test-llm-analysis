@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 219,
+    "provisioned_request_mem_mib": 105,
+    "provisioned_limit_cpu_m": 420,
+    "provisioned_limit_mem_mib": 225,
+    "per_pod_unit_cost": 0.069118,
+    "per_pod_unit_cost_util": 0.049588,
+    "cost_score": 0.2074,
+    "cost_score_util": 0.1488,
+    "cost_score_legacy": 0.3215
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "SLO latency: p95 = 5ms, threshold = 500ms",
+    "cpu_util_pct = 73.4% indicating hot state, cost.score = 0.2074",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3",
+    "squeeze_down_axis=resources"
+  ],
+  "squeeze_down_axis": "resources",
+  "resource_pass_streak": 1,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with slack on at least one resource; small reduction may be safe.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 5.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 73.4,
+    "mem_util_pct": 39.9,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.73,
+    "total_requests": 2100
+  }
+}

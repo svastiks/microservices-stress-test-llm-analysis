@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 180,
+    "provisioned_request_mem_mib": 90,
+    "provisioned_limit_cpu_m": 450,
+    "provisioned_limit_mem_mib": 225,
+    "per_pod_unit_cost": 0.05693,
+    "per_pod_unit_cost_util": 0.035544,
+    "cost_score": 0.1708,
+    "cost_score_util": 0.1066,
+    "cost_score_legacy": 0.2679
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "CPU Utilization: 64.0%, Latency P95: 15ms, below SLO threshold of 500ms.",
+    "Cost score of 0.1708 provides evidence of excessive resource allocation.",
+    "Reduction of requests from 60m to 50m and limits from 150m to 100m based on observed utilization suggests resource over-provisioning.",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3",
+    "squeeze_down_axis=replica"
+  ],
+  "squeeze_down_axis": "replica",
+  "resource_pass_streak": 0,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with slack on at least one resource; small reduction may be safe.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 15.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 64.0,
+    "mem_util_pct": 33.6,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.64,
+    "total_requests": 3151
+  }
+}

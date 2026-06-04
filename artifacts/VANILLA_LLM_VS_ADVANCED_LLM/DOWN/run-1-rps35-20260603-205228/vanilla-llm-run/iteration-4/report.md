@@ -1,0 +1,5 @@
+- Stress test passed with low p95 latency (6.0 ms vs SLO 500 ms).
+- Achieved target load of 35 RPS successfully with an error rate of 0%.
+- Current configuration has replication and resource allocations above the required level given the latency slack.
+- Scaling down CPU and memory requests/limits is warranted to optimize resource usage.
+- Adjusting HPA maxReplicas from 2 to 1 to reduce overhead.

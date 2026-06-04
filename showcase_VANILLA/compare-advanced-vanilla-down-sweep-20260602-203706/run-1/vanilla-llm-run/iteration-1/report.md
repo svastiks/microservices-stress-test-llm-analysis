@@ -1,0 +1,5 @@
+- Test passed with comfortable latency and no errors
+- p95 latency was 6.0 ms, well below the SLO limit of 500 ms
+- Achieved throughput matched the target load of 25 RPS
+- Keeping same replica count should be sufficient to maintain current performance
+- Recommended to reduce resource requests to optimize costs.
