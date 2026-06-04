@@ -1,0 +1,52 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 120,
+    "provisioned_request_mem_mib": 50,
+    "provisioned_limit_cpu_m": 280,
+    "provisioned_limit_mem_mib": 120,
+    "per_pod_unit_cost": 0.056441,
+    "per_pod_unit_cost_util": 0.041296,
+    "cost_score": 0.1129,
+    "cost_score_util": 0.0826,
+    "cost_score_legacy": 0.1688
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML (unless SLO failed and you need no change)",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "Observed CPU utilization of 75.1%, close to the resource limit.",
+    "Cost score of 0.1129 and current deployment with 2 replicas provide opportunity for more cost-efficient configurations.",
+    "SLO PASS indicates that load is being handled adequately despite over-utilization metrics.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2",
+    "guard.llm_replica_step (deployment.replicas_clamp: llm=2 -> 1 (live=2); hpa.maxReplicas: 2 -> 1 (match deployment=1))",
+    "guard.veto_replica_down:resource_phase_gate",
+    "squeeze_down_axis=resources"
+  ],
+  "squeeze_down_axis": "resources",
+  "resource_pass_streak": 4,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass in squeeze DOWN boundary search; continue reducing despite elevated utilization.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 44.9,
+    "error_rate": 0.0,
+    "latency_ms_p95": 5.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 75.1,
+    "mem_util_pct": 30.4,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.75,
+    "total_requests": 2701
+  }
+}

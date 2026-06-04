@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # DOWN advanced LLM vs vanilla LLM compare sweep (down_demo DOWN boundary search).
 #
+# Pass bar (COMPARE_SWEEP_PASS_BAR): cost = advanced best_pass < vanilla (smoke minimum);
+#   full = cost + advanced iters <= vanilla. Smoke until cost PASS; batch round 2+ only when you approve.
+#
 # Example (1-round smoke, fast 60s k6):
 #   BUILD_ANALYZER_IMAGE=true COMPARE_SWEEP_FAST=1 COMPARE_SWEEP_RPS=35 COMPARE_SWEEP_ROUNDS=1 \
-#     ./scripts/run_down_demo_advanced_vs_vanilla_sweep.sh
+#     COMPARE_SWEEP_PASS_BAR=cost ./scripts/run_down_demo_advanced_vs_vanilla_sweep.sh
 #
 # Example (1-round smoke):
 #   BUILD_ANALYZER_IMAGE=true COMPARE_SWEEP_RPS=25 COMPARE_SWEEP_ROUNDS=1 \
@@ -20,6 +23,7 @@ cd "${ROOT}"
 
 : "${COMPARE_SWEEP_BASE_PROFILE:=down_demo}"
 : "${COMPARE_SWEEP_RPS:=25,35,45,55}"
+: "${COMPARE_SWEEP_PASS_BAR:=cost}"
 
 SWEEP_STAMP="$(date +%Y%m%d-%H%M%S)"
 SWEEP_PARENT="${COMPARE_SWEEP_PARENT:-${ROOT}/results-from-cluster}"
@@ -89,9 +93,35 @@ for ((r = 0; r < ROUNDS; r++)); do
   if [[ -f "${SWEEP_ROOT}/.last_sync_r${idx}.txt" ]]; then
     run_label="$(tr -d '\r\n' < "${SWEEP_ROOT}/.last_sync_r${idx}.txt")"
   fi
+  run_dir="${SWEEP_ROOT}/${run_label}"
+  pass_bar_ok=1
+  if sweep_round_has_local_bundle "${run_dir}"; then
+    if ! sweep_round_advanced_vanilla_pass_bar "${run_dir}"; then
+      log "ERROR: round ${idx} PASS BAR failed (COMPARE_SWEEP_PASS_BAR=${COMPARE_SWEEP_PASS_BAR})"
+      pass_bar_ok=0
+      any_fail=1
+      if [[ "${COMPARE_SWEEP_STOP_ON_PASS_BAR_FAIL:-1}" =~ ^(1|true|yes|on)$ ]]; then
+        log "stopping sweep — fix and re-smoke one RPS before multi-round batch"
+        break
+      fi
+    else
+      log "round ${idx} PASS BAR OK (${COMPARE_SWEEP_PASS_BAR})"
+      if [[ "${round_ok}" -eq 0 ]]; then
+        log "WARNING: cluster job failed/timeout but compare bundle passed bar — OK for smoke"
+        if [[ "${ROUNDS}" -eq 1 ]]; then
+          any_fail=0
+        fi
+      fi
+    fi
+  elif [[ "${round_ok}" -eq 0 ]]; then
+    pass_bar_ok=0
+  fi
+
   status="OK"
-  if [[ "${round_ok}" -eq 0 ]]; then
-    status="FAILED"
+  if [[ "${pass_bar_ok:-1}" -eq 0 ]]; then
+    status="PASS_BAR_FAIL"
+  elif [[ "${round_ok}" -eq 0 ]]; then
+    status="CLUSTER_FAIL"
   fi
   {
     echo "round=${idx}/${ROUNDS}"

@@ -1,0 +1,7 @@
+- The SLO has passed with a P95 latency of 5.0ms, well below the threshold of 500ms.
+- The observed CPU utilization is 58.3% and memory utilization is 37.6%, indicating headroom for efficient resource use.
+- The experiment showed an effective cost score of 0.2349, indicating room for optimization.
+- With 3 replicas, observed utilization suggests that a drop in replicas is safe; therefore, I will drop one replica to meet cost-effective resource constraints.
+- Previous contraction on replicas was done once, which allows for another drop under current conditions.
+- The deployment and HPA will reflect the new replica configurations and a slight resource trim compared to previous settings
+- Ensuring that the HPA maxReplicas matches the new replica count for seamless scaling adjustments.

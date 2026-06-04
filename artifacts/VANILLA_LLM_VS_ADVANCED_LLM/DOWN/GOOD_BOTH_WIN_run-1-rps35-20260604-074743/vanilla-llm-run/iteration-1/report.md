@@ -1,0 +1,6 @@
+- Test result: PASS with excellent latency
+- p95 latency: 6.0 ms vs SLO of 500 ms
+- Error rate: 0.0
+- Achieved throughput: 35.0 RPS
+- Current replicas: 5
+- Scaling down capacity recommended.

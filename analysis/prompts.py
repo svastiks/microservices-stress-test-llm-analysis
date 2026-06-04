@@ -506,6 +506,12 @@ def build_user_prompt(
                     f"{' (consecutive replica OK)' if burst else ''}. "
                     f"Resource-only trim alone is forbidden when util ≥ 65%.\n"
                 )
+            elif live_for_step <= 2 and max_util >= 85.0 and cpu_m > 65:
+                parts.append(
+                    f"\n**HOT BOUNDARY TRIM (mandatory)**: live={live_for_step}, max_util={max_util:.0f}%, "
+                    f"cpu_request_m={cpu_m} — still above lean floor. **Trim CPU/memory 10–15%**; "
+                    f"do NOT lower replicas. Empty YAML only when cpu_request_m ≤ 65m.\n"
+                )
             elif live_for_step <= 2 and max_util >= 85.0:
                 parts.append(
                     f"\n**HOT BOUNDARY (mandatory)**: live={live_for_step}, max_util={max_util:.0f}% — "

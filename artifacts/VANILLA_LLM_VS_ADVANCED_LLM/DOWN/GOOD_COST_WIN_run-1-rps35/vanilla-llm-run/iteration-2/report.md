@@ -1,0 +1,5 @@
+- Target load was successful at 35 RPS for 60s.
+- p95 latency was low at 6.0 ms, well below the SLO of 500 ms.
+- No errors were recorded during the test.
+- Current configuration had 4 replicas with modest resource allocations.
+- Scaling down is recommended to optimize resource usage while maintaining performance.

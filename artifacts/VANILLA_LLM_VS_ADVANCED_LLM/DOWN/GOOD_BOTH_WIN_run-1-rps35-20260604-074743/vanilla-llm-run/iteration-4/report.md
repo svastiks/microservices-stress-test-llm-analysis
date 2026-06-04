@@ -1,0 +1,5 @@
+- Test passed with significant latency slack
+- p95 latency was only 6.0 ms, well below SLO
+- Error rate was 0.0, indicating stable performance
+- Achieved throughput matched the target load of 35 RPS
+- Suggesting a reduction in resource allocation for efficiency

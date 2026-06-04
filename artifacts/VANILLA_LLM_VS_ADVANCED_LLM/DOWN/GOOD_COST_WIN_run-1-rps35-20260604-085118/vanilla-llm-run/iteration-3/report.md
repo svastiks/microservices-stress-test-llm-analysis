@@ -1,0 +1,5 @@
+- Stress test passed with p95 latency of 6.0 ms against SLO of 500 ms.
+- No errors recorded during the test.
+- Achieved throughput matched target load of 35 RPS.
+- Current deployment has 3 replicas; HPA maxReplicas set to 3.
+- Scaling down resources and replicas is recommended for optimization.

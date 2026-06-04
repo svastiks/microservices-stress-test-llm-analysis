@@ -1,0 +1,48 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 78,
+    "provisioned_request_mem_mib": 39,
+    "provisioned_limit_cpu_m": 139,
+    "provisioned_limit_mem_mib": 78,
+    "per_pod_unit_cost": 0.074009,
+    "per_pod_unit_cost_util": 0.071982,
+    "cost_score": 0.074,
+    "cost_score_util": 0.072,
+    "cost_score_legacy": 0.1161
+  },
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "Stress test failed due to exceeded CPU utilization.",
+    "Only one replica was running during the test, limiting capacity.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Vanilla LLM squeeze: coarse outcome summary + current YAML only (no detailed telemetry in the prompt).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 147.6,
+    "mem_util_pct": 46.8,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 1.48,
+    "total_requests": 2101
+  }
+}

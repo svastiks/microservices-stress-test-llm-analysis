@@ -1,0 +1,5 @@
+- Observed CPU utilization at 26% and memory utilization at 14%, indicating significant over-provisioning.
+- The current deployment has 5 replicas while achieving the target RPS with low resource utilization.
+- Cost score of 0.7116 suggests the system can be optimized for better cost efficiency.
+- Since SLO passed with plenty of resource overhead, a reduction in both replicas and resource requests is warranted.
+- Updating to 4 replicas and lowering CPU and memory requests by approximately 10-15% meets the optimization goals effectively.

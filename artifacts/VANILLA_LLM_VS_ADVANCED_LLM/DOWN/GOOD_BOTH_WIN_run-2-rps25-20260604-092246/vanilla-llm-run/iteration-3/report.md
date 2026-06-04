@@ -1,0 +1,5 @@
+- Test passed with a p95 latency of 6.0 ms against an SLO of 500 ms.
+- Zero error rate observed during the test.
+- Achieved throughput matched the target load of 25 RPS.
+- Current config had 4 replicas observed, but only 3 defined.
+- Scaling down is mandatory to optimize resources.

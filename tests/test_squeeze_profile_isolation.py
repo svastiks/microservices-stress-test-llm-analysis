@@ -184,7 +184,7 @@ spec:
             "mode": "squeeze",
             "scaling_hint": "DOWN",
             "failure": {"failed": False},
-            "config": {"cpu_request_m": 80, "deployment_replicas": 2},
+            "config": {"cpu_request_m": 60, "deployment_replicas": 2},
             "observed": {
                 "cpu_util_pct": 94.0,
                 "mem_util_pct": 44.0,
@@ -205,11 +205,11 @@ spec:
       - name: web
         resources:
           requests:
-            cpu: 80m
-            memory: 40Mi
+            cpu: 60m
+            memory: 30Mi
 """
         result = {
-            "deployment_yaml_new": dep_on_disk.replace("80m", "70m"),
+            "deployment_yaml_new": dep_on_disk.replace("60m", "55m"),
             "hpa_yaml_new": "",
             "evidence": [],
         }
@@ -221,11 +221,105 @@ spec:
                 "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n"
                 "spec:\n  minReplicas: 1\n  maxReplicas: 2\n"
             )
-            self.assertTrue(
-                _apply_down_boundary_stop(result, exp, dep_path, hpa_path)
-            )
+            self.assertTrue(_apply_down_boundary_stop(result, exp, dep_path, hpa_path))
         self.assertEqual(result.get("deployment_yaml_new"), "")
         self.assertIn("guard.hot_boundary_stop", " ".join(result.get("evidence") or []))
+
+    def test_hot_boundary_defers_stop_when_cpu_above_floor(self) -> None:
+        exp = {
+            "squeeze_optimizer": "llm",
+            "analysis_goal": "efficiency",
+            "mode": "squeeze",
+            "scaling_hint": "DOWN",
+            "failure": {"failed": False},
+            "config": {"cpu_request_m": 90, "deployment_replicas": 2},
+            "observed": {
+                "cpu_util_pct": 92.0,
+                "mem_util_pct": 44.0,
+                "replicas": 2,
+                "replicas_max": 2,
+            },
+        }
+        self.assertFalse(_llm_at_down_boundary_stop(exp))
+        dep_on_disk = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 90m
+            memory: 45Mi
+"""
+        result = {"deployment_yaml_new": "", "hpa_yaml_new": "", "evidence": []}
+        with tempfile.TemporaryDirectory() as td:
+            dep_path = Path(td) / "dep.yaml"
+            hpa_path = Path(td) / "hpa.yaml"
+            dep_path.write_text(dep_on_disk)
+            hpa_path.write_text(
+                "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n"
+                "spec:\n  minReplicas: 1\n  maxReplicas: 2\n"
+            )
+            with mock.patch.dict(os.environ, {"SQUEEZE_LLM_DOWN_BOUNDARY": "1"}, clear=False):
+                self.assertTrue(
+                    _apply_down_boundary_stop(result, exp, dep_path, hpa_path)
+                )
+        self.assertIn("90m", result.get("deployment_yaml_new", ""))
+        self.assertIn("guard.hot_boundary_trim", " ".join(result.get("evidence") or []))
+
+    def test_vanilla_hpa_max_not_below_deployment_replicas(self) -> None:
+        from analysis.results import _finalize_vanilla_llm_squeeze_down
+
+        exp = {
+            "squeeze_optimizer": "llm",
+            "analysis_goal": "efficiency",
+            "mode": "squeeze",
+            "scaling_hint": "DOWN",
+            "failure": {"failed": False},
+            "config": {"deployment_replicas": 4},
+        }
+        dep_on_disk = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 4
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 110m
+            memory: 50Mi
+"""
+        hpa_on_disk = """apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-hpa
+spec:
+  minReplicas: 1
+  maxReplicas: 4
+"""
+        result = {
+            "deployment_yaml_new": dep_on_disk.replace("110m", "100m"),
+            "hpa_yaml_new": hpa_on_disk.replace("maxReplicas: 4", "maxReplicas: 2"),
+            "evidence": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            dep_path = Path(td) / "dep.yaml"
+            hpa_path = Path(td) / "hpa.yaml"
+            dep_path.write_text(dep_on_disk)
+            hpa_path.write_text(hpa_on_disk)
+            with mock.patch.dict(os.environ, {"SQUEEZE_LLM_VANILLA": "1"}, clear=False):
+                _finalize_vanilla_llm_squeeze_down(result, exp, dep_path, hpa_path)
+        self.assertIn("maxReplicas: 4", result["hpa_yaml_new"])
+        self.assertIn("guard.hpa_max_not_below_dep_replicas", " ".join(result.get("evidence") or []))
 
     def test_hot_replica_drop_enforced_at_73_util(self) -> None:
         from analysis.results import _llm_hot_replica_drop_required

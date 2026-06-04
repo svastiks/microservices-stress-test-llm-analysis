@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 194,
+    "provisioned_request_mem_mib": 96,
+    "provisioned_limit_cpu_m": 388,
+    "provisioned_limit_mem_mib": 194,
+    "per_pod_unit_cost": 0.091987,
+    "per_pod_unit_cost_util": 0.0714,
+    "cost_score": 0.184,
+    "cost_score_util": 0.1428,
+    "cost_score_legacy": 0.2878
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "LOW",
+  "over_provisioned": true,
+  "evidence": [
+    "Test passed with comfortable latency",
+    "Error rate was 0.0%",
+    "Resource allocation can be optimized",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Vanilla LLM squeeze: coarse outcome summary + current YAML only (no detailed telemetry in the prompt).",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 35.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 5.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 79.0,
+    "mem_util_pct": 51.9,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.79,
+    "total_requests": 2100
+  }
+}

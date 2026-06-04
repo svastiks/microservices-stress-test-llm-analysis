@@ -1,0 +1,5 @@
+- Stress test passed with p95 latency of 5.0 ms (SLO is 500 ms).
+- Achieved throughput was 44.9 RPS with error rate of 0.0.
+- Current configuration includes 1 replica with CPU request of 90m.
+- Safe to scale down resources to optimize costs.
+- Reducing CPU and memory requests/limits in the deployment and max replicas in HPA.

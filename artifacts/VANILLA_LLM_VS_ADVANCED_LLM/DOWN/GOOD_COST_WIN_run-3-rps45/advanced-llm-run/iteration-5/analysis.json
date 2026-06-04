@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 3,
+    "provisioned_request_cpu_m": 300,
+    "provisioned_request_mem_mib": 135,
+    "provisioned_limit_cpu_m": 570,
+    "provisioned_limit_mem_mib": 255,
+    "per_pod_unit_cost": 0.094395,
+    "per_pod_unit_cost_util": 0.052202,
+    "cost_score": 0.2832,
+    "cost_score_util": 0.1566,
+    "cost_score_legacy": 0.4318
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "current cpu_util_pct=56%, mem_util_pct=41%, total_requests=2701 from observed stats",
+    "utilization metrics indicate 3 replicas are not required for performance under given SLO",
+    "previous cost_score=0.2832 indicates opportunity for cost-effectiveness with new settings",
+    "observed.replicas: 3",
+    "observed.replicas_max: 3",
+    "squeeze_down_axis=replica"
+  ],
+  "squeeze_down_axis": "replica",
+  "resource_pass_streak": 0,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass in squeeze DOWN boundary search; continue reducing toward first FAIL.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 44.9,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 56.0,
+    "mem_util_pct": 41.0,
+    "replicas": 3,
+    "replicas_max": 3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.56,
+    "total_requests": 2701
+  }
+}

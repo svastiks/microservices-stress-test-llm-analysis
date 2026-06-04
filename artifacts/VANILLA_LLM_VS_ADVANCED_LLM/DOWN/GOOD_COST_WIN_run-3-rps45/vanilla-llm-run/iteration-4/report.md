@@ -1,0 +1,5 @@
+- Stress test passed with 5.0 ms p95 latency (SLO: 500 ms)
+- Achieved throughput was 44.9 RPS at a target of 45 RPS
+- Current deployment has 2 replicas; scale down is applicable
+- CPU request/memory usage are comfortably below limits
+- Error rate was 0.0; thus, service is stable under current load

@@ -1,0 +1,6 @@
+- Target load: 25 RPS for 60s
+- Result: FAIL due to cpu_utilization_exceeded
+- p95 latency: 15.0 ms (well within SLO)
+- Error rate: 0.0
+- Scaling up based on failure reason
+- Increasing CPU and memory requests/limits and replicas

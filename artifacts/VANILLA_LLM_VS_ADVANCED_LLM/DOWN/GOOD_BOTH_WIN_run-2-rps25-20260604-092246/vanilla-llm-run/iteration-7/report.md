@@ -1,0 +1,5 @@
+- SLO PASS with large latency slack
+- p95 latency: 6.0 ms vs SLO limit: 500 ms
+- Achieved throughput: 25.0 RPS
+- Current replicas observed: 3
+- Trimming down resources is mandatory for cost effectiveness.

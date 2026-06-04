@@ -1,0 +1,5 @@
+- Test result: PASS
+- p95 latency: 6.0 ms (SLO limit: 500 ms)
+- Error rate: 0.0
+- Achieved throughput: 25 RPS
+- Scaling down CPU/memory and replicas as mandated.

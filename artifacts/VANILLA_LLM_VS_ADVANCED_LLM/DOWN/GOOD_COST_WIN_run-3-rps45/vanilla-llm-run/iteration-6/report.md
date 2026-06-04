@@ -1,0 +1,6 @@
+- Target load: 45 RPS for 60s
+- Result: FAIL due to CPU utilization exceeding limits
+- Achieved throughput: 44.9 RPS
+- p95 latency: 6.0 ms (well below SLO)
+- Current replicas: 1
+- Proposed changes to handle load better.

@@ -1,0 +1,5 @@
+- Test outcome: PASS
+- p95 latency: 6.0 ms (SLO limit: 500 ms)
+- Error rate: 0.0%
+- Replicas observed: 2
+- Trimming capacity due to large latency slack.

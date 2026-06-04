@@ -46,3 +46,11 @@ finalize_sweep_round_local() {
   "${log_fn}" "WARNING: round ${idx}: still no local bundle at ${run_dir} (cluster job may have failed early)"
   return 1
 }
+
+# Pass bar: COMPARE_SWEEP_PASS_BAR=cost (default) or full — see check_advanced_vanilla_pass_bar.py.
+# Prints one-line summary to stdout; exit 0 if pass, 1 if fail or missing data.
+sweep_round_advanced_vanilla_pass_bar() {
+  local run_dir="$1"
+  local root_dir="${ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+  "${root_dir}/scripts/lib/check_advanced_vanilla_pass_bar.py" "${run_dir}"
+}

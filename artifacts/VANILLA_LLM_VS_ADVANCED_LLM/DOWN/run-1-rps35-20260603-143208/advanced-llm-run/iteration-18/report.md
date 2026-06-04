@@ -1,7 +1,0 @@
-- Current CPU utilization is very high at 87% indicating the pods are hot.
-- Memory utilization is at a safe 17%, suggesting that memory is not a constraint.
-- SLO Pass has been achieved with low latency (p95 = 4ms), indicating that the application can handle the current load.
-- The previous squeeze focused on resources has led to a consistent pass streak, allowing for reduction on the CPU.
-- A small cut of 10% CPU is proposed based on current CPU utilization and SLO performance.
-- No changes to replicas or HPA maxReplicas as part of this down iteration.
-- This down iteration targets reduced costs while maintaining performance.

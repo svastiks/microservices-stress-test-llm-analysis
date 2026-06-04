@@ -1,0 +1,5 @@
+- Stress test passed comfortably with p95 latency at 6.0 ms (SLO: 500 ms).
+- Achieved throughput met the target of 25 RPS.
+- No errors observed during the test.
+- Current deployment has 4 replicas; CPU/memory limits/requests could be reduced.
+- Scaling down is mandatory to optimize resource usage.

@@ -449,6 +449,11 @@ def _llm_hot_multi_replica_burst(experiment: dict) -> bool:
     )
 
 
+def _llm_hot_boundary_cpu_floor_m(experiment: dict) -> int:
+    """Stop only after CPU request is trimmed near this floor (avoids fat 2-pod early stop)."""
+    return int(os.environ.get("SQUEEZE_LLM_HOT_BOUNDARY_CPU_FLOOR_M", "65"))
+
+
 def _llm_at_down_boundary_stop(experiment: dict) -> bool:
     """PASS at ≤2 pods near saturation — frontier reached; stop proposing further DOWN."""
     if bool(((experiment.get("failure") or {}).get("failed"))):
@@ -456,7 +461,12 @@ def _llm_at_down_boundary_stop(experiment: dict) -> bool:
     if _llm_live_replicas(experiment) > 2:
         return False
     threshold = float(os.environ.get("SQUEEZE_LLM_HOT_BOUNDARY_UTIL_PCT", "85"))
-    return _llm_max_util_pct(experiment) >= threshold
+    if _llm_max_util_pct(experiment) < threshold:
+        return False
+    cpu_m = int((experiment.get("config") or {}).get("cpu_request_m") or 0)
+    if cpu_m > _llm_hot_boundary_cpu_floor_m(experiment):
+        return False
+    return True
 
 
 def _llm_over_replicated_replica_required(experiment: dict) -> bool:
@@ -527,11 +537,24 @@ def _apply_down_boundary_stop(
 ) -> bool:
     """Clear DOWN YAML when hot at ≤2 pods so the squeeze loop stops at best_pass."""
     if not _llm_at_down_boundary_stop(experiment):
+        if (
+            _llm_live_replicas(experiment) <= 2
+            and _llm_max_util_pct(experiment)
+            >= float(os.environ.get("SQUEEZE_LLM_HOT_BOUNDARY_UTIL_PCT", "85"))
+            and not (result.get("deployment_yaml_new") or "").strip()
+        ):
+            _pure_llm_resource_nudge(
+                result, experiment, deployment_yaml_path, hpa_yaml_path
+            )
+            if (result.get("deployment_yaml_new") or "").strip():
+                ev = list(result.get("evidence") or [])
+                ev.append(
+                    f"guard.hot_boundary_trim: cpu_m>{_llm_hot_boundary_cpu_floor_m(experiment)} "
+                    f"max_util={_llm_max_util_pct(experiment):.0f}%"
+                )
+                result["evidence"] = ev
+                return True
         return False
-    had_change = bool(
-        (result.get("deployment_yaml_new") or "").strip()
-        or (result.get("hpa_yaml_new") or "").strip()
-    )
     result["deployment_yaml_new"] = ""
     result["hpa_yaml_new"] = ""
     ev = list(result.get("evidence") or [])
@@ -541,6 +564,74 @@ def _apply_down_boundary_stop(
     )
     result["evidence"] = ev
     return True
+
+
+def _deployment_replicas_from_yaml_blob(
+    blob: str, *, deployment_yaml_path: Path
+) -> int | None:
+    if blob.strip():
+        try:
+            doc = yaml.safe_load(blob)
+            if isinstance(doc, dict) and doc.get("kind") == "Deployment":
+                return int((doc.get("spec") or {}).get("replicas") or 0) or None
+        except Exception:
+            pass
+    if deployment_yaml_path.exists():
+        try:
+            doc = yaml.safe_load(deployment_yaml_path.read_text())
+            if isinstance(doc, dict) and doc.get("kind") == "Deployment":
+                return int((doc.get("spec") or {}).get("replicas") or 0) or None
+        except Exception:
+            pass
+    return None
+
+
+def _align_down_hpa_max_to_deployment_replicas(
+    result: dict,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+) -> None:
+    """Prevent HPA maxReplicas < deployment.spec.replicas (HPA must not lead replica drops)."""
+    hpa_new = (result.get("hpa_yaml_new") or "").strip()
+    if not hpa_new:
+        return
+    dep_rep = _deployment_replicas_from_yaml_blob(
+        (result.get("deployment_yaml_new") or "").strip(),
+        deployment_yaml_path=deployment_yaml_path,
+    )
+    if not dep_rep or dep_rep < 1:
+        return
+    try:
+        hpa_doc = yaml.safe_load(hpa_new)
+    except Exception:
+        return
+    if not isinstance(hpa_doc, dict) or hpa_doc.get("kind") != "HorizontalPodAutoscaler":
+        return
+    hspec = hpa_doc.setdefault("spec", {})
+    old_max = int(hspec.get("maxReplicas") or dep_rep)
+    if old_max >= dep_rep:
+        return
+    hspec["maxReplicas"] = dep_rep
+    result["hpa_yaml_new"] = yaml.safe_dump(hpa_doc, sort_keys=False)
+    ev = list(result.get("evidence") or [])
+    ev.append(f"guard.hpa_max_not_below_dep_replicas:{old_max}->{dep_rep}")
+    result["evidence"] = ev
+
+
+def _finalize_vanilla_llm_squeeze_down(
+    result: dict,
+    experiment: dict,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+) -> None:
+    """Minimal DOWN guards for vanilla LLM (no advanced replica enforcement)."""
+    if bool(((experiment.get("failure") or {}).get("failed"))):
+        return
+    if not _llm_squeeze_down_boundary_active(experiment):
+        return
+    _align_down_hpa_max_to_deployment_replicas(
+        result, deployment_yaml_path, hpa_yaml_path
+    )
 
 
 def _container_requests(doc: dict) -> tuple[dict, dict]:
@@ -2393,6 +2484,10 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             )
         if _llm_squeeze_down_boundary_active(exp_data) and not _llm_vanilla_squeeze():
             _finalize_llm_squeeze_down(
+                result, exp_data, deployment_yaml_path, hpa_yaml_path
+            )
+        elif _llm_squeeze_down_boundary_active(exp_data) and _llm_vanilla_squeeze():
+            _finalize_vanilla_llm_squeeze_down(
                 result, exp_data, deployment_yaml_path, hpa_yaml_path
             )
         _log(

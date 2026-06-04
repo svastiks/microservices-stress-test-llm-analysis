@@ -1,0 +1,5 @@
+- Stress test resulted in PASS
+- p95 latency well below SLO at 6.0 ms
+- Error rate was 0.0, achieved 25.0 RPS
+- Current configuration is scalable with excess capacity
+- Reducing CPU and memory as part of optimization
