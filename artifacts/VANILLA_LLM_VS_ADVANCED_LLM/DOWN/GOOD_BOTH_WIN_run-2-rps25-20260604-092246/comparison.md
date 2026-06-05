@@ -9,7 +9,7 @@
 
 ## Resource delta (first row → last row)
 
-| | CPU req (m) | Mem req (MiB) |
+| | 🟩 CPU req (m) | 🟧 Mem req (MiB) |
 |---|---:|---:|
 | advanced-llm | -70.0 | -40.0 |
 | vanilla-llm | -94.0 | -46.0 |
@@ -18,7 +18,7 @@
 
 One row per iteration index (boundary `rows` order).
 
-| # | advanced-llm status | advanced-llm prov cost | advanced-llm util cost | advanced-llm p95 | advanced-llm err | advanced-llm ach RPS | advanced-llm cpu% | advanced-llm mem% | advanced-llm cpu m | advanced-llm mem Mi | advanced-llm cpu lim | advanced-llm mem lim | advanced-llm repl | vanilla-llm status | vanilla-llm prov cost | vanilla-llm util cost | vanilla-llm p95 | vanilla-llm err | vanilla-llm ach RPS | vanilla-llm cpu% | vanilla-llm mem% | vanilla-llm cpu m | vanilla-llm mem Mi | vanilla-llm cpu lim | vanilla-llm mem lim | vanilla-llm repl |
+| # | advanced-llm status | ⬜ advanced-llm prov cost | ⬜ advanced-llm util cost | advanced-llm p95 | advanced-llm err | advanced-llm ach RPS | advanced-llm cpu% | advanced-llm mem% | 🟩 advanced-llm cpu m | 🟧 advanced-llm mem Mi | advanced-llm cpu lim | advanced-llm mem lim | advanced-llm repl | vanilla-llm status | ⬜ vanilla-llm prov cost | ⬜ vanilla-llm util cost | vanilla-llm p95 | vanilla-llm err | vanilla-llm ach RPS | vanilla-llm cpu% | vanilla-llm mem% | 🟩 vanilla-llm cpu m | 🟧 vanilla-llm mem Mi | vanilla-llm cpu lim | vanilla-llm mem lim | vanilla-llm repl |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | PASS | 0.7116 | 0.0985 | 6 | 0 | 25 | 14.1 | 9.1 | 150 | 75 | 300 | 150 | 5 | PASS | 0.7116 | 0.1208 | 6 | 0 | 25 | 17.4 | 9.1 | 150 | 75 | 300 | 150 | 5 |
 | 2 | PASS | 0.6392 | 0.1412 | 6 | 0 | 25 | 22.7 | 10.5 | 135 | 65 | 270 | 130 | 5 | PASS | 0.5717 | 0.141 | 6 | 0 | 25 | 25.5 | 10.3 | 120 | 65 | 240 | 135 | 5 |
@@ -36,7 +36,7 @@ One row per iteration index (boundary `rows` order).
 
 One row per iteration; prov cost and util cost only (easier to scan than the full table above).
 
-| # | advanced-llm status | advanced-llm prov cost | advanced-llm util cost | vanilla-llm status | vanilla-llm prov cost | vanilla-llm util cost |
+| # | advanced-llm status | ⬜ advanced-llm prov cost | ⬜ advanced-llm util cost | vanilla-llm status | ⬜ vanilla-llm prov cost | ⬜ vanilla-llm util cost |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | PASS | 0.7116 | 0.0985 | PASS | 0.7116 | 0.1208 |
 | 2 | PASS | 0.6392 | 0.1412 | PASS | 0.5717 | 0.141 |

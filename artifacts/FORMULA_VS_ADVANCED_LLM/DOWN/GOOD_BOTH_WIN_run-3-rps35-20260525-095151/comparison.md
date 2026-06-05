@@ -9,7 +9,7 @@
 
 ## Resource delta (first row → last row)
 
-| | CPU req (m) | Mem req (MiB) |
+| | 🟩 CPU req (m) | 🟧 Mem req (MiB) |
 |---|---:|---:|
 | formula | -100.0 | -43.0 |
 | llm | -90.0 | -60.0 |
@@ -18,7 +18,7 @@
 
 One row per iteration index (boundary `rows` order).
 
-| # | formula status | formula prov cost | formula util cost | formula p95 | formula err | formula ach RPS | formula cpu% | formula mem% | formula cpu m | formula mem Mi | formula cpu lim | formula mem lim | formula repl | llm status | llm prov cost | llm util cost | llm p95 | llm err | llm ach RPS | llm cpu% | llm mem% | llm cpu m | llm mem Mi | llm cpu lim | llm mem lim | llm repl |
+| # | formula status | ⬜ formula prov cost | ⬜ formula util cost | formula p95 | formula err | formula ach RPS | formula cpu% | formula mem% | 🟩 formula cpu m | 🟧 formula mem Mi | formula cpu lim | formula mem lim | formula repl | llm status | ⬜ llm prov cost | ⬜ llm util cost | llm p95 | llm err | llm ach RPS | llm cpu% | llm mem% | 🟩 llm cpu m | 🟧 llm mem Mi | llm cpu lim | llm mem lim | llm repl |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | PASS | 0.7116 | 0.1687 | 6 | 0 | 35 | 24.2 | 14.5 | 150 | 75 | 300 | 150 | 5 | PASS | 0.7116 | 0.1688 | 7 | 0 | 35 | 24.2 | 14.8 | 150 | 75 | 300 | 150 | 5 |
 | 2 | PASS | 0.5363 | 0.2272 | 7 | 0 | 35 | 43.5 | 21.7 | 113 | 57 | 226 | 113 | 5 | PASS | 0.4744 | 0.152 | 6 | 0 | 35 | 32.9 | 16.3 | 100 | 50 | 300 | 150 | 5 |
@@ -43,7 +43,7 @@ One row per iteration index (boundary `rows` order).
 
 One row per iteration; prov cost and util cost only (easier to scan than the full table above).
 
-| # | formula status | formula prov cost | formula util cost | llm status | llm prov cost | llm util cost |
+| # | formula status | ⬜ formula prov cost | ⬜ formula util cost | llm status | ⬜ llm prov cost | ⬜ llm util cost |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | PASS | 0.7116 | 0.1687 | PASS | 0.7116 | 0.1688 |
 | 2 | PASS | 0.5363 | 0.2272 | PASS | 0.4744 | 0.152 |

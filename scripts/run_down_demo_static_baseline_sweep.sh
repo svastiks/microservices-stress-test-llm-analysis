@@ -42,8 +42,8 @@ fi
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [static-down-sweep] $*"; }
 
 export RESULTS_DEST="${SWEEP_ROOT}"
-export BASELINE_DEPLOYMENT_YAML="${BASELINE_DEPLOYMENT_YAML:-${ROOT}/infra/k8s/spark/robot-shop-web-deployment.baseline.yaml}"
-export BASELINE_HPA_YAML="${BASELINE_HPA_YAML:-${ROOT}/infra/k8s/spark/robot-shop-web-hpa.baseline.yaml}"
+# shellcheck source=scripts/lib/engineer_baseline_env.sh
+source "${ROOT}/scripts/lib/engineer_baseline_env.sh"
 export RESET_BASELINE_EACH_PROFILE=true
 export COMPARE_SYNC_MODE=static
 export STRESS_RESULTS_SUBDIR=static-baseline

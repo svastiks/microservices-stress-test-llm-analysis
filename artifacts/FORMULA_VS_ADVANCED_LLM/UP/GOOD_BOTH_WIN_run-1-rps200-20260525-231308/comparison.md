@@ -9,7 +9,7 @@
 
 ## Resource delta (first row → last row)
 
-| | CPU req (m) | Mem req (MiB) |
+| | 🟩 CPU req (m) | 🟧 Mem req (MiB) |
 |---|---:|---:|
 | formula | +14.0 | +7.0 |
 | llm | -6.0 | -3.0 |
@@ -18,7 +18,7 @@
 
 One row per iteration index (boundary `rows` order).
 
-| # | formula status | formula prov cost | formula util cost | formula p95 | formula err | formula ach RPS | formula cpu% | formula mem% | formula cpu m | formula mem Mi | formula cpu lim | formula mem lim | formula repl | llm status | llm prov cost | llm util cost | llm p95 | llm err | llm ach RPS | llm cpu% | llm mem% | llm cpu m | llm mem Mi | llm cpu lim | llm mem lim | llm repl |
+| # | formula status | ⬜ formula prov cost | ⬜ formula util cost | formula p95 | formula err | formula ach RPS | formula cpu% | formula mem% | 🟩 formula cpu m | 🟧 formula mem Mi | formula cpu lim | formula mem lim | formula repl | llm status | ⬜ llm prov cost | ⬜ llm util cost | llm p95 | llm err | llm ach RPS | llm cpu% | llm mem% | 🟩 llm cpu m | 🟧 llm mem Mi | llm cpu lim | llm mem lim | llm repl |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | FAIL | 0.0474 | 0.0474 | 836 | 0 | 200 | 205.1 | 116.7 | 50 | 25 | 100 | 50 | 1 | FAIL | 0.0474 | 0.0474 | 816 | 0 | 200 | 275 | 184 | 50 | 25 | 100 | 50 | 1 |
 | 2 | FAIL | 0.0949 | 0.0653 | 1241 | 0 | 200 | 68.3 | 77.8 | 50 | 25 | 100 | 50 | 2 | FAIL | 0.033 | 0.033 | 1021 | 0 | 200 | 210.3 | 128.7 | 35 | 15 | 100 | 50 | 1 |
@@ -28,7 +28,7 @@ One row per iteration index (boundary `rows` order).
 
 One row per iteration; prov cost and util cost only (easier to scan than the full table above).
 
-| # | formula status | formula prov cost | formula util cost | llm status | llm prov cost | llm util cost |
+| # | formula status | ⬜ formula prov cost | ⬜ formula util cost | llm status | ⬜ llm prov cost | ⬜ llm util cost |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | FAIL | 0.0474 | 0.0474 | FAIL | 0.0474 | 0.0474 |
 | 2 | FAIL | 0.0949 | 0.0653 | FAIL | 0.033 | 0.033 |

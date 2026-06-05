@@ -9,7 +9,7 @@
 
 ## Resource delta (first row → last row)
 
-| | CPU req (m) | Mem req (MiB) |
+| | 🟩 CPU req (m) | 🟧 Mem req (MiB) |
 |---|---:|---:|
 | formula | -93.0 | -43.0 |
 | llm | -138.0 | -66.0 |
@@ -18,7 +18,7 @@
 
 One row per iteration index (boundary `rows` order).
 
-| # | formula status | formula prov cost | formula util cost | formula p95 | formula err | formula ach RPS | formula cpu% | formula mem% | formula cpu m | formula mem Mi | formula cpu lim | formula mem lim | formula repl | llm status | llm prov cost | llm util cost | llm p95 | llm err | llm ach RPS | llm cpu% | llm mem% | llm cpu m | llm mem Mi | llm cpu lim | llm mem lim | llm repl |
+| # | formula status | ⬜ formula prov cost | ⬜ formula util cost | formula p95 | formula err | formula ach RPS | formula cpu% | formula mem% | 🟩 formula cpu m | 🟧 formula mem Mi | formula cpu lim | formula mem lim | formula repl | llm status | ⬜ llm prov cost | ⬜ llm util cost | llm p95 | llm err | llm ach RPS | llm cpu% | llm mem% | 🟩 llm cpu m | 🟧 llm mem Mi | llm cpu lim | llm mem lim | llm repl |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | PASS | 0.7116 | 0.1732 | 6 | 0 | 25 | 24.9 | 14.1 | 150 | 75 | 300 | 150 | 5 | PASS | 0.7116 | 0.1739 | 7 | 0 | 25 | 25 | 14.1 | 150 | 75 | 300 | 150 | 5 |
 | 2 | PASS | 0.5408 | 0.2296 | 6 | 0 | 25 | 43.6 | 21.3 | 114 | 57 | 227 | 114 | 5 | PASS | 0.4744 | 0.1524 | 6 | 0 | 25 | 33 | 16.1 | 100 | 50 | 300 | 150 | 5 |
@@ -40,7 +40,7 @@ One row per iteration index (boundary `rows` order).
 
 One row per iteration; prov cost and util cost only (easier to scan than the full table above).
 
-| # | formula status | formula prov cost | formula util cost | llm status | llm prov cost | llm util cost |
+| # | formula status | ⬜ formula prov cost | ⬜ formula util cost | llm status | ⬜ llm prov cost | ⬜ llm util cost |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | PASS | 0.7116 | 0.1732 | PASS | 0.7116 | 0.1739 |
 | 2 | PASS | 0.5408 | 0.2296 | PASS | 0.4744 | 0.1524 |

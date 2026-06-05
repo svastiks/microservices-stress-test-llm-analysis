@@ -2,8 +2,8 @@
 # UP static baseline sweep (no LLM/formula apply loop; Kubernetes baseline+HPA only).
 # Saves run-1..run-N under results-from-cluster/static-up-sweep-<stamp>/.
 #
-# Thin static (default): up-demo-thin.baseline.yaml (1 repl @ 50m/25Mi).
-# Engineer static: BASELINE_DEPLOYMENT_YAML=infra/k8s/spark/robot-shop-web-deployment.baseline.yaml
+# Engineer static (default): fat 5×150m/75Mi + HPA (see scripts/lib/engineer_baseline_env.sh).
+# Thin strawman only: USE_THIN_UP_BASELINE=1 (1 repl @ 50m/25Mi — fails UP demo RPS).
 #
 # Example (5×10 matrix):
 #   BUILD_ANALYZER_IMAGE=true COMPARE_SWEEP_LOADS=200,220,240,260,280 COMPARE_SWEEP_REPEATS_PER_LOAD=10 \
@@ -18,7 +18,8 @@ cd "${ROOT}"
 
 SWEEP_STAMP="$(date +%Y%m%d-%H%M%S)"
 SWEEP_PARENT="${COMPARE_SWEEP_PARENT:-${ROOT}/results-from-cluster}"
-SWEEP_ROOT="${SWEEP_PARENT}/static-up-sweep-${SWEEP_STAMP}"
+: "${SWEEP_NAME_PREFIX:=static-up-sweep}"
+SWEEP_ROOT="${SWEEP_PARENT}/${SWEEP_NAME_PREFIX}-${SWEEP_STAMP}"
 mkdir -p "${SWEEP_ROOT}"
 
 declare -a ROUND_LABELS=()
@@ -42,9 +43,8 @@ fi
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [static-up-sweep] $*"; }
 
 export RESULTS_DEST="${SWEEP_ROOT}"
-# Static baseline for UP should start thin and allow HPA scaling.
-export BASELINE_DEPLOYMENT_YAML="${ROOT}/infra/k8s/spark/robot-shop-web-deployment.up-demo-thin.baseline.yaml"
-export BASELINE_HPA_YAML="${ROOT}/infra/k8s/spark/robot-shop-web-hpa.baseline.yaml"
+# shellcheck source=scripts/lib/engineer_baseline_env.sh
+source "${ROOT}/scripts/lib/engineer_baseline_env.sh"
 export RESET_BASELINE_EACH_PROFILE=true
 export COMPARE_SYNC_MODE=static
 export STRESS_RESULTS_SUBDIR=static-baseline
