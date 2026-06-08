@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 from analysis.cost_model import row_util_cost
@@ -23,6 +24,29 @@ def _last_row(rows: list) -> dict | None:
     return rows[-1]
 
 
+# Heading-only: coloured block emoji next to title (visible in MD preview).
+def _color_table_heading(label: str) -> str:
+    """Prefix column title: grey=cost, green=cpu m, orange=mem Mi."""
+    raw = label
+    if "🟩" in label or "🟧" in label or "⬜" in label:
+        for mark in ("🟩 ", "🟧 ", "⬜ "):
+            if mark in label:
+                raw = label.split(mark, 1)[-1]
+                break
+    if "<span" in raw:
+        raw = re.sub(r"<[^>]+>", "", raw)
+    low = raw.lower()
+    if "prov cost" in low or "util cost" in low:
+        block = "⬜"
+    elif "cpu m" in low or "cpu req" in low:
+        block = "🟩"
+    elif "mem mi" in low or "mem req" in low:
+        block = "🟧"
+    else:
+        return raw
+    return f"{block} {raw}"
+
+
 def _cell(r: dict | None, key: str) -> str:
     if not r:
         return "—"
@@ -34,6 +58,18 @@ def _cell(r: dict | None, key: str) -> str:
     if isinstance(v, float):
         return f"{v:.4g}"
     return str(v)
+
+
+def _cpu_util_cell(r: dict | None) -> str:
+    """Request-relative CPU util (HPA-aligned); fall back to limit-relative on old runs."""
+    if not r:
+        return "—"
+    v = r.get("cpu_util_request_pct")
+    if v is None:
+        v = r.get("cpu_util_pct")
+    if v is None:
+        return "—"
+    return f"{float(v):.4g}"
 
 
 def compare(
@@ -104,7 +140,7 @@ def compare(
         "",
         "## Resource delta (first row → last row)",
         "",
-        f"| | CPU req (m) | Mem req (MiB) |",
+        f"| | {_color_table_heading('CPU req (m)')} | {_color_table_heading('Mem req (MiB)')} |",
         f"|---|---:|---:|",
         f"| {label_a} | {_delta((r0a or {}).get('cpu_request_m'), (la or {}).get('cpu_request_m'))} | "
         f"{_delta((r0a or {}).get('mem_request_mib'), (la or {}).get('mem_request_mib'))} |",
@@ -113,14 +149,17 @@ def compare(
         "",
         "## Combined iterations",
         "",
-        "One row per iteration index (boundary `rows` order).",
+        "One row per iteration index (boundary `rows` order). "
+        "Rows are **not** matched configs — each arm ran an independent squeeze trajectory. "
+        "When `paired-baseline-probe.md` exists under each arm, **row 1** shares the same "
+        "observed burn/cpu% (one k6 window, two optimizer analyses).",
         "",
         "| # | "
-        f"{label_a} status | {label_a} prov cost | {label_a} util cost | {label_a} p95 | {label_a} err | {label_a} ach RPS | "
-        f"{label_a} cpu% | {label_a} mem% | {label_a} cpu m | {label_a} mem Mi | "
+        f"{label_a} status | {_color_table_heading(f'{label_a} prov cost')} | {_color_table_heading(f'{label_a} util cost')} | {label_a} p95 | {label_a} err | {label_a} ach RPS | "
+        f"{label_a} cpu% req | {label_a} mem% | {_color_table_heading(f'{label_a} cpu m')} | {_color_table_heading(f'{label_a} mem Mi')} | "
         f"{label_a} cpu lim | {label_a} mem lim | {label_a} repl | "
-        f"{label_b} status | {label_b} prov cost | {label_b} util cost | {label_b} p95 | {label_b} err | {label_b} ach RPS | "
-        f"{label_b} cpu% | {label_b} mem% | {label_b} cpu m | {label_b} mem Mi | "
+        f"{label_b} status | {_color_table_heading(f'{label_b} prov cost')} | {_color_table_heading(f'{label_b} util cost')} | {label_b} p95 | {label_b} err | {label_b} ach RPS | "
+        f"{label_b} cpu% req | {label_b} mem% | {_color_table_heading(f'{label_b} cpu m')} | {_color_table_heading(f'{label_b} mem Mi')} | "
         f"{label_b} cpu lim | {label_b} mem lim | {label_b} repl |",
         "| " + " | ".join(["---"] * 27) + " |",
     ]
@@ -132,11 +171,11 @@ def compare(
         lines.append(
             f"| {i + 1} | "
             f"{_cell(a, 'status')} | {_cell(a, 'cost_score')} | {_util_cell(a)} | {_cell(a, 'p95_ms')} | {_cell(a, 'error_rate')} | "
-            f"{_cell(a, 'achieved_rps_target_window')} | {_cell(a, 'cpu_util_pct')} | {_cell(a, 'mem_util_pct')} | "
+            f"{_cell(a, 'achieved_rps_target_window')} | {_cpu_util_cell(a)} | {_cell(a, 'mem_util_pct')} | "
             f"{_cell(a, 'cpu_request_m')} | {_cell(a, 'mem_request_mib')} | "
             f"{_cell(a, 'cpu_limit_m')} | {_cell(a, 'mem_limit_mib')} | {_cell(a, 'replicas')} | "
             f"{_cell(b, 'status')} | {_cell(b, 'cost_score')} | {_util_cell(b)} | {_cell(b, 'p95_ms')} | {_cell(b, 'error_rate')} | "
-            f"{_cell(b, 'achieved_rps_target_window')} | {_cell(b, 'cpu_util_pct')} | {_cell(b, 'mem_util_pct')} | "
+            f"{_cell(b, 'achieved_rps_target_window')} | {_cpu_util_cell(b)} | {_cell(b, 'mem_util_pct')} | "
             f"{_cell(b, 'cpu_request_m')} | {_cell(b, 'mem_request_mib')} | "
             f"{_cell(b, 'cpu_limit_m')} | {_cell(b, 'mem_limit_mib')} | {_cell(b, 'replicas')} |"
         )
@@ -156,8 +195,8 @@ def compare(
             "",
             "One row per iteration; prov cost and util cost only (easier to scan than the full table above).",
             "",
-            f"| # | {label_a} status | {label_a} prov cost | {label_a} util cost | "
-            f"{label_b} status | {label_b} prov cost | {label_b} util cost |",
+            f"| # | {label_a} status | {_color_table_heading(f'{label_a} prov cost')} | {_color_table_heading(f'{label_a} util cost')} | "
+            f"{label_b} status | {_color_table_heading(f'{label_b} prov cost')} | {_color_table_heading(f'{label_b} util cost')} |",
             "| " + " | ".join(["---"] * 7) + " |",
         ]
     )

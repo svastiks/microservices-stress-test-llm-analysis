@@ -1,6 +1,8 @@
 """
-Query Prometheus over a time window and return observed metrics for experiment JSON.
-Fills replicas, cpu_util_pct, mem_util_pct, oom_kills, cpu_util_to_limit, and telemetry.*.
+Query Prometheus over the k6 window and return observed metrics for experiment JSON.
+
+Primary utilization (cpu_util_request_pct, cpu_util_pct, mem_util_pct) uses the mean of
+Prometheus samples in [start_ts, end_ts]. Peak variants (*_peak) use the window maximum.
 """
 from typing import Any
 
@@ -8,8 +10,8 @@ import requests
 
 DEFAULT_PROMETHEUS_URL = "http://localhost:9090"
 
-# Pad the k6 window so short runs still overlap Prometheus scrapes.
-_TIME_PAD_S = 45.0
+# Optional pad around [start_ts, end_ts]. Default 0: gate on k6 window only.
+_TIME_PAD_S = 0.0
 
 
 def _log(msg: str) -> None:
@@ -101,6 +103,17 @@ def _max_value(results: list[dict]) -> float:
     return out
 
 
+def _mean_value(results: list[dict]) -> float:
+    if not results:
+        return 0.0
+    vals: list[float] = []
+    for r in results:
+        for pair in r.get("values") or []:
+            if isinstance(pair, (list, tuple)) and len(pair) >= 2:
+                vals.append(float(pair[1]))
+    return sum(vals) / len(vals) if vals else 0.0
+
+
 def _sum_series_maxima(results: list[dict]) -> float:
     if not results:
         return 0.0
@@ -113,6 +126,28 @@ def _sum_series_maxima(results: list[dict]) -> float:
                 series_max = max(series_max, float(pair[1]))
         total += series_max
     return total
+
+
+def _sum_series_means(results: list[dict]) -> float:
+    if not results:
+        return 0.0
+    total = 0.0
+    for r in results:
+        vals = r.get("values") or []
+        series_vals = [
+            float(pair[1])
+            for pair in vals
+            if isinstance(pair, (list, tuple)) and len(pair) >= 2
+        ]
+        if series_vals:
+            total += sum(series_vals) / len(series_vals)
+    return total
+
+
+def _util_pct(usage: float, capacity: float) -> float:
+    if capacity <= 0:
+        return 0.0
+    return round(100 * usage / capacity, 1)
 
 
 def _range_step(start: float, end: float) -> str:
@@ -161,6 +196,7 @@ def get_prometheus_observed(
     namespace: str = "default",
     deployment_name: str = "stress-service",
     prometheus_url: str = DEFAULT_PROMETHEUS_URL,
+    cpu_request_m: int = 0,
     cpu_limit_m: int = 500,
     mem_limit_mib: int = 256,
     deployment_replicas: int = 0,
@@ -168,21 +204,34 @@ def get_prometheus_observed(
     time_pad_s: float = _TIME_PAD_S,
 ) -> dict:
     """
-    Query Prometheus over an expanded window around [start_ts, end_ts].
-    When replica series are empty but YAML declares replicas, use config fallback for denominators only.
+    Query Prometheus over [start_ts, end_ts] (optional time_pad_s).
+
+    Primary utilization fields (cpu_util_request_pct, cpu_util_pct, mem_util_pct) use the
+    arithmetic mean of samples in that window. Peak variants (*_peak) retain the window max.
+    When replica series are empty but YAML declares replicas, use config fallback for denominators.
     """
     observed: dict[str, Any] = {
         "replicas": 0,
         "replicas_max": 0,
         "cpu_util_pct": 0.0,
+        "cpu_util_pct_peak": 0.0,
+        "cpu_util_request_pct": 0.0,
+        "cpu_util_request_pct_peak": 0.0,
         "mem_util_pct": 0.0,
+        "mem_util_pct_peak": 0.0,
+        "cpu_usage_avg_m": 0.0,
+        "mem_usage_avg_mib": 0.0,
         "oom_kills": 0,
         "cpu_util_to_limit": 0.0,
+        "cpu_util_to_request": 0.0,
+        "cpu_util_to_request_peak": 0.0,
     }
 
-    q_start = float(start_ts) - time_pad_s
-    q_end = float(end_ts) + time_pad_s
-    step = _range_step(q_start, q_end)
+    k6_start = float(start_ts)
+    k6_end = float(end_ts)
+    q_start = k6_start - time_pad_s
+    q_end = k6_end + time_pad_s
+    step = _range_step(k6_start, k6_end)
     hpa_name = f"{deployment_name}-hpa"
     _log(
         f"collect_start namespace={namespace} deployment={deployment_name} "
@@ -210,19 +259,27 @@ def get_prometheus_observed(
     max_spec = int(_max_value(repl_spec_r))
     max_hpa = int(_max_value(repl_hpa_r))
     max_from_prom = max(max_avail, max_spec, max_hpa)
+    mean_avail = _mean_value(repl_avail_r)
+    mean_spec = _mean_value(repl_spec_r)
+    mean_hpa = _mean_value(repl_hpa_r)
+    mean_from_prom = max(mean_avail, mean_spec, mean_hpa)
 
     replicas_series_matched = bool(repl_avail_r or repl_spec_r or repl_hpa_r)
 
     yaml_floor = max(int(deployment_replicas or 0), int(hpa_min_replicas or 0), 1)
     if max_from_prom > 0:
         max_replicas = max_from_prom
+        mean_replicas = max(mean_from_prom, 1.0)
         replicas_inferred = False
     else:
         max_replicas = yaml_floor
+        mean_replicas = float(yaml_floor)
         replicas_inferred = True
 
     observed["replicas"] = max_replicas
     observed["replicas_max"] = max_replicas
+    denom_replicas_mean = max(int(round(mean_replicas)), 1)
+    denom_replicas_peak = max(max_replicas, 1)
 
     cadv = _cadvisor_pod_selector(namespace, deployment_name)
     cadv_loose = _cadvisor_pod_selector_loose(namespace, deployment_name)
@@ -254,7 +311,8 @@ def get_prometheus_observed(
     cpu_results, cpu_query_attempts = _first_non_empty_range(
         prometheus_url, cpu_queries, q_start, q_end, step
     )
-    cpu_usage_cores = _max_value(cpu_results)
+    cpu_usage_mean_cores = _mean_value(cpu_results)
+    cpu_usage_peak_cores = _max_value(cpu_results)
     cpu_collection_mode = "aggregate_query"
     if not cpu_results:
         instant_cpu_queries = [
@@ -264,14 +322,16 @@ def get_prometheus_observed(
         ]
         for iq in instant_cpu_queries:
             cpu_query_attempts += 1
-            inst = _query(prometheus_url, iq, time_ts=q_end)
+            inst = _query(prometheus_url, iq, time_ts=k6_end)
             if inst:
                 cpu_results = inst
                 cpu_collection_mode = "instant_query"
                 try:
-                    cpu_usage_cores = float((inst[0].get("value") or [0, "0"])[1])
+                    instant_cores = float((inst[0].get("value") or [0, "0"])[1])
                 except (TypeError, ValueError, IndexError):
-                    cpu_usage_cores = 0.0
+                    instant_cores = 0.0
+                cpu_usage_mean_cores = instant_cores
+                cpu_usage_peak_cores = instant_cores
                 break
     if not cpu_results:
         cpu_per_pod_queries = [
@@ -288,7 +348,8 @@ def get_prometheus_observed(
         )
         cpu_query_attempts += cpu_per_pod_attempts
         if cpu_per_pod_results:
-            cpu_usage_cores = _sum_series_maxima(cpu_per_pod_results)
+            cpu_usage_mean_cores = _sum_series_means(cpu_per_pod_results)
+            cpu_usage_peak_cores = _sum_series_maxima(cpu_per_pod_results)
             cpu_results = cpu_per_pod_results
             cpu_collection_mode = "per_pod_series_sum"
 
@@ -306,7 +367,8 @@ def get_prometheus_observed(
     mem_results, mem_query_attempts = _first_non_empty_range(
         prometheus_url, mem_queries, q_start, q_end, step
     )
-    mem_bytes = _max_value(mem_results)
+    mem_bytes_mean = _mean_value(mem_results)
+    mem_bytes_peak = _max_value(mem_results)
     mem_collection_mode = "aggregate_query"
     if not mem_results:
         mem_per_pod_queries = [
@@ -319,28 +381,52 @@ def get_prometheus_observed(
         )
         mem_query_attempts += mem_per_pod_attempts
         if mem_per_pod_results:
-            mem_bytes = _sum_series_maxima(mem_per_pod_results)
+            mem_bytes_mean = _sum_series_means(mem_per_pod_results)
+            mem_bytes_peak = _sum_series_maxima(mem_per_pod_results)
             mem_results = mem_per_pod_results
             mem_collection_mode = "per_pod_series_sum"
 
-    denom_replicas = max(max_replicas, 1)
+    observed["cpu_usage_avg_m"] = round(cpu_usage_mean_cores * 1000.0, 1)
+    observed["mem_usage_avg_mib"] = round(mem_bytes_mean / (1024 * 1024), 1)
+
+    if cpu_request_m > 0:
+        mean_req_cores = (cpu_request_m / 1000.0) * denom_replicas_mean
+        peak_req_cores = (cpu_request_m / 1000.0) * denom_replicas_peak
+        if mean_req_cores > 0:
+            observed["cpu_util_request_pct"] = _util_pct(
+                cpu_usage_mean_cores, mean_req_cores
+            )
+            observed["cpu_util_to_request"] = round(
+                cpu_usage_mean_cores / mean_req_cores, 2
+            )
+        if peak_req_cores > 0:
+            observed["cpu_util_request_pct_peak"] = _util_pct(
+                cpu_usage_peak_cores, peak_req_cores
+            )
+            observed["cpu_util_to_request_peak"] = round(
+                cpu_usage_peak_cores / peak_req_cores, 2
+            )
 
     if cpu_limit_m > 0:
-        total_cpu_limit_cores = (cpu_limit_m / 1000.0) * denom_replicas
-        if total_cpu_limit_cores > 0:
-            observed["cpu_util_pct"] = round(
-                100 * cpu_usage_cores / total_cpu_limit_cores, 1
-            )
+        mean_lim_cores = (cpu_limit_m / 1000.0) * denom_replicas_mean
+        peak_lim_cores = (cpu_limit_m / 1000.0) * denom_replicas_peak
+        if mean_lim_cores > 0:
+            observed["cpu_util_pct"] = _util_pct(cpu_usage_mean_cores, mean_lim_cores)
             observed["cpu_util_to_limit"] = round(
-                cpu_usage_cores / total_cpu_limit_cores, 2
+                cpu_usage_mean_cores / mean_lim_cores, 2
+            )
+        if peak_lim_cores > 0:
+            observed["cpu_util_pct_peak"] = _util_pct(
+                cpu_usage_peak_cores, peak_lim_cores
             )
 
     if mem_limit_mib > 0:
-        total_mem_limit_bytes = mem_limit_mib * 1024 * 1024 * denom_replicas
-        if total_mem_limit_bytes > 0:
-            observed["mem_util_pct"] = round(
-                100 * mem_bytes / total_mem_limit_bytes, 1
-            )
+        mean_mem_cap = mem_limit_mib * 1024 * 1024 * denom_replicas_mean
+        peak_mem_cap = mem_limit_mib * 1024 * 1024 * denom_replicas_peak
+        if mean_mem_cap > 0:
+            observed["mem_util_pct"] = _util_pct(mem_bytes_mean, mean_mem_cap)
+        if peak_mem_cap > 0:
+            observed["mem_util_pct_peak"] = _util_pct(mem_bytes_peak, peak_mem_cap)
 
     oom_q = (
         f"sum(kube_pod_container_status_last_terminated_reason{{"
@@ -358,8 +444,12 @@ def get_prometheus_observed(
     )
 
     observed["telemetry"] = {
+        "k6_window_start_ts": k6_start,
+        "k6_window_end_ts": k6_end,
         "window_start_ts": q_start,
         "window_end_ts": q_end,
+        "utilization_aggregation": "mean",
+        "replicas_mean": round(mean_replicas, 2),
         "replicas_series_matched": replicas_series_matched,
         "replicas_inferred_from_config": replicas_inferred,
         "cpu_series_matched": cpu_series_matched,
@@ -371,7 +461,8 @@ def get_prometheus_observed(
         "utilization_trustworthy": utilization_trustworthy,
     }
     _log(
-        f"collect_done cpu_util_pct={observed.get('cpu_util_pct')} "
+        f"collect_done cpu_util_request_pct={observed.get('cpu_util_request_pct')} "
+        f"cpu_util_request_pct_peak={observed.get('cpu_util_request_pct_peak')} "
         f"mem_util_pct={observed.get('mem_util_pct')} "
         f"cpu_series_matched={cpu_series_matched} mem_series_matched={mem_series_matched} "
         f"cpu_attempts={cpu_query_attempts} mem_attempts={mem_query_attempts} "

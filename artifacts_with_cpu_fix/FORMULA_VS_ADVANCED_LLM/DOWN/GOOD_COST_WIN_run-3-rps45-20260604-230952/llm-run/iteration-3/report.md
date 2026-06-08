@@ -1,0 +1,9 @@
+- The workload has been successfully handled with an average of 45 RPS, well within the SLO. 
+- CPU utilization is at 36% and memory utilization is at 19%, indicating that there is significant headroom for optimization.
+- The cost score is 0.4535, suggesting over-provisioning; steps must be taken to align resource allocation with demand.
+- As per the FAT-START analysis and observed metrics, it is mandatory to reduce the number of replicas from 4 to 3 and adjust resource requests and limits. 
+- The deployment and HPA will reflect the proposed changes to optimize cost and resource efficiency.
+- The scaling rationale is justified since it has passed the SLO with slack on resources.
+- No failures were detected during the test, and the previous iteration did not indicate any instability. 
+- It is vital to proceed with caution to avoid under-provisioning in future experiments.
+- Proposed changes will ensure ongoing resource efficiency, keeping the cost in check while maintaining performance.

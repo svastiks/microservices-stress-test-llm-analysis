@@ -121,6 +121,9 @@ for ((r = 0; r < ROUNDS; r++)); do
   idx=$((r + 1))
   export COMPARE_SWEEP_ROUND="${idx}"
   unset STRESS_K6_RPS STRESS_K6_DURATION 2>/dev/null || true
+  if [[ -n "${COMPARE_SWEEP_K6_DURATION:-}" ]]; then
+    export STRESS_K6_DURATION="${COMPARE_SWEEP_K6_DURATION}"
+  fi
 
   if [[ "${USE_PROFILE_NAMES}" -eq 1 ]]; then
     profile="${CLEAN_PROFILES[${r}]}"

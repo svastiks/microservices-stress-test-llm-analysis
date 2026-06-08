@@ -221,9 +221,71 @@ spec:
                 "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n"
                 "spec:\n  minReplicas: 1\n  maxReplicas: 2\n"
             )
-            self.assertTrue(_apply_down_boundary_stop(result, exp, dep_path, hpa_path))
+            with mock.patch.dict(
+                os.environ, {"SQUEEZE_UNTIL_VIOLATION": "0"}, clear=False
+            ):
+                self.assertTrue(
+                    _apply_down_boundary_stop(result, exp, dep_path, hpa_path)
+                )
         self.assertEqual(result.get("deployment_yaml_new"), "")
         self.assertIn("guard.hot_boundary_stop", " ".join(result.get("evidence") or []))
+
+    def test_hot_boundary_continues_when_until_violation(self) -> None:
+        exp = {
+            "squeeze_optimizer": "llm",
+            "analysis_goal": "efficiency",
+            "mode": "squeeze",
+            "scaling_hint": "DOWN",
+            "failure": {"failed": False},
+            "config": {"cpu_request_m": 60, "deployment_replicas": 2},
+            "observed": {
+                "cpu_util_pct": 94.0,
+                "mem_util_pct": 44.0,
+                "replicas": 2,
+                "replicas_max": 2,
+            },
+        }
+        dep_on_disk = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 60m
+            memory: 30Mi
+          limits:
+            cpu: 120m
+            memory: 60Mi
+"""
+        result = {"deployment_yaml_new": "", "hpa_yaml_new": "", "evidence": []}
+        with tempfile.TemporaryDirectory() as td:
+            dep_path = Path(td) / "dep.yaml"
+            hpa_path = Path(td) / "hpa.yaml"
+            dep_path.write_text(dep_on_disk)
+            hpa_path.write_text(
+                "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n"
+                "spec:\n  minReplicas: 1\n  maxReplicas: 2\n"
+            )
+            with mock.patch.dict(
+                os.environ,
+                {"SQUEEZE_LLM_DOWN_BOUNDARY": "1", "SQUEEZE_UNTIL_VIOLATION": "1"},
+                clear=False,
+            ):
+                self.assertTrue(
+                    _apply_down_boundary_stop(result, exp, dep_path, hpa_path)
+                )
+        self.assertTrue((result.get("deployment_yaml_new") or "").strip())
+        self.assertNotIn("guard.hot_boundary_stop", " ".join(result.get("evidence") or []))
+        self.assertIn(
+            "guard.hot_boundary_continue_until_violation",
+            " ".join(result.get("evidence") or []),
+        )
 
     def test_hot_boundary_defers_stop_when_cpu_above_floor(self) -> None:
         exp = {

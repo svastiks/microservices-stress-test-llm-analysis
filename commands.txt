@@ -42,20 +42,19 @@ BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=svastik COMPARE_SWEEP_K6_DURATION=90s \
   COMPARE_SWEEP_LOADS=20,25,35,45,55 COMPARE_SWEEP_REPEATS_PER_LOAD=10 \
   ./scripts/run_down_demo_compare_sweep.sh
 
-# Method 2 static thin (UP) + engineer static (5×150m/75Mi):
+# Method 2 engineer baseline (B1): fat 5×150m/75Mi + HPA, one k6 pass (no squeeze):
 BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=svastik COMPARE_SWEEP_K6_DURATION=90s \
-  COMPARE_SWEEP_LOADS=200,220,240,260,280 COMPARE_SWEEP_REPEATS_PER_LOAD=10 \
-  ./scripts/run_up_demo_static_baseline_sweep.sh
+  COMPARE_SWEEP_RPS=220,240,260 ./scripts/run_up_demo_engineer_baseline_sweep.sh
 
 BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=svastik COMPARE_SWEEP_K6_DURATION=90s \
-  COMPARE_SWEEP_LOADS=20,25,35,45,55 COMPARE_SWEEP_REPEATS_PER_LOAD=10 \
-  ./scripts/run_down_demo_static_baseline_sweep.sh
+  COMPARE_SWEEP_RPS=25,35,45 ./scripts/run_down_demo_static_baseline_sweep.sh
 
-# Method 2 engineer baseline (UP) — override thin YAML:
-BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=svastik COMPARE_SWEEP_K6_DURATION=90s \
-  BASELINE_DEPLOYMENT_YAML=infra/k8s/spark/robot-shop-web-deployment.baseline.yaml \
-  COMPARE_SWEEP_LOADS=200,220,240,260,280 COMPARE_SWEEP_REPEATS_PER_LOAD=10 \
-  ./scripts/run_up_demo_static_baseline_sweep.sh
+# Then compare engineer vs advanced artifacts:
+#   ENGINEER_UP_SWEEP=results-from-cluster/engineer-up-sweep-<stamp> \
+#   ENGINEER_DOWN_SWEEP=results-from-cluster/static-down-sweep-<stamp> \
+#   ./scripts/build_engineer_vs_advanced_comparisons.sh
+
+# Thin UP strawman only (fails SLO at 220+): USE_THIN_UP_BASELINE=1 ./scripts/run_up_demo_static_baseline_sweep.sh
 
 # Vanilla vs Advanced full 5×10 (shuffled rounds recommended):
 BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=svastik COMPARE_SWEEP_K6_DURATION=90s \
@@ -69,8 +68,20 @@ BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=svastik COMPARE_SWEEP_K6_DURATION=90s \
 #   (mirror for down, static, advanced-vanilla)
 
 # --- Quick one-offs ---
+# Formula vs LLM DOWN smoke (60s k6, 30s settle) — verify telemetry + first_fail fixes
+BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=monitoring COMPARE_SWEEP_K6_DURATION=60s SQUEEZE_SETTLE_SECONDS=30 COMPARE_SWEEP_RPS=35 COMPARE_SWEEP_ROUNDS=1 ./scripts/run_down_demo_compare_sweep.sh
+
+# Formula vs LLM DOWN 3-round (90s k6, 30s settle) — post-fix production smoke
+BUILD_ANALYZER_IMAGE=false KUBE_CONTEXT=monitoring COMPARE_SWEEP_K6_DURATION=90s SQUEEZE_SETTLE_SECONDS=30 COMPARE_SWEEP_RPS=25,35,45 COMPARE_SWEEP_ROUNDS=3 ./scripts/run_down_demo_compare_sweep.sh
+
 COMPARE FORMULA VS LLM (down_demo — 5 repl @ 150m / 75Mi baseline)
 BUILD_ANALYZER_IMAGE=true COMPARE_SWEEP_RPS=25 COMPARE_SWEEP_ROUNDS=1 ./scripts/run_down_demo_compare_sweep.sh
+
+# Formula trajectory replay validate (same configs twice — tests burn/cpu% consistency)
+BUILD_ANALYZER_IMAGE=true KUBE_CONTEXT=monitoring COMPARE_SWEEP_K6_DURATION=90s SQUEEZE_SETTLE_SECONDS=30 STRESS_K6_RPS=25 ./scripts/run_down_demo_formula_replay_validate.sh
+
+# Replay both arms from saved compare artifact (matched-config table)
+ARTIFACT_DIR=artifacts_with_cpu_fix/FORMULA_VS_ADVANCED_LLM/DOWN/GOOD_COST_WIN_run-1-rps25-20260604-230952 KUBE_CONTEXT=monitoring COMPARE_SWEEP_K6_DURATION=90s SQUEEZE_SETTLE_SECONDS=30 STRESS_K6_RPS=25 ./scripts/run_compare_artifact_replay_validate.sh
 
 COMPARE FORMULA VS LLM (up_demo — 1 repl @ 50m/25Mi, HPA max=1)
 BUILD_ANALYZER_IMAGE=true COMPARE_SWEEP_RPS=220 COMPARE_SWEEP_ROUNDS=1 ./scripts/run_up_demo_compare_sweep.sh

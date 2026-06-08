@@ -72,6 +72,45 @@ def experiment_to_boundary(exp_path: Path) -> dict:
     }
 
 
+def compare_engineer_vs_advanced(
+    engineer_experiment: Path,
+    advanced_boundary: Path,
+    *,
+    scenario: str = "up_demo",
+    rps: int | None = None,
+    engineer_data: str | None = None,
+    advanced_data: str | None = None,
+) -> str:
+    """Engineer B1 (single experiment.json) vs advanced-llm squeeze boundary."""
+    text = compare_static_vs_llm(
+        engineer_experiment,
+        advanced_boundary,
+        label_static="engineer",
+        label_llm="advanced-llm",
+        rps=rps,
+        scenario=scenario,
+        static_sweep=engineer_data,
+        llm_sweep=advanced_data,
+    )
+    return text.replace(
+        "# Static baseline vs LLM squeeze comparison",
+        "# Engineer baseline vs advanced LLM squeeze comparison",
+        1,
+    ).replace(
+        "- **Static**: thin deployment YAML + HPA (1–5 replicas); one k6 pass; no squeeze apply loop.",
+        (
+            f"- **Engineer (B1)**: fat deployment "
+            f"(`robot-shop-web-deployment.baseline.yaml`: 5×150m/75Mi) + HPA; "
+            f"one k6 pass at fixed RPS; no squeeze (`{scenario}`)."
+        ),
+        1,
+    ).replace(
+        "- **LLM**: iterative squeeze until SLO-safe minimum cost (`cost-effective-boundary.json`).",
+        "- **Advanced LLM**: iterative squeeze with full telemetry + guards (`cost-effective-boundary.json`).",
+        1,
+    )
+
+
 def compare_static_vs_llm(
     static_experiment: Path,
     llm_boundary: Path,
@@ -79,6 +118,7 @@ def compare_static_vs_llm(
     label_static: str = "static",
     label_llm: str = "llm",
     rps: int | None = None,
+    scenario: str = "up_demo",
     static_sweep: str | None = None,
     llm_sweep: str | None = None,
 ) -> str:
@@ -103,7 +143,7 @@ def compare_static_vs_llm(
 
     header = ["# Static baseline vs LLM squeeze comparison", ""]
     if rps is not None:
-        header.append(f"- **Target RPS**: {rps} (`up_demo`)")
+        header.append(f"- **Target RPS**: {rps} (`{scenario}`)")
     header.append(
         "- **Static**: thin deployment YAML + HPA (1–5 replicas); one k6 pass; no squeeze apply loop."
     )

@@ -152,6 +152,67 @@ def get_config_from_yaml(deployment_path: Path, hpa_path: Path) -> dict:
     return config
 
 
+def apply_config_to_managed_yaml(
+    config: dict,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+) -> None:
+    """Write deployment/HPA CPU, memory, replicas from an experiment config block."""
+    if not deployment_yaml_path.is_file():
+        raise FileNotFoundError(deployment_yaml_path)
+    dep_doc = yaml.safe_load(deployment_yaml_path.read_text())
+    if not isinstance(dep_doc, dict) or dep_doc.get("kind") != "Deployment":
+        raise ValueError(f"Not a Deployment: {deployment_yaml_path}")
+    hpa_doc = None
+    if hpa_yaml_path.is_file():
+        hpa_doc = yaml.safe_load(hpa_yaml_path.read_text())
+
+    cpu_req = int(config.get("cpu_request_m") or 0)
+    cpu_lim = int(config.get("cpu_limit_m") or cpu_req)
+    mem_req = int(config.get("mem_request_mib") or 0)
+    mem_lim = int(config.get("mem_limit_mib") or mem_req)
+    repl = max(1, int(config.get("deployment_replicas") or 1))
+
+    spec = dep_doc.setdefault("spec", {})
+    spec["replicas"] = repl
+    tmpl = spec.setdefault("template", {}).setdefault("spec", {})
+    containers = tmpl.get("containers") or []
+    if not containers:
+        raise ValueError(f"No containers in {deployment_yaml_path}")
+    c0 = containers[0]
+    res = c0.setdefault("resources", {})
+    req = res.setdefault("requests", {})
+    lim = res.setdefault("limits", {})
+    req["cpu"] = format_cpu_millicores(cpu_req)
+    lim["cpu"] = format_cpu_millicores(cpu_lim)
+    req["memory"] = format_memory_mib(mem_req)
+    lim["memory"] = format_memory_mib(mem_lim)
+
+    dump_kw = {
+        "default_flow_style": False,
+        "sort_keys": False,
+        "allow_unicode": True,
+    }
+    deployment_yaml_path.write_text(yaml.safe_dump(dep_doc, **dump_kw))
+
+    hpa_cfg = config.get("hpa") or {}
+    if isinstance(hpa_doc, dict) and hpa_doc.get("kind") == "HorizontalPodAutoscaler":
+        hspec = hpa_doc.setdefault("spec", {})
+        min_r = max(1, int(hpa_cfg.get("min_replicas") or repl))
+        max_r = max(min_r, int(hpa_cfg.get("max_replicas") or repl))
+        hspec["minReplicas"] = min(min_r, repl)
+        hspec["maxReplicas"] = min(max_r, repl)
+        target = int(hpa_cfg.get("target_cpu_util_pct") or 60)
+        metrics = hspec.setdefault("metrics", [])
+        if metrics and isinstance(metrics[0], dict):
+            res_m = metrics[0].setdefault("resource", {})
+            res_m["name"] = "cpu"
+            tgt = res_m.setdefault("target", {})
+            tgt["type"] = "Utilization"
+            tgt["averageUtilization"] = target
+        hpa_yaml_path.write_text(yaml.safe_dump(hpa_doc, **dump_kw))
+
+
 def from_k6_summary(
     summary: dict, slo: dict | None = None, workload: dict | None = None
 ) -> tuple[dict, dict]:
@@ -203,10 +264,18 @@ def squeeze_cpu_util_fail_pct() -> float:
     return float(os.environ.get("SQUEEZE_CPU_UTIL_FAIL_PCT", "95"))
 
 
+def squeeze_cpu_util_gate_field() -> str:
+    """Metric used for squeeze CPU PASS/FAIL gate: request (HPA-aligned) or limit."""
+    gate = os.environ.get("SQUEEZE_CPU_UTIL_GATE", "request").strip().lower()
+    return "cpu_util_pct" if gate == "limit" else "cpu_util_request_pct"
+
+
 def apply_squeeze_cpu_util_failure(payload: dict) -> None:
     """
     In squeeze mode, high CPU utilization ends the PASS frontier (same class as p95 SLO breach).
     Requires trustworthy Prometheus telemetry.
+    Default gate uses request-relative cpu_util_request_pct (HPA-aligned).
+    Set SQUEEZE_CPU_UTIL_GATE=limit to restore limit-relative behavior.
     """
     if payload.get("mode") != "squeeze":
         return
@@ -217,7 +286,8 @@ def apply_squeeze_cpu_util_failure(payload: dict) -> None:
     tel = observed.get("telemetry") or {}
     if not tel.get("utilization_trustworthy"):
         return
-    cpu = float(observed.get("cpu_util_pct") or 0.0)
+    field = squeeze_cpu_util_gate_field()
+    cpu = float(observed.get(field) or observed.get("cpu_util_pct") or 0.0)
     threshold = squeeze_cpu_util_fail_pct()
     if cpu > threshold:
         failure["failed"] = True

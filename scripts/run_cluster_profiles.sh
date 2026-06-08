@@ -540,6 +540,23 @@ run_out.joinpath('comparison.md').write_text(
       log "PVC sync done (${reason}, layout=thin, compare): ${run_out}"
       fi
     fi
+  elif [[ -n "${STRESS_RESULTS_SUBDIR:-}" && -d "${COPIED_ROOT}/${STRESS_RESULTS_SUBDIR}" ]]; then
+    local sub_src sub_base run_out
+    sub_src="$(latest_numbered_run_dir "${COPIED_ROOT}/${STRESS_RESULTS_SUBDIR}")"
+    if [[ -n "${sub_src}" ]]; then
+      sub_base="$(basename "${STRESS_RESULTS_SUBDIR}")"
+      run_out="${RESULTS_DEST}/${sub_base}"
+      rm -rf "${run_out}"
+      cp -R "${sub_src}" "${run_out}"
+      if [[ -f "${COPIED_ROOT}/${STRESS_RESULTS_SUBDIR}/replay-comparison.md" ]]; then
+        cp "${COPIED_ROOT}/${STRESS_RESULTS_SUBDIR}/replay-comparison.md" "${run_out}/"
+      fi
+      log "PVC sync done (${reason}, layout=thin, subdir=${STRESS_RESULTS_SUBDIR}): ${run_out}"
+    else
+      log "WARNING: ${STRESS_RESULTS_SUBDIR} present but no run-* under ${COPIED_ROOT}/${STRESS_RESULTS_SUBDIR}"
+    fi
+  elif [[ -n "${STRESS_RESULTS_SUBDIR:-}" ]]; then
+    log "WARNING: expected PVC subdir ${STRESS_RESULTS_SUBDIR} but nothing to sync (no stale llm fallback)"
   elif [[ -d "${COPIED_ROOT}/squeeze-compare-llm" ]]; then
     LLM_SRC="$(latest_numbered_run_dir "${COPIED_ROOT}/squeeze-compare-llm")"
     if [[ -n "${LLM_SRC}" ]]; then
@@ -596,7 +613,11 @@ if [[ "${SYNC_PVC_ONLY}" == "true" ]]; then
   sync_results_pvc_to_local "sync_pvc_only"
   exit 0
 fi
-set -- "${PROFILE_ARGS[@]}"
+if ((${#PROFILE_ARGS[@]} > 0)); then
+  set -- "${PROFILE_ARGS[@]}"
+else
+  set --
+fi
 
 reset_managed_web_yaml_to_baseline() {
   cp "${BASELINE_DEPLOYMENT_YAML}" "${DEPLOYMENT_YAML}"
@@ -720,6 +741,12 @@ for profile in "${PROFILE_LIST[@]}"; do
   fi
   job_name="stress-analyzer-${p_job}"
   job_log="${LOG_DIR}/${job_name}.log"
+  # down_demo and up_demo share the analyzer PVC; never run both jobs at once.
+  for stale_job in stress-analyzer-down-demo stress-analyzer-up-demo; do
+    if [[ "${stale_job}" != "${job_name}" ]]; then
+      kubectl -n "${NAMESPACE}" delete job "${stale_job}" --ignore-not-found >/dev/null 2>&1 || true
+    fi
+  done
   log "launch profile=${p} job=${job_name}"
   PROFILE="${p}" \
   ANALYZER_SCRIPT="${ANALYZER_SCRIPT}" \

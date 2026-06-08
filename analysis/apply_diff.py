@@ -372,6 +372,46 @@ def wait_rollout(
     )
 
 
+def _squeeze_env_truthy(name: str, *, default: str = "1") -> bool:
+    return os.environ.get(name, default).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
+def rollout_restart_deployment(
+    *,
+    deployment_name: str,
+    namespace: str,
+    timeout_s: int | None = None,
+) -> None:
+    """Replace all pods for a deployment (fresh containers for observe k6)."""
+    if timeout_s is None:
+        timeout_s = int(os.environ.get("SQUEEZE_ROLLOUT_TIMEOUT_S", "300"))
+    print(
+        f"[squeeze] rollout restart deployment/{deployment_name} in ns/{namespace}...",
+        flush=True,
+    )
+    subprocess.run(
+        [
+            "kubectl",
+            "-n",
+            namespace,
+            "rollout",
+            "restart",
+            f"deployment/{deployment_name}",
+        ],
+        check=True,
+    )
+    wait_rollout(
+        deployment_name=deployment_name,
+        namespace=namespace,
+        timeout_s=timeout_s,
+    )
+
+
 def _replica_steady_checks() -> int:
     try:
         n = int(os.environ.get("SQUEEZE_REPLICA_STEADY_CHECKS", "3"))
@@ -446,6 +486,40 @@ def squeeze_yaml_live_replica_drift(
     return False
 
 
+def prepare_squeeze_observe_before_k6(
+    *,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+    deployment_name: str,
+    namespace: str,
+    timeout_s: int | None = None,
+) -> int:
+    """Pin replicas, optionally rollout-restart all pods, wait steady before observe k6."""
+    target = pin_observe_replicas_before_k6(
+        deployment_yaml_path=deployment_yaml_path,
+        hpa_yaml_path=hpa_yaml_path,
+        deployment_name=deployment_name,
+        namespace=namespace,
+        timeout_s=timeout_s,
+    )
+    if target < 1:
+        return target
+    if _squeeze_env_truthy("SQUEEZE_ROLLOUT_RESTART_BEFORE_OBSERVE"):
+        rollout_restart_deployment(
+            deployment_name=deployment_name,
+            namespace=namespace,
+            timeout_s=timeout_s,
+        )
+        wait_for_deployment_replicas(
+            deployment_name=deployment_name,
+            namespace=namespace,
+            yaml_replicas=target,
+            timeout_s=timeout_s or int(os.environ.get("SQUEEZE_ROLLOUT_TIMEOUT_S", "300")),
+            steady_checks=max(3, _replica_steady_checks()),
+        )
+    return target
+
+
 def ensure_squeeze_cluster_ready_before_k6(
     *,
     deployment_yaml_path: Path,
@@ -454,36 +528,79 @@ def ensure_squeeze_cluster_ready_before_k6(
     namespace: str,
     timeout_s: int = 300,
 ) -> None:
-    """Block until live replicas match managed YAML (preflight before k6)."""
+    """Pin deployment+HPA, restart pods, wait steady before observe k6."""
+    prepare_squeeze_observe_before_k6(
+        deployment_yaml_path=deployment_yaml_path,
+        hpa_yaml_path=hpa_yaml_path,
+        deployment_name=deployment_name,
+        namespace=namespace,
+        timeout_s=timeout_s,
+    )
+
+
+def pin_observe_replicas_before_k6(
+    *,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+    deployment_name: str,
+    namespace: str,
+    timeout_s: int | None = None,
+) -> int:
+    """Pin live deployment+HPA to yaml spec.replicas (min=max) before observe/replay k6.
+
+    Prevents HPA scale-up during settle/load so replay measures the saved config.
+    Returns the pinned replica target.
+    """
     if os.environ.get("SQUEEZE_WAIT_REPLICAS_STEADY", "1").strip().lower() not in (
         "1",
         "true",
         "yes",
         "on",
     ):
-        return
+        return read_yaml_target_replicas(deployment_yaml_path)
     target = read_yaml_target_replicas(deployment_yaml_path)
     if target < 1:
-        return
-    if hpa_yaml_path.exists():
-        hpa_name = f"{deployment_name}-hpa"
-        _kubectl_patch_hpa_replica_cap(
-            hpa_name=hpa_name,
-            namespace=namespace,
-            max_replicas=target,
-        )
-    if not squeeze_yaml_live_replica_drift(
-        deployment_yaml_path,
-        deployment_name=deployment_name,
-        namespace=namespace,
-    ):
-        print(
-            f"[squeeze] pre-k6 ready: live replicas match yaml target={target}.",
-            flush=True,
-        )
-        return
+        return target
+    if timeout_s is None:
+        timeout_s = int(os.environ.get("SQUEEZE_ROLLOUT_TIMEOUT_S", "300"))
+    hpa_name = f"{deployment_name}-hpa"
+    pin = json.dumps({"spec": {"maxReplicas": target, "minReplicas": target}})
+    subprocess.run(
+        [
+            "kubectl",
+            "-n",
+            namespace,
+            "patch",
+            "hpa",
+            hpa_name,
+            "--type=merge",
+            "-p",
+            pin,
+        ],
+        check=True,
+    )
     print(
-        f"[squeeze] pre-k6 drift: yaml spec.replicas={target} != live; waiting...",
+        f"[squeeze] pinned hpa/{hpa_name} minReplicas=maxReplicas={target}",
+        flush=True,
+    )
+    # Use deployment patch (RBAC: patch/update) — not `kubectl scale` (scale subresource).
+    dep_patch = json.dumps({"spec": {"replicas": target}})
+    subprocess.run(
+        [
+            "kubectl",
+            "-n",
+            namespace,
+            "patch",
+            "deployment",
+            deployment_name,
+            "--type=merge",
+            "-p",
+            dep_patch,
+        ],
+        check=True,
+    )
+    print(
+        f"[squeeze] patched deployment/{deployment_name} spec.replicas={target}",
         flush=True,
     )
     wait_for_deployment_replicas(
@@ -491,7 +608,9 @@ def ensure_squeeze_cluster_ready_before_k6(
         namespace=namespace,
         yaml_replicas=target,
         timeout_s=timeout_s,
+        steady_checks=max(3, _replica_steady_checks()),
     )
+    return target
 
 
 def wait_for_deployment_replicas(

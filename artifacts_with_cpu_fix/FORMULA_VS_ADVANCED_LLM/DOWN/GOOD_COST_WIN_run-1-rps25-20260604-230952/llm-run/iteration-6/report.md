@@ -1,0 +1,7 @@
+- Observed CPU utilization at 41.7% and memory utilization at 14.5%, indicating over-provisioning with a cost score of 0.2562.
+- SLO metrics show a pass with p95 latency at 5ms, significantly below the SLO target of 500ms, reflecting acceptable performance.
+- Since the deployment has 3 replicas, it is deemed over-replicated given the low utilization and cost score.
+- A drop in one replica is required to align with efficiency goals, in addition to a modest reduction in resource requests to maintain balance.
+- The current HPA maxReplicas also needs to be reduced to match the adjusted replicas in the deployment for proper scaling behavior.
+- Cost optimization is the primary focus due to the need to minimize waste while ensuring stable performance.
+- Next steps involve restructuring the YAML files to reflect the changes and re-running the workload to validate performance against the updated resource allocation.

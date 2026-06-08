@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -24,6 +25,12 @@ from .prompts import (
     VANILLA_LLM_SQUEEZE_PROMPT,
 )
 from .results_paths import results_dir as _results_dir_for_repo
+from .compare_shared_measure import (
+    MEASURED_DEPLOYMENT_YAML,
+    MEASURED_HPA_YAML,
+    load_measured_yaml_for_prompt,
+    load_shared_canonical_overrides,
+)
 from .scaling_policy import attach_scaling_hint
 
 def _results_base() -> Path:
@@ -397,6 +404,16 @@ def _llm_vanilla_squeeze() -> bool:
     )
 
 
+def _squeeze_until_violation_active() -> bool:
+    """True when squeeze must run until a real FAIL (first_fail), not stop at best_pass."""
+    return os.environ.get("SQUEEZE_UNTIL_VIOLATION", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def _llm_squeeze_down_boundary_active(experiment: dict) -> bool:
     """True when LLM squeeze is seeking the DOWN cost-effective boundary (compare / down_demo)."""
     if os.environ.get("SQUEEZE_LLM_DOWN_BOUNDARY", "1").strip().lower() in (
@@ -535,7 +552,11 @@ def _apply_down_boundary_stop(
     deployment_yaml_path: Path,
     hpa_yaml_path: Path,
 ) -> bool:
-    """Clear DOWN YAML when hot at ≤2 pods so the squeeze loop stops at best_pass."""
+    """Clear DOWN YAML when hot at ≤2 pods so the squeeze loop stops at best_pass.
+
+    When SQUEEZE_UNTIL_VIOLATION is on (DOWN compare sweeps), do not stop early —
+    keep nudging resources down until experiment_build records first_fail.
+    """
     if not _llm_at_down_boundary_stop(experiment):
         if (
             _llm_live_replicas(experiment) <= 2
@@ -554,6 +575,20 @@ def _apply_down_boundary_stop(
                 )
                 result["evidence"] = ev
                 return True
+        return False
+    if _squeeze_until_violation_active():
+        if not (result.get("deployment_yaml_new") or "").strip():
+            _pure_llm_resource_nudge(
+                result, experiment, deployment_yaml_path, hpa_yaml_path
+            )
+        if (result.get("deployment_yaml_new") or "").strip():
+            ev = list(result.get("evidence") or [])
+            ev.append(
+                f"guard.hot_boundary_continue_until_violation: live={_llm_live_replicas(experiment)} "
+                f"max_util={_llm_max_util_pct(experiment):.0f}%"
+            )
+            result["evidence"] = ev
+            return True
         return False
     result["deployment_yaml_new"] = ""
     result["hpa_yaml_new"] = ""
@@ -1346,6 +1381,33 @@ def _resolve_squeeze_optimizer(meta: dict | None, experiment_config: dict | None
     if opt not in {"hybrid", "formula", "llm", "hpa"}:
         opt = "hybrid"
     return opt
+
+
+def _replay_observe_result(experiment: dict) -> dict:
+    """Replay arm: same config re-tested; metrics only, no optimizer."""
+    obs = experiment.get("observed") or {}
+    cfg = experiment.get("config") or {}
+    slo = _slo_status_from_experiment(experiment)
+    failed = bool((experiment.get("failure") or {}).get("failed"))
+    burn = obs.get("cpu_usage_avg_m")
+    cpu_pct = obs.get("cpu_util_request_pct")
+    lines = [
+        "## Replay observe-only",
+        "",
+        "- **Optimizer**: replay (no YAML change; config applied before k6).",
+        f"- **SLO**: {slo}; failed={failed}",
+        f"- **Config**: {cfg.get('cpu_request_m')}m CPU, {cfg.get('mem_request_mib')} MiB, "
+        f"{cfg.get('deployment_replicas')} repl",
+        f"- **cpu_usage_avg_m**: {burn}; **cpu_util_request_pct**: {cpu_pct}",
+    ]
+    return {
+        "report": "\n".join(lines),
+        "deployment_yaml_new": "",
+        "hpa_yaml_new": "",
+        "failure_archetype": (experiment.get("failure") or {}).get("reason") or "none",
+        "optimization_headroom": "NONE",
+        "evidence": ["optimizer.replay_observe"],
+    }
 
 
 def _hpa_only_result(experiment: dict) -> dict:
@@ -2234,12 +2296,15 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
                 pass
 
     deployment_yaml_path, hpa_yaml_path = _resolve_yaml_paths(meta)
+    canonical = load_shared_canonical_overrides(run_dir)
     _log(
         f"run_analysis_start run_dir={run_dir} deployment_yaml={deployment_yaml_path} "
-        f"hpa_yaml={hpa_yaml_path}"
+        f"hpa_yaml={hpa_yaml_path} shared_canonical={bool(canonical)}"
     )
     k6_path = run_dir / "k6-run-summary.json"
     config = get_config_from_yaml(deployment_yaml_path, hpa_yaml_path)
+    if canonical and canonical.get("config"):
+        config = {**config, **canonical["config"]}
 
     experiment_config = None
     if meta is not None and (
@@ -2329,11 +2394,33 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
     observed_override = None
     start_ts = None
     end_ts = None
+    if canonical:
+        meta = meta or {}
+        if canonical.get("start_ts") is not None:
+            meta["start_ts"] = canonical["start_ts"]
+        if canonical.get("end_ts") is not None:
+            meta["end_ts"] = canonical["end_ts"]
+        frozen_observed = canonical.get("observed")
+        if isinstance(frozen_observed, dict):
+            observed_override = dict(frozen_observed)
+            _log(
+                "shared_reanalyze_frozen_observed "
+                f"burn={observed_override.get('cpu_usage_avg_m')} "
+                f"cpu_util_request_pct={observed_override.get('cpu_util_request_pct')}"
+            )
+        if canonical.get("config"):
+            experiment_config = experiment_config or {}
+            experiment_config["config"] = canonical["config"]
     if meta is not None:
         start_ts = meta.get("start_ts")
         end_ts = meta.get("end_ts")
         use_prom = meta.get("prometheus", True)
-        if use_prom and start_ts is not None and end_ts is not None:
+        if (
+            observed_override is None
+            and use_prom
+            and start_ts is not None
+            and end_ts is not None
+        ):
             from .prometheus_collect import get_prometheus_observed
 
             hpa_cfg = config.get("hpa") or {}
@@ -2347,6 +2434,7 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
                 namespace=meta.get("k8s_namespace") or "default",
                 deployment_name=meta.get("k8s_deployment") or "stress-service",
                 prometheus_url=meta.get("prometheus_url") or DEFAULT_PROMETHEUS_URL,
+                cpu_request_m=int(config.get("cpu_request_m") or 0),
                 cpu_limit_m=config.get("cpu_limit_m") or 500,
                 mem_limit_mib=config.get("mem_limit_mib") or 256,
                 deployment_replicas=int(config.get("deployment_replicas") or 0),
@@ -2418,7 +2506,7 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
     mode_flag = (meta or {}).get("mode")
     use_efficiency = analysis_goal == "efficiency" or mode_flag == "squeeze"
     user_mode = "squeeze" if use_efficiency else "failure"
-    if user_mode == "squeeze" and squeeze_opt != "hpa":
+    if user_mode == "squeeze" and squeeze_opt not in {"hpa", "replay"}:
         obs = exp_data.get("observed") or {}
         tel = (obs.get("telemetry") or {})
         if tel.get("utilization_trustworthy"):
@@ -2439,12 +2527,16 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
                 cfg = get_config_from_yaml(deployment_yaml_path, hpa_yaml_path)
                 exp_data["config"] = cfg
                 _log("yaml_live_sync " + "; ".join(sync_notes))
-    yaml_str = load_current_yaml(deployment_yaml_path, hpa_yaml_path)
+    measured_yaml = load_measured_yaml_for_prompt(run_dir) if canonical else None
+    yaml_str = measured_yaml or load_current_yaml(deployment_yaml_path, hpa_yaml_path)
     user_prompt = build_user_prompt(exp_data, yaml_str, mode=user_mode)
 
     if use_efficiency and squeeze_opt == "hpa":
         _log("hpa_only_observe mode=squeeze (no LLM/formula YAML)")
         result = _hpa_only_result(exp_data)
+    elif use_efficiency and squeeze_opt == "replay":
+        _log("replay_observe mode=squeeze (no optimizer YAML)")
+        result = _replay_observe_result(exp_data)
     elif use_efficiency and squeeze_opt == "formula":
         _log(
             f"formula_optimizer_step mode={user_mode} analysis_goal={analysis_goal} "
@@ -2510,6 +2602,10 @@ def write_outputs(
 
     report = _coerce_report_markdown(result.get("report", ""))
     _normalize_llm_yaml_fields(result)
+    if deployment_yaml_path.exists():
+        shutil.copy2(deployment_yaml_path, run_dir / MEASURED_DEPLOYMENT_YAML)
+    if hpa_yaml_path.exists():
+        shutil.copy2(hpa_yaml_path, run_dir / MEASURED_HPA_YAML)
     deployment_yaml_new = (result.get("deployment_yaml_new") or "").strip()
     hpa_yaml_new = (result.get("hpa_yaml_new") or "").strip()
 

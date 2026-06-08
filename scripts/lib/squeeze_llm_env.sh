@@ -13,8 +13,8 @@ apply_llm_squeeze_env() {
   export SQUEEZE_LLM_P95_REGRESSION_RATIO="${SQUEEZE_LLM_P95_REGRESSION_RATIO:-99}"
   # After DOWN apply, wait until ready replicas match spec (avoids k6 on stale pod count).
   export SQUEEZE_WAIT_REPLICAS_STEADY="${SQUEEZE_WAIT_REPLICAS_STEADY:-1}"
-  # Off by default in pure LLM runs — probe uses fixed % cuts (formula-like).
-  export SQUEEZE_UNTIL_VIOLATION_PROBE_LLM="${SQUEEZE_UNTIL_VIOLATION_PROBE_LLM:-0}"
+  # When LLM returns empty diff before first_fail, apply a small deterministic DOWN step.
+  export SQUEEZE_UNTIL_VIOLATION_PROBE_LLM="${SQUEEZE_UNTIL_VIOLATION_PROBE_LLM:-1}"
   # Pure LLM: resource-first phase before replica cuts (Python vetoes only).
   export SQUEEZE_LLM_REPLICA_CPU_REQUEST_CEILING_M="${SQUEEZE_LLM_REPLICA_CPU_REQUEST_CEILING_M:-100}"
   export SQUEEZE_LLM_MIN_RESOURCE_PASSES_BEFORE_REPLICA="${SQUEEZE_LLM_MIN_RESOURCE_PASSES_BEFORE_REPLICA:-2}"

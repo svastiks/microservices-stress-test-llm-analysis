@@ -1,0 +1,66 @@
+[2026-06-06 00:37:29] [compare-sweep] sweep artifacts root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260606-003729
+[2026-06-06 00:37:29] [compare-sweep] mode=rps_overrides profile=down_demo rounds=1: rps=25
+[2026-06-06 00:37:29] [compare-sweep] all rounds write under RESULTS_DEST=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260606-003729 (local run-1..run-N per sweep round; cluster PVC still run-1 per job)
+[2026-06-06 00:37:29] [compare-sweep] === round 1/1 profile=down_demo STRESS_K6_RPS=25 (compare) ===
+[2026-06-06 00:37:29] [compare-sweep] squeeze env: until_violation=true max_iter=16 formula_max=16 formula_uv=1
+[2026-06-06 00:37:29] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-06 00:37:29] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-06 00:37:29] [cluster-run] switching context to: monitoring
+[2026-06-06 00:37:30] [cluster-run] context: monitoring
+[2026-06-06 00:37:30] [cluster-run] namespace: svastik
+[2026-06-06 00:37:30] [cluster-run] profiles: down_demo
+[2026-06-06 00:37:30] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-06 00:37:30] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-06 00:37:30] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-06 00:37:30] [cluster-run] build_analyzer_image: true
+[2026-06-06 00:37:30] [cluster-run] stream_job_logs: true
+[2026-06-06 00:37:30] [cluster-run] cleanup_completed_jobs: true
+[2026-06-06 00:37:30] [cluster-run] cleanup_terminal_pods: true
+[2026-06-06 00:37:30] [cluster-run] cleanup_failed_jobs: true
+[2026-06-06 00:37:30] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-06 00:37:30] [cluster-run] up_demo_stabilize_user: true
+[2026-06-06 00:37:30] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-06 00:37:30] [cluster-run] results_pvc_snapshots: false
+[2026-06-06 00:37:30] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-06 00:37:30] [cluster-run] results_stamped_comparison_md: false
+[2026-06-06 00:37:30] [cluster-run] compare_sweep_round: 1
+[2026-06-06 00:37:30] [cluster-run] extra args for analyzer job: --compare-squeeze-optimizers
+[2026-06-06 00:37:30] [cluster-run] building and pushing analyzer image: docker.io/svastik/microservices-stress-analyzer:latest
+ERROR: Cannot connect to the Docker daemon at unix:///Users/svastik/.docker/run/docker.sock. Is the docker daemon running?
+[2026-06-06 00:37:31] [cluster-run] ERROR at line 630; exit_code=1
+[2026-06-06 00:37:32] [compare-sweep] ERROR: round 1 failed — partial data may exist under /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260606-003729
+[2026-06-06 00:37:32] [compare-sweep] round 1: local bundle missing — copying PVC to /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260606-003729/run-1 before next round
+[2026-06-06 00:37:32] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-06 00:37:32] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-06 00:37:32] [cluster-run] switching context to: monitoring
+[2026-06-06 00:37:32] [cluster-run] context: monitoring
+[2026-06-06 00:37:32] [cluster-run] namespace: svastik
+[2026-06-06 00:37:32] [cluster-run] profiles: down_demo
+[2026-06-06 00:37:32] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-06 00:37:32] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-06 00:37:32] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-06 00:37:32] [cluster-run] build_analyzer_image: true
+[2026-06-06 00:37:32] [cluster-run] stream_job_logs: true
+[2026-06-06 00:37:32] [cluster-run] cleanup_completed_jobs: true
+[2026-06-06 00:37:32] [cluster-run] cleanup_terminal_pods: true
+[2026-06-06 00:37:32] [cluster-run] cleanup_failed_jobs: true
+[2026-06-06 00:37:32] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-06 00:37:32] [cluster-run] up_demo_stabilize_user: true
+[2026-06-06 00:37:32] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-06 00:37:32] [cluster-run] results_pvc_snapshots: false
+[2026-06-06 00:37:32] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-06 00:37:32] [cluster-run] results_stamped_comparison_md: false
+[2026-06-06 00:37:32] [cluster-run] compare_sweep_round: 1
+[2026-06-06 00:37:32] [cluster-run] extra args for analyzer job: --sync-pvc-only
+[2026-06-06 00:37:32] [cluster-run] copy results PVC to local /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260606-003729 (sync_pvc_only) ...
+tar: removing leading '/' from member names
+[2026-06-06 00:37:38] [cluster-run] wrote comparison.md from bundled boundary JSON (formula vs llm)
+[2026-06-06 00:37:38] [cluster-run] PVC sync done (sync_pvc_only, layout=thin, compare): /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260606-003729/run-1
+[2026-06-06 00:38:10] [compare-sweep] round 1: local bundle saved at /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260606-003729/run-1
+[2026-06-06 00:38:10] [compare-sweep] sweep finished with failures

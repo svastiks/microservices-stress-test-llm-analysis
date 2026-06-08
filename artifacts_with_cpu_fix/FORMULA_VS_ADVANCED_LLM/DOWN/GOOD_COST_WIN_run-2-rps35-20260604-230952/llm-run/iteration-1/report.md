@@ -1,0 +1,8 @@
+- Initially observed 5 replicas with CPU utilization at 24% and memory utilization at 14%, indicating over-provisioning.
+- Cost score of 0.7116 suggests higher resource costs compared to optimal usage, warranting a scale-down.
+- Given the SLO passed with low utilization, a replica reduction is necessary while also trimming CPU and memory allocations.
+- Following mandatory FAT-START conditions, reducing replicas from 5 to 4 is required with a proportional decrease of CPU and memory requests and limits.
+- New resource requests and limits have been calculated to be conservatively 15% lower than current values to ensure efficient operation.
+- Updated HPA maxReplicas to match new deployment replicas at 4.
+- This step aims to balance cost-effectiveness while maintaining performance standards.
+- Following this adjustment, further monitoring is recommended to ensure SLO compliance remains intact.

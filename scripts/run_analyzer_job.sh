@@ -17,6 +17,7 @@ COMPARE_SQUEEZE_OPTIMIZERS="${COMPARE_SQUEEZE_OPTIMIZERS:-false}"
 COMPARE_HPA_VS_LLM="${COMPARE_HPA_VS_LLM:-false}"
 COMPARE_ADVANCED_VS_VANILLA_LLM="${COMPARE_ADVANCED_VS_VANILLA_LLM:-false}"
 STATIC_BASELINE="${STATIC_BASELINE:-false}"
+REPLAY_TRAJECTORY="false"
 SQUEEZE_FINAL_REPORT_LLM="${SQUEEZE_FINAL_REPORT_LLM:-false}"
 
 for arg in "$@"; do
@@ -32,6 +33,9 @@ for arg in "$@"; do
   if [[ "${arg}" == "--static-baseline" ]]; then
     STATIC_BASELINE="true"
   fi
+  if [[ "${arg}" == "--replay-trajectory" ]]; then
+    REPLAY_TRAJECTORY="true"
+  fi
 done
 _compare_count=0
 [[ "${COMPARE_SQUEEZE_OPTIMIZERS}" == "true" ]] && _compare_count=$((_compare_count + 1))
@@ -43,6 +47,14 @@ if (( _compare_count > 1 )); then
 fi
 if [[ "${STATIC_BASELINE}" == "true" && "${_compare_count}" -gt 0 ]]; then
   echo "[analyzer] --static-baseline cannot be combined with compare flags" >&2
+  exit 1
+fi
+if [[ "${REPLAY_TRAJECTORY}" == "true" && "${_compare_count}" -gt 0 ]]; then
+  echo "[analyzer] --replay-trajectory cannot be combined with compare flags" >&2
+  exit 1
+fi
+if [[ "${REPLAY_TRAJECTORY}" == "true" && "${STATIC_BASELINE}" == "true" ]]; then
+  echo "[analyzer] --replay-trajectory cannot be combined with --static-baseline" >&2
   exit 1
 fi
 SUT_BASE_URL="${SUT_BASE_URL:-http://web.${NAMESPACE}.svc.cluster.local:8080}"
@@ -243,6 +255,48 @@ elif [[ "${COMPARE_ADVANCED_VS_VANILLA_LLM}" == "true" ]]; then
     }
   }" -o yaml > "${MANIFEST}.tmp"
   mv "${MANIFEST}.tmp" "${MANIFEST}"
+elif [[ "${REPLAY_TRAJECTORY}" == "true" ]]; then
+  REPLAY_SOURCE_ARG="${REPLAY_SOURCE_PATH:-/app/results/squeeze-formula-source/run-1}"
+  kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
+    \"spec\":{
+      \"template\":{
+        \"spec\":{
+          \"containers\":[
+            {
+              \"name\":\"runner\",
+              \"command\":[
+                \"python3\",
+                \"start.py\",
+                \"--replay-trajectory\",
+                \"--replay-source\",
+                \"${REPLAY_SOURCE_ARG}\",
+                \"--profile\",
+                \"${PROFILE}\",
+                \"--script\",
+                \"${ANALYZER_SCRIPT}\",
+                \"--settle-seconds\",
+                \"${SQUEEZE_SETTLE_SECONDS}\",
+                \"--efficiency\",
+                \"--k8s-namespace\",
+                \"${NAMESPACE}\",
+                \"--k8s-deployment\",
+                \"web\",
+                \"--base-url\",
+                \"${SUT_BASE_URL}\",
+                \"--deployment-yaml\",
+                \"infra/k8s/spark/robot-shop-web-deployment.yaml\",
+                \"--hpa-yaml\",
+                \"infra/k8s/spark/robot-shop-web-hpa.yaml\",
+                \"--prometheus-url\",
+                \"http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090\"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }" -o yaml > "${MANIFEST}.tmp"
+  mv "${MANIFEST}.tmp" "${MANIFEST}"
 elif [[ "${STATIC_BASELINE}" == "true" ]]; then
   kubectl patch --local -f "${MANIFEST}" --type strategic -p "{
     \"spec\":{
@@ -354,6 +408,18 @@ if [[ -n "${SQUEEZE_LLM_P95_REGRESSION_RATIO:-}" ]]; then
 fi
 if [[ -n "${SQUEEZE_WAIT_REPLICAS_STEADY:-}" ]]; then
   SET_ENV_CMD+=(SQUEEZE_WAIT_REPLICAS_STEADY="${SQUEEZE_WAIT_REPLICAS_STEADY}")
+fi
+if [[ -n "${SQUEEZE_ROLLOUT_RESTART_BEFORE_OBSERVE:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_ROLLOUT_RESTART_BEFORE_OBSERVE="${SQUEEZE_ROLLOUT_RESTART_BEFORE_OBSERVE}")
+fi
+if [[ -n "${SQUEEZE_WARMUP_K6_DURATION:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_WARMUP_K6_DURATION="${SQUEEZE_WARMUP_K6_DURATION}")
+fi
+if [[ -n "${SQUEEZE_COMPARE_PAIRED_MEASURE:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_COMPARE_PAIRED_MEASURE="${SQUEEZE_COMPARE_PAIRED_MEASURE}")
+fi
+if [[ -n "${SQUEEZE_COMPARE_PAIRED_BURN_TOLERANCE_PCT:-}" ]]; then
+  SET_ENV_CMD+=(SQUEEZE_COMPARE_PAIRED_BURN_TOLERANCE_PCT="${SQUEEZE_COMPARE_PAIRED_BURN_TOLERANCE_PCT}")
 fi
 if [[ -n "${SQUEEZE_UNTIL_VIOLATION_PROBE_LLM:-}" ]]; then
   SET_ENV_CMD+=(SQUEEZE_UNTIL_VIOLATION_PROBE_LLM="${SQUEEZE_UNTIL_VIOLATION_PROBE_LLM}")

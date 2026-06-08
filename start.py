@@ -19,6 +19,7 @@ from analysis.apply_diff import (
     ensure_squeeze_cluster_ready_before_k6,
     ensure_up_demo_thin_baseline,
     kubectl_apply,
+    prepare_squeeze_observe_before_k6,
     reset_managed_web_yaml_to_baseline,
     squeeze_yaml_live_replica_drift,
     wait_rollout,
@@ -28,6 +29,22 @@ from analysis.cost_model import boundary_cost_totals
 from analysis.results_db import write_boundary, write_iteration
 from analysis.results_paths import results_dir as _results_dir_for_repo
 from analysis.verify import run_verification, write_verification_output
+from analysis.experiment_build import apply_config_to_managed_yaml
+from analysis.compare_shared_measure import (
+    SHARED_CANONICAL_EXPERIMENT_FILENAME,
+    compare_paired_measure_enabled,
+    compare_skip_iteration_1,
+    extract_shared_canonical_fields,
+    format_paired_probe_report,
+    paired_burn_delta_pct,
+    paired_burn_tolerance_pct,
+)
+from analysis.experiment_build import get_config_from_yaml
+from analysis.replay_trajectory import (
+    load_boundary_rows,
+    load_iteration_config,
+    write_replay_comparison,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent
 EXPERIMENTS_PATH = REPO_ROOT / "experiments.json"
@@ -119,16 +136,52 @@ def _validate_k6_summary_export(summary_path: Path) -> None:
         )
 
 
-def run_k6(profile_config: dict, script_name: str, base_url: str | None = None) -> int:
+def _squeeze_warmup_duration() -> str | None:
+    raw = os.environ.get("SQUEEZE_WARMUP_K6_DURATION", "60s").strip()
+    if not raw or raw.lower() in ("0", "false", "off", "no", "none", "skip"):
+        return None
+    return raw
+
+
+def _run_squeeze_warmup_k6(
+    profile_config: dict,
+    script: str,
+    base_url: str | None,
+) -> None:
+    duration = _squeeze_warmup_duration()
+    if not duration:
+        return
+    _log(f"warmup_k6 duration={duration} (metrics discarded)")
+    warmup_summary = _results_dir() / "k6-warmup-summary.json"
+    run_k6(
+        profile_config,
+        script,
+        base_url=base_url,
+        duration_override=duration,
+        summary_export=warmup_summary,
+    )
+
+
+def run_k6(
+    profile_config: dict,
+    script_name: str,
+    base_url: str | None = None,
+    *,
+    duration_override: str | None = None,
+    summary_export: Path | None = None,
+) -> int:
     """Run k6 load test. Returns k6 exit code (0 = pass, 99 = thresholds crossed)."""
     rd = _results_dir()
     rd.mkdir(parents=True, exist_ok=True)
-    summary_export = rd / "k6-summary.json"
+    if summary_export is None:
+        summary_export = rd / "k6-summary.json"
     env = os.environ.copy()
     if base_url:
         env["BASE_URL"] = base_url
     env["RPS"] = str(profile_config.get("RPS", 50))
-    env["DURATION"] = str(profile_config.get("DURATION", "60s"))
+    env["DURATION"] = str(
+        duration_override or profile_config.get("DURATION", "60s")
+    )
     slo_cfg = profile_config.get("slo") or {}
     env["SLO_P95_MS"] = str(slo_cfg.get("p95_latency_ms", 500))
     env["SLO_ERROR_RATE"] = str(slo_cfg.get("error_rate", 0.01))
@@ -256,6 +309,8 @@ def _run_once(
         f"run_start profile={profile} script={script} mode={mode} "
         f"analysis_goal={analysis_goal} prometheus={prometheus}"
     )
+    if mode == "squeeze":
+        _run_squeeze_warmup_k6(profile_config, script, base_url)
     start_ts = time.time()
     k6_exit = run_k6(profile_config, script, base_url=base_url)
     k6_snapshot = _read_k6_snapshot()
@@ -416,7 +471,11 @@ def _squeeze_row(run_dir: Path, experiment: dict, status: str) -> dict:
         "p95_ms": latency.get("p95"),
         "error_rate": observed.get("error_rate"),
         "cpu_util_pct": observed.get("cpu_util_pct"),
+        "cpu_util_request_pct": observed.get("cpu_util_request_pct"),
+        "cpu_util_request_pct_peak": observed.get("cpu_util_request_pct_peak"),
         "mem_util_pct": observed.get("mem_util_pct"),
+        "mem_util_pct_peak": observed.get("mem_util_pct_peak"),
+        "cpu_usage_avg_m": observed.get("cpu_usage_avg_m"),
         "replicas": observed.get("replicas"),
         "cpu_request_m": config.get("cpu_request_m"),
         "mem_request_mib": config.get("mem_request_mib"),
@@ -541,6 +600,422 @@ def _latest_run_root(results_parent: Path) -> Path | None:
     return best
 
 
+def _replay_trajectory_pipeline(
+    args: argparse.Namespace,
+    *,
+    base_url: str | None,
+    prometheus: bool,
+    k8s_namespace: str,
+    k8s_deployment: str,
+    analysis_goal: str,
+    deployment_yaml: str,
+    hpa_yaml: str,
+    prometheus_url: str,
+) -> int:
+    """Re-apply each source iteration config and run k6 (observe-only); compare metrics."""
+    source_raw = (
+        (getattr(args, "replay_source", None) or "")
+        or os.environ.get("REPLAY_SOURCE_PATH", "")
+    ).strip()
+    if not source_raw:
+        print("[replay] ERROR: set --replay-source or REPLAY_SOURCE_PATH", flush=True)
+        return 1
+    source_path = Path(source_raw)
+    if not source_path.is_absolute():
+        source_path = REPO_ROOT / source_path
+    try:
+        source_run, source_rows = load_boundary_rows(source_path)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"[replay] ERROR: {e}", flush=True)
+        return 1
+
+    dep_path = REPO_ROOT / deployment_yaml
+    hpa_path = REPO_ROOT / hpa_yaml
+    k8s_apply_enabled = bool(
+        k8s_namespace and k8s_deployment and deployment_yaml and hpa_yaml
+    )
+    # Match squeeze loop: skip kubectl only for external BASE_URL without k8s (Docker-only).
+    skip_kubectl_apply = bool(base_url) and not k8s_apply_enabled
+    squeeze_kubectl = k8s_apply_enabled and not skip_kubectl_apply
+
+    run_label = os.environ.get("STRESS_RESULTS_RUN_LABEL", "").strip() or _next_run_label()
+    run_root = _results_dir() / run_label
+    replay_rows: list[dict] = []
+    print(
+        f"[replay] source={source_run} iterations={len(source_rows)} "
+        f"dest={run_root}",
+        flush=True,
+    )
+
+    for i, row in enumerate(source_rows, start=1):
+        cfg = load_iteration_config(source_run, i, row)
+        apply_config_to_managed_yaml(cfg, dep_path, hpa_path)
+        from analysis.k8s_manifest import align_squeeze_hpa_to_deployment_replicas
+
+        align_squeeze_hpa_to_deployment_replicas(dep_path, hpa_path)
+        if squeeze_kubectl:
+            print(f"[replay] applying config iteration {i} ...", flush=True)
+            kubectl_apply(dep_path, hpa_path, REPO_ROOT)
+            wait_rollout(deployment_name=k8s_deployment, namespace=k8s_namespace)
+            pinned = prepare_squeeze_observe_before_k6(
+                deployment_yaml_path=dep_path,
+                hpa_yaml_path=hpa_path,
+                deployment_name=k8s_deployment,
+                namespace=k8s_namespace,
+            )
+            print(
+                f"[replay] iteration {i} observe-ready replicas={pinned}",
+                flush=True,
+            )
+        run_dir = _run_once(
+            args.profile,
+            args.script,
+            "squeeze",
+            base_url=base_url,
+            prometheus=prometheus,
+            k8s_namespace=k8s_namespace,
+            k8s_deployment=k8s_deployment,
+            analysis_goal=analysis_goal,
+            deployment_yaml=deployment_yaml,
+            hpa_yaml=hpa_yaml,
+            prometheus_url=prometheus_url,
+            settle_seconds=args.settle_seconds,
+            run_label=run_label,
+            iteration_index=i,
+            squeeze_optimizer="replay",
+        )
+        if run_dir is None:
+            print(f"[replay] ERROR: iteration {i} produced no run dir", flush=True)
+            return 1
+        status, exp = _read_experiment_status(run_dir)
+        obs = exp.get("observed") or {}
+        cfg_repl = int(cfg.get("deployment_replicas") or 0)
+        obs_repl = int(obs.get("replicas") or 0)
+        if cfg_repl and obs_repl and cfg_repl != obs_repl:
+            print(
+                f"[replay] WARNING iteration {i}: config replicas={cfg_repl} "
+                f"!= observed={obs_repl} (replay may be invalid)",
+                flush=True,
+            )
+        replay_rows.append(_squeeze_row(run_dir, exp, status))
+        print(
+            f"[replay] iteration {i} {status} repl={obs_repl} "
+            f"cpu%={obs.get('cpu_util_request_pct')} burn={obs.get('cpu_usage_avg_m')}",
+            flush=True,
+        )
+
+    _write_squeeze_summary(
+        replay_rows,
+        run_root=run_root,
+        best_pass_dir=None,
+        first_fail_dir=None,
+        stopped_reason="replay_complete",
+        squeeze_optimizer="replay",
+    )
+    out = write_replay_comparison(source_run, run_root)
+    print(f"[replay] comparison written to {out}", flush=True)
+    return 0
+
+
+def _compare_paired_run_dir(results_parent: Path, pair_id: str) -> Path | None:
+    """Resolve the compare arm run dir for this job's paired label (not highest run-*)."""
+    run_dir = results_parent / pair_id
+    return run_dir if run_dir.is_dir() else None
+
+
+def _run_observe_probe_measure(
+    *,
+    profile: str,
+    script: str,
+    base_url: str | None,
+    prometheus: bool,
+    k8s_namespace: str,
+    k8s_deployment: str,
+    deployment_yaml: str,
+    hpa_yaml: str,
+    prometheus_url: str,
+    label: str,
+) -> dict:
+    """Warmup + measured k6 + Prometheus observe (no LLM). For paired stability probes."""
+    profile_config = _effective_profile_config(profile)
+    _log(f"paired_probe_{label} start")
+    _run_squeeze_warmup_k6(profile_config, script, base_url)
+    start_ts = time.time()
+    k6_exit = run_k6(profile_config, script, base_url=base_url)
+    end_ts = time.time()
+    _log(f"paired_probe_{label} k6_done exit={k6_exit}")
+    out: dict = {
+        "start_ts": start_ts,
+        "end_ts": end_ts,
+        "cpu_usage_avg_m": None,
+        "cpu_util_request_pct": None,
+    }
+    if not prometheus:
+        return out
+    from analysis.prometheus_collect import DEFAULT_PROMETHEUS_URL, get_prometheus_observed
+
+    dep_path = REPO_ROOT / deployment_yaml
+    hpa_path = REPO_ROOT / hpa_yaml
+    cfg = get_config_from_yaml(dep_path, hpa_path)
+    hpa = cfg.get("hpa") or {}
+    observed = get_prometheus_observed(
+        start_ts=float(start_ts),
+        end_ts=float(end_ts),
+        namespace=k8s_namespace or "default",
+        deployment_name=k8s_deployment or "stress-service",
+        prometheus_url=prometheus_url or DEFAULT_PROMETHEUS_URL,
+        cpu_request_m=int(cfg.get("cpu_request_m") or 0),
+        cpu_limit_m=cfg.get("cpu_limit_m") or 500,
+        mem_limit_mib=cfg.get("mem_limit_mib") or 256,
+        deployment_replicas=int(cfg.get("deployment_replicas") or 0),
+        hpa_min_replicas=int(hpa.get("min_replicas") or 0),
+    )
+    out["cpu_usage_avg_m"] = (observed or {}).get("cpu_usage_avg_m")
+    out["cpu_util_request_pct"] = (observed or {}).get("cpu_util_request_pct")
+    return out
+
+
+def _reanalyze_shared_iteration(
+    args: argparse.Namespace,
+    *,
+    pair_id: str,
+    src_subdir: str,
+    dest_subdir: str,
+    optimizer: str,
+    llm_vanilla: bool | None,
+    base_url: str | None,
+    prometheus: bool,
+    analysis_goal: str,
+) -> Path | None:
+    """Copy shared iter-1 k6 window; re-run analysis under another optimizer/prompt."""
+    src_iter = REPO_ROOT / "results" / src_subdir / pair_id / "iteration-1"
+    if not src_iter.is_dir():
+        raise FileNotFoundError(f"shared iter-1 missing: {src_iter}")
+    dest_root = REPO_ROOT / "results" / dest_subdir
+    dest_iter = dest_root / pair_id / "iteration-1"
+    dest_iter.parent.mkdir(parents=True, exist_ok=True)
+    if dest_iter.exists():
+        shutil.rmtree(dest_iter)
+    shutil.copytree(src_iter, dest_iter)
+    for name in ("analysis.json", "experiment.json", "report.md", "recommended.diff"):
+        p = dest_iter / name
+        if p.exists():
+            p.unlink()
+    k6_iter = dest_iter / "k6-run-summary.json"
+    if not k6_iter.is_file():
+        raise FileNotFoundError(f"missing k6-run-summary in {dest_iter}")
+    shutil.copy(k6_iter, dest_root / "k6-summary.json")
+
+    src_exp_path = src_iter / "experiment.json"
+    start_ts = end_ts = None
+    k6_crossed = False
+    if src_exp_path.is_file():
+        try:
+            src_exp = json.loads(src_exp_path.read_text())
+            start_ts = src_exp.get("start_ts")
+            end_ts = src_exp.get("end_ts")
+            k6_crossed = bool(src_exp.get("k6_thresholds_crossed"))
+            canonical = extract_shared_canonical_fields(src_exp)
+            if canonical:
+                (dest_iter / SHARED_CANONICAL_EXPERIMENT_FILENAME).write_text(
+                    json.dumps(canonical, indent=2)
+                )
+                _log(
+                    "shared_iter1_canonical_frozen "
+                    f"cpu_req={((canonical.get('config') or {}).get('cpu_request_m'))} "
+                    f"burn={((canonical.get('observed') or {}).get('cpu_usage_avg_m'))}"
+                )
+        except json.JSONDecodeError:
+            pass
+
+    prev_sub = os.environ.get("STRESS_RESULTS_SUBDIR")
+    prev_vanilla = os.environ.get("SQUEEZE_LLM_VANILLA")
+    os.environ["STRESS_RESULTS_SUBDIR"] = dest_subdir
+    if llm_vanilla is not None:
+        os.environ["SQUEEZE_LLM_VANILLA"] = "1" if llm_vanilla else "0"
+    profile_config = _effective_profile_config(args.profile)
+    run_meta: dict = {
+        "start_ts": start_ts,
+        "end_ts": end_ts,
+        "profile": args.profile,
+        "script": args.script,
+        "mode": "squeeze",
+        "analysis_goal": analysis_goal,
+        "k6_thresholds_crossed": k6_crossed,
+        "prometheus": prometheus,
+        "k8s_namespace": args.k8s_namespace,
+        "k8s_deployment": args.k8s_deployment,
+        "deployment_yaml": args.deployment_yaml,
+        "hpa_yaml": args.hpa_yaml,
+        "prometheus_url": args.prometheus_url,
+        "run_label": pair_id,
+        "iteration_index": 1,
+        "squeeze_optimizer": optimizer,
+    }
+    if base_url:
+        run_meta["base_url"] = base_url
+        run_meta["service"] = "robot-shop-web"
+        run_meta["endpoint"] = "POST /api/user/login"
+    if profile_config:
+        run_meta["experiment_id"] = profile_config.get("experiment_id")
+        run_meta["workload"] = profile_config.get("workload")
+        run_meta["slo"] = profile_config.get("slo")
+    _write_run_meta(run_meta)
+    _log(f"shared_iter1_reanalyze optimizer={optimizer} subdir={dest_subdir}")
+    run_dir = analysis_main()
+    if prev_sub:
+        os.environ["STRESS_RESULTS_SUBDIR"] = prev_sub
+    else:
+        os.environ.pop("STRESS_RESULTS_SUBDIR", None)
+    if prev_vanilla is None:
+        os.environ.pop("SQUEEZE_LLM_VANILLA", None)
+    else:
+        os.environ["SQUEEZE_LLM_VANILLA"] = prev_vanilla
+    return run_dir
+
+
+def _run_shared_compare_iteration_1(
+    args: argparse.Namespace,
+    *,
+    pair_id: str,
+    arm_a_subdir: str,
+    arm_b_subdir: str,
+    optimizer_a: str,
+    optimizer_b: str,
+    llm_vanilla_a: bool | None = None,
+    llm_vanilla_b: bool | None = None,
+    base_url: str | None,
+    prometheus: bool,
+    analysis_goal: str,
+    k8s_apply_enabled: bool,
+) -> None:
+    """One canonical k6 at baseline YAML; both compare arms analyze the same observed telemetry."""
+    if not compare_paired_measure_enabled():
+        return
+    print(
+        f"[squeeze-compare] paired shared iteration-1 pair={pair_id} "
+        f"({optimizer_a} + {optimizer_b})",
+        flush=True,
+    )
+    probes: list[dict] = []
+    for label in ("a", "b"):
+        _squeeze_preflight_before_k6(
+            mode="squeeze",
+            profile=args.profile,
+            base_url=base_url,
+            k8s_apply_enabled=k8s_apply_enabled,
+            deployment_yaml=args.deployment_yaml,
+            hpa_yaml=args.hpa_yaml,
+            k8s_namespace=args.k8s_namespace,
+            k8s_deployment=args.k8s_deployment,
+        )
+        probes.append(
+            _run_observe_probe_measure(
+                profile=args.profile,
+                script=args.script,
+                base_url=base_url,
+                prometheus=prometheus,
+                k8s_namespace=args.k8s_namespace,
+                k8s_deployment=args.k8s_deployment,
+                deployment_yaml=args.deployment_yaml,
+                hpa_yaml=args.hpa_yaml,
+                prometheus_url=args.prometheus_url,
+                label=label,
+            )
+        )
+    tol = paired_burn_tolerance_pct()
+    ba = float(probes[0].get("cpu_usage_avg_m") or 0)
+    bb = float(probes[1].get("cpu_usage_avg_m") or 0)
+    delta = paired_burn_delta_pct(ba, bb)
+    report = format_paired_probe_report(
+        pair_id=pair_id,
+        probe_a=probes[0],
+        probe_b=probes[1],
+        tolerance_pct=tol,
+    )
+    print(report, flush=True)
+    if delta > tol:
+        print(
+            f"[squeeze-compare] WARNING: paired probe burn delta {delta:.1f}% "
+            f"exceeds tolerance {tol:.1f}%",
+            flush=True,
+        )
+
+    prev_sub = os.environ.get("STRESS_RESULTS_SUBDIR")
+    prev_label = os.environ.get("STRESS_RESULTS_RUN_LABEL")
+    prev_vanilla = os.environ.get("SQUEEZE_LLM_VANILLA")
+    os.environ["STRESS_RESULTS_SUBDIR"] = arm_a_subdir
+    os.environ["STRESS_RESULTS_RUN_LABEL"] = pair_id
+    if llm_vanilla_a is not None:
+        os.environ["SQUEEZE_LLM_VANILLA"] = "1" if llm_vanilla_a else "0"
+
+    _squeeze_preflight_before_k6(
+        mode="squeeze",
+        profile=args.profile,
+        base_url=base_url,
+        k8s_apply_enabled=k8s_apply_enabled,
+        deployment_yaml=args.deployment_yaml,
+        hpa_yaml=args.hpa_yaml,
+        k8s_namespace=args.k8s_namespace,
+        k8s_deployment=args.k8s_deployment,
+    )
+    run_a = _run_once(
+        args.profile,
+        args.script,
+        "squeeze",
+        base_url=base_url,
+        prometheus=prometheus,
+        k8s_namespace=args.k8s_namespace,
+        k8s_deployment=args.k8s_deployment,
+        analysis_goal=analysis_goal,
+        deployment_yaml=args.deployment_yaml,
+        hpa_yaml=args.hpa_yaml,
+        prometheus_url=args.prometheus_url,
+        settle_seconds=args.settle_seconds,
+        run_label=pair_id,
+        iteration_index=1,
+        squeeze_optimizer=optimizer_a,
+    )
+    if run_a is None:
+        raise RuntimeError("shared compare iteration-1 canonical measure failed")
+
+    _reanalyze_shared_iteration(
+        args,
+        pair_id=pair_id,
+        src_subdir=arm_a_subdir,
+        dest_subdir=arm_b_subdir,
+        optimizer=optimizer_b,
+        llm_vanilla=llm_vanilla_b,
+        base_url=base_url,
+        prometheus=prometheus,
+        analysis_goal=analysis_goal,
+    )
+
+    for sub in (arm_a_subdir, arm_b_subdir):
+        out = REPO_ROOT / "results" / sub / pair_id / "paired-baseline-probe.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(report)
+
+    if prev_sub:
+        os.environ["STRESS_RESULTS_SUBDIR"] = prev_sub
+    else:
+        os.environ.pop("STRESS_RESULTS_SUBDIR", None)
+    if prev_label:
+        os.environ["STRESS_RESULTS_RUN_LABEL"] = prev_label
+    else:
+        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
+    if prev_vanilla is None:
+        os.environ.pop("SQUEEZE_LLM_VANILLA", None)
+    else:
+        os.environ["SQUEEZE_LLM_VANILLA"] = prev_vanilla
+
+    os.environ["SQUEEZE_COMPARE_SKIP_ITERATION_1"] = "1"
+    print(
+        "[squeeze-compare] shared iteration-1 complete; subprocess arms skip re-measure",
+        flush=True,
+    )
+
+
 def _run_squeeze_subprocess(
     args: argparse.Namespace,
     *,
@@ -559,6 +1034,8 @@ def _run_squeeze_subprocess(
     pair = os.environ.get("SQUEEZE_COMPARE_PAIR_ID", "").strip()
     if pair:
         env["STRESS_RESULTS_RUN_LABEL"] = pair
+    if compare_skip_iteration_1():
+        env["SQUEEZE_COMPARE_SKIP_ITERATION_1"] = "1"
     cap = max(1, int(squeeze_max_iterations))
     cmd = [
         sys.executable,
@@ -804,7 +1281,28 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
         os.environ["SQUEEZE_COMPARE_PAIR_ID"] = pair_id
         print(f"[squeeze-compare] paired run label={pair_id} (formula + llm)", flush=True)
 
-        _apply_compare_arm_baseline(args, label="before formula arm")
+        _apply_compare_arm_baseline(args, label="before shared iteration-1")
+        k8s_apply_enabled = bool(
+            args.k8s_namespace
+            and args.k8s_deployment
+            and args.deployment_yaml
+            and args.hpa_yaml
+        )
+        base_url = args.base_url
+        prometheus = not args.no_prometheus
+        analysis_goal = "efficiency" if args.efficiency else "failure"
+        _run_shared_compare_iteration_1(
+            args,
+            pair_id=pair_id,
+            arm_a_subdir=sub_formula,
+            arm_b_subdir=sub_llm,
+            optimizer_a="formula",
+            optimizer_b="llm",
+            base_url=base_url,
+            prometheus=prometheus,
+            analysis_goal=analysis_goal,
+            k8s_apply_enabled=k8s_apply_enabled and not (base_url and not k8s_apply_enabled),
+        )
         c1 = _run_squeeze_subprocess(
             args,
             optimizer="formula",
@@ -838,16 +1336,16 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
         if c2 != 0:
             return c2
 
-        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
-        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
-
         root_formula = REPO_ROOT / "results" / sub_formula
         root_llm = REPO_ROOT / "results" / sub_llm
-        run_a = _latest_run_root(root_formula)
-        run_b = _latest_run_root(root_llm)
+        run_a = _compare_paired_run_dir(root_formula, pair_id)
+        run_b = _compare_paired_run_dir(root_llm, pair_id)
+        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
+        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
         if not run_a or not run_b:
             print(
-                "[squeeze-compare] could not find run-* under comparison subdirs",
+                f"[squeeze-compare] could not find paired run dirs "
+                f"{pair_id} under comparison subdirs",
                 flush=True,
             )
             return 1
@@ -927,7 +1425,30 @@ def _compare_advanced_vs_vanilla_llm_main(args: argparse.Namespace) -> int:
             flush=True,
         )
 
-        _apply_compare_arm_baseline(args, label="before advanced-llm arm")
+        _apply_compare_arm_baseline(args, label="before shared iteration-1")
+        k8s_apply_enabled = bool(
+            args.k8s_namespace
+            and args.k8s_deployment
+            and args.deployment_yaml
+            and args.hpa_yaml
+        )
+        base_url = args.base_url
+        prometheus = not args.no_prometheus
+        analysis_goal = "efficiency" if args.efficiency else "failure"
+        _run_shared_compare_iteration_1(
+            args,
+            pair_id=pair_id,
+            arm_a_subdir=sub_advanced,
+            arm_b_subdir=sub_vanilla,
+            optimizer_a="llm",
+            optimizer_b="llm",
+            llm_vanilla_a=False,
+            llm_vanilla_b=True,
+            base_url=base_url,
+            prometheus=prometheus,
+            analysis_goal=analysis_goal,
+            k8s_apply_enabled=k8s_apply_enabled and not (base_url and not k8s_apply_enabled),
+        )
         c1 = _run_squeeze_subprocess(
             args,
             optimizer="llm",
@@ -962,16 +1483,16 @@ def _compare_advanced_vs_vanilla_llm_main(args: argparse.Namespace) -> int:
         if c2 != 0:
             return c2
 
-        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
-        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
-
         root_adv = REPO_ROOT / "results" / sub_advanced
         root_van = REPO_ROOT / "results" / sub_vanilla
-        run_a = _latest_run_root(root_adv)
-        run_b = _latest_run_root(root_van)
+        run_a = _compare_paired_run_dir(root_adv, pair_id)
+        run_b = _compare_paired_run_dir(root_van, pair_id)
+        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
+        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
         if not run_a or not run_b:
             print(
-                "[advanced-vanilla-compare] could not find run-* under comparison subdirs",
+                f"[advanced-vanilla-compare] could not find paired run dirs "
+                f"{pair_id} under comparison subdirs",
                 flush=True,
             )
             return 1
@@ -1074,13 +1595,12 @@ def _compare_hpa_vs_llm_main(args: argparse.Namespace) -> int:
         if c2 != 0:
             return c2
 
-        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
-        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
-
         root_hpa = REPO_ROOT / "results" / sub_hpa
         root_llm = REPO_ROOT / "results" / sub_llm
-        run_a = _latest_run_root(root_hpa)
-        run_b = _latest_run_root(root_llm)
+        run_a = _compare_paired_run_dir(root_hpa, pair_id)
+        run_b = _compare_paired_run_dir(root_llm, pair_id)
+        os.environ.pop("SQUEEZE_COMPARE_PAIR_ID", None)
+        os.environ.pop("STRESS_RESULTS_RUN_LABEL", None)
         if not run_a or not run_b:
             print("[hpa-compare] could not find run-* under comparison subdirs", flush=True)
             return 1
@@ -1148,6 +1668,14 @@ if __name__ == "__main__":
         "--squeeze",
         action="store_true",
         help="Iterative scale-down loop; repeats while PASS and stops on first FAIL (or other stop condition).",
+    )
+    mode_group.add_argument(
+        "--replay-trajectory",
+        action="store_true",
+        help=(
+            "Re-apply each config from --replay-source boundary and run k6 again "
+            "(observe-only). Writes replay-comparison.md vs source."
+        ),
     )
     mode_group.add_argument(
         "--compare-squeeze-optimizers",
@@ -1280,13 +1808,18 @@ if __name__ == "__main__":
         help="Prometheus base URL used by analysis (localhost uses port-forward; in-cluster DNS skips port-forward).",
     )
     p.add_argument(
+        "--replay-source",
+        default=os.environ.get("REPLAY_SOURCE_PATH", ""),
+        help="Source run dir or cost-effective-boundary.json for --replay-trajectory.",
+    )
+    p.add_argument(
         "--squeeze-optimizer",
-        choices=["hybrid", "formula", "llm", "hpa"],
+        choices=["hybrid", "formula", "llm", "hpa", "replay"],
         default=os.environ.get("SQUEEZE_OPTIMIZER", "hybrid"),
         help=(
             "squeeze YAML source: hybrid=LLM then deterministic override (default); "
             "formula=Python step only; llm=LLM only (no deterministic YAML); "
-            "hpa=observe only (HPA-only arm)."
+            "hpa=observe only (HPA-only arm); replay=set via --replay-trajectory."
         ),
     )
     p.add_argument(
@@ -1298,6 +1831,35 @@ if __name__ == "__main__":
         ),
     )
     args = p.parse_args()
+
+    if args.replay_trajectory:
+        if args.verify or args.squeeze or args.compare_squeeze_optimizers:
+            p.error("--replay-trajectory is mutually exclusive with other run modes")
+        base_url_replay = args.base_url
+        if args.robot_shop:
+            base_url_replay = base_url_replay or os.environ.get(
+                "ROBOT_SHOP_BASE_URL", "http://localhost:8080"
+            )
+            args.script = "robotshop_login"
+        prometheus_replay = not args.no_prometheus
+        analysis_goal_replay = (
+            "efficiency"
+            if (base_url_replay or args.efficiency)
+            else "failure"
+        )
+        sys.exit(
+            _replay_trajectory_pipeline(
+                args,
+                base_url=base_url_replay,
+                prometheus=prometheus_replay,
+                k8s_namespace=args.k8s_namespace,
+                k8s_deployment=args.k8s_deployment,
+                analysis_goal=analysis_goal_replay,
+                deployment_yaml=args.deployment_yaml,
+                hpa_yaml=args.hpa_yaml,
+                prometheus_url=args.prometheus_url,
+            )
+        )
 
     if args.compare_squeeze_optimizers:
         if args.verify:
@@ -1479,9 +2041,10 @@ if __name__ == "__main__":
                                     f"Verification written to {run_1_dir / 'verification'}"
                                 )
         elif mode == "squeeze":
-            run_label = _next_run_label()
+            run_label = os.environ.get("STRESS_RESULTS_RUN_LABEL", "").strip() or _next_run_label()
             run_root = _results_dir() / run_label
             is_up_demo_profile = args.profile in {"up_demo", "up_demo_strict"}
+            skip_iter1 = compare_skip_iteration_1() and (run_root / "iteration-1").is_dir()
             print(
                 (
                     "[squeeze] until first violation"
@@ -1494,36 +2057,54 @@ if __name__ == "__main__":
                     else " (no kubectl apply — external BASE_URL)"
                 )
                 + f" [{run_label}] optimizer={args.squeeze_optimizer}"
+                + (" shared-iter-1" if skip_iter1 else "")
             )
-            if is_up_demo_profile and k8s_apply_enabled:
-                _log(
-                    f"{args.profile}: pinning cluster to thin baseline before iteration 1 "
-                    "(single replica, HPA maxReplicas=1)"
+            if skip_iter1:
+                print(
+                    "[squeeze] using shared compare iteration-1 (same observed burn as paired arm)",
+                    flush=True,
                 )
-                ensure_up_demo_thin_baseline(
-                    deployment_yaml_path=REPO_ROOT / deployment_yaml,
-                    hpa_yaml_path=REPO_ROOT / hpa_yaml,
-                    deployment_name=k8s_deployment,
-                    namespace=k8s_namespace,
-                    repo_root=REPO_ROOT,
+                run_1_dir = run_root / "iteration-1"
+            else:
+                if is_up_demo_profile and k8s_apply_enabled:
+                    _log(
+                        f"{args.profile}: pinning cluster to thin baseline before iteration 1 "
+                        "(single replica, HPA maxReplicas=1)"
+                    )
+                    ensure_up_demo_thin_baseline(
+                        deployment_yaml_path=REPO_ROOT / deployment_yaml,
+                        hpa_yaml_path=REPO_ROOT / hpa_yaml,
+                        deployment_name=k8s_deployment,
+                        namespace=k8s_namespace,
+                        repo_root=REPO_ROOT,
+                    )
+                _squeeze_preflight_before_k6(
+                    mode=mode,
+                    profile=args.profile,
+                    base_url=base_url,
+                    k8s_apply_enabled=k8s_apply_enabled,
+                    deployment_yaml=deployment_yaml,
+                    hpa_yaml=hpa_yaml,
+                    k8s_namespace=k8s_namespace,
+                    k8s_deployment=k8s_deployment,
                 )
-            run_1_dir = _run_once(
-                args.profile,
-                args.script,
-                mode,
-                base_url=base_url,
-                prometheus=prometheus,
-                k8s_namespace=k8s_namespace,
-                k8s_deployment=k8s_deployment,
-                analysis_goal=analysis_goal,
-                deployment_yaml=deployment_yaml,
-                hpa_yaml=hpa_yaml,
-                prometheus_url=prometheus_url,
-                settle_seconds=args.settle_seconds,
-                run_label=run_label,
-                iteration_index=1,
-                squeeze_optimizer=args.squeeze_optimizer,
-            )
+                run_1_dir = _run_once(
+                    args.profile,
+                    args.script,
+                    mode,
+                    base_url=base_url,
+                    prometheus=prometheus,
+                    k8s_namespace=k8s_namespace,
+                    k8s_deployment=k8s_deployment,
+                    analysis_goal=analysis_goal,
+                    deployment_yaml=deployment_yaml,
+                    hpa_yaml=hpa_yaml,
+                    prometheus_url=prometheus_url,
+                    settle_seconds=args.settle_seconds,
+                    run_label=run_label,
+                    iteration_index=1,
+                    squeeze_optimizer=args.squeeze_optimizer,
+                )
             if run_1_dir is None:
                 raise RuntimeError("failed to create first squeeze iteration")
             best_pass_dir = None
