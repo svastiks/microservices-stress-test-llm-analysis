@@ -28,6 +28,8 @@ from .results_paths import results_dir as _results_dir_for_repo
 from .compare_shared_measure import (
     MEASURED_DEPLOYMENT_YAML,
     MEASURED_HPA_YAML,
+    RECOMMENDED_DEPLOYMENT_YAML,
+    RECOMMENDED_HPA_YAML,
     load_measured_yaml_for_prompt,
     load_shared_canonical_overrides,
 )
@@ -2687,6 +2689,10 @@ def write_outputs(
     (run_dir / "recommended.diff").write_text(
         "\n".join(diff_parts) if diff_parts else ""
     )
+    if diff_parts and deployment_yaml_path.exists():
+        shutil.copy2(deployment_yaml_path, run_dir / RECOMMENDED_DEPLOYMENT_YAML)
+        if hpa_yaml_path.exists():
+            shutil.copy2(hpa_yaml_path, run_dir / RECOMMENDED_HPA_YAML)
     _log(
         f"outputs_written run_dir={run_dir} diff_nonempty={bool(diff_parts)} "
         f"report_chars={len(report)}"

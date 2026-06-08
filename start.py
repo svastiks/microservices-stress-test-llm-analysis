@@ -33,11 +33,15 @@ from analysis.experiment_build import apply_config_to_managed_yaml
 from analysis.compare_shared_measure import (
     SHARED_CANONICAL_EXPERIMENT_FILENAME,
     compare_paired_measure_enabled,
+    compare_probe_count,
+    compare_probe_settle_seconds,
     compare_skip_iteration_1,
     extract_shared_canonical_fields,
     format_paired_probe_report,
+    max_paired_burn_delta_pct,
     paired_burn_delta_pct,
     paired_burn_tolerance_pct,
+    restore_compare_arm_iter1_yaml,
 )
 from analysis.experiment_build import get_config_from_yaml
 from analysis.replay_trajectory import (
@@ -898,7 +902,9 @@ def _run_shared_compare_iteration_1(
         flush=True,
     )
     probes: list[dict] = []
-    for label in ("a", "b"):
+    probe_n = compare_probe_count()
+    probe_settle = compare_probe_settle_seconds()
+    for i in range(probe_n):
         _squeeze_preflight_before_k6(
             mode="squeeze",
             profile=args.profile,
@@ -920,17 +926,17 @@ def _run_shared_compare_iteration_1(
                 deployment_yaml=args.deployment_yaml,
                 hpa_yaml=args.hpa_yaml,
                 prometheus_url=args.prometheus_url,
-                label=label,
+                label=str(i + 1),
             )
         )
+        if i + 1 < probe_n and probe_settle > 0:
+            _log(f"paired_probe_settle seconds={probe_settle} after_probe={i + 1}")
+            time.sleep(probe_settle)
     tol = paired_burn_tolerance_pct()
-    ba = float(probes[0].get("cpu_usage_avg_m") or 0)
-    bb = float(probes[1].get("cpu_usage_avg_m") or 0)
-    delta = paired_burn_delta_pct(ba, bb)
+    delta = max_paired_burn_delta_pct(probes)
     report = format_paired_probe_report(
         pair_id=pair_id,
-        probe_a=probes[0],
-        probe_b=probes[1],
+        probes=probes,
         tolerance_pct=tol,
     )
     print(report, flush=True)
@@ -1247,6 +1253,36 @@ def _apply_compare_arm_baseline(args: argparse.Namespace, *, label: str) -> None
         time.sleep(args.settle_seconds)
 
 
+def _prepare_compare_arm_subprocess(
+    args: argparse.Namespace,
+    *,
+    label: str,
+    results_subdir: str,
+    pair_id: str,
+) -> None:
+    """Baseline reset, then restore this arm's iter-1 recommended YAML for a fair iter 2+ start."""
+    _apply_compare_arm_baseline(args, label=f"{label} baseline")
+    arm_run = REPO_ROOT / "results" / results_subdir / pair_id
+    if not (arm_run / "iteration-1").is_dir():
+        return
+    restored = restore_compare_arm_iter1_yaml(
+        arm_run_dir=arm_run,
+        deployment_yaml_path=REPO_ROOT / args.deployment_yaml,
+        hpa_yaml_path=REPO_ROOT / args.hpa_yaml,
+    )
+    if restored:
+        print(
+            f"[squeeze-compare] restored iter-1 recommended YAML on disk ({label})",
+            flush=True,
+        )
+    else:
+        print(
+            f"[squeeze-compare] no iter-1 recommended YAML snapshot ({label}); "
+            "iter 2+ will apply repo baseline only",
+            flush=True,
+        )
+
+
 def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
     dep_path = REPO_ROOT / args.deployment_yaml
     hpa_path = REPO_ROOT / args.hpa_yaml
@@ -1303,6 +1339,12 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
             analysis_goal=analysis_goal,
             k8s_apply_enabled=k8s_apply_enabled and not (base_url and not k8s_apply_enabled),
         )
+        _prepare_compare_arm_subprocess(
+            args,
+            label="formula arm",
+            results_subdir=sub_formula,
+            pair_id=pair_id,
+        )
         c1 = _run_squeeze_subprocess(
             args,
             optimizer="formula",
@@ -1323,7 +1365,12 @@ def _compare_squeeze_optimizers_main(args: argparse.Namespace) -> int:
                 flush=True,
             )
 
-        _apply_compare_arm_baseline(args, label="before llm arm")
+        _prepare_compare_arm_subprocess(
+            args,
+            label="llm arm",
+            results_subdir=sub_llm,
+            pair_id=pair_id,
+        )
 
         c2 = _run_squeeze_subprocess(
             args,
@@ -1449,6 +1496,12 @@ def _compare_advanced_vs_vanilla_llm_main(args: argparse.Namespace) -> int:
             analysis_goal=analysis_goal,
             k8s_apply_enabled=k8s_apply_enabled and not (base_url and not k8s_apply_enabled),
         )
+        _prepare_compare_arm_subprocess(
+            args,
+            label="advanced-llm arm",
+            results_subdir=sub_advanced,
+            pair_id=pair_id,
+        )
         c1 = _run_squeeze_subprocess(
             args,
             optimizer="llm",
@@ -1470,7 +1523,12 @@ def _compare_advanced_vs_vanilla_llm_main(args: argparse.Namespace) -> int:
                 flush=True,
             )
 
-        _apply_compare_arm_baseline(args, label="before vanilla-llm arm")
+        _prepare_compare_arm_subprocess(
+            args,
+            label="vanilla-llm arm",
+            results_subdir=sub_vanilla,
+            pair_id=pair_id,
+        )
         c2 = _run_squeeze_subprocess(
             args,
             optimizer="llm",

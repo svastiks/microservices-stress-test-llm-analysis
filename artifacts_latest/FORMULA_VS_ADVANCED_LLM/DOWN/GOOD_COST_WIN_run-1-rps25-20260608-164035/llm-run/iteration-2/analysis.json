@@ -1,0 +1,51 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 540,
+    "provisioned_request_mem_mib": 260,
+    "provisioned_limit_cpu_m": 1020,
+    "provisioned_limit_mem_mib": 540,
+    "per_pod_unit_cost": 0.127848,
+    "per_pod_unit_cost_util": 0.039691,
+    "cost_score": 0.5114,
+    "cost_score_util": 0.1588,
+    "cost_score_legacy": 0.7939
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "CPU utilization at 31.8% (observed) with CPU request at 135m, resource request reductions planned.",
+    "Memory utilization at 16.6% (observed) with memory request at 65Mi, resource request reductions planned.",
+    "Cost score is at 0.5114 indicating potential for optimization.",
+    "observed.replicas: 4",
+    "observed.replicas_max: 4",
+    "guard.veto_replica_down:back_to_back_replica,resource_phase_gate",
+    "squeeze_down_axis=resources"
+  ],
+  "squeeze_down_axis": "resources",
+  "resource_pass_streak": 1,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with low CPU and memory vs limits; candidate for modest right-sizing down.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 6.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 31.8,
+    "mem_util_pct": 16.6,
+    "replicas": 4,
+    "replicas_max": 4,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.32,
+    "total_requests": 2251
+  }
+}

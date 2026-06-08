@@ -1,0 +1,48 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 170,
+    "provisioned_request_mem_mib": 80,
+    "provisioned_limit_cpu_m": 320,
+    "provisioned_limit_mem_mib": 170,
+    "per_pod_unit_cost": 0.080406,
+    "per_pod_unit_cost_util": 0.046051,
+    "cost_score": 0.1608,
+    "cost_score_util": 0.0921,
+    "cost_score_legacy": 0.2481
+  },
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "observed.cpu_util_pct peak: 60.3%, provides strong signal for resource adjustments.",
+    "previous deployment score cost: 0.1608 suggest potential savings through effective resource targeting.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "HOLD",
+  "scaling_rationale": "SLO/error stress with ambiguous utilization; investigate before large resource changes.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 25.0,
+    "error_rate": 0.0,
+    "latency_ms_p95": 5.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 59.1,
+    "mem_util_pct": 21.5,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.59,
+    "total_requests": 2251
+  }
+}

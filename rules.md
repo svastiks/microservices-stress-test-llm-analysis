@@ -1,45 +1,75 @@
-# Squeeze run validation rules
+# Squeeze compare validation rules
 
-**Agents: read this before judging any compare run or `comparison.md`.**
+**Agents: read this before judging any compare run or `comparison.md`. Use as pass/fail checklist.**
 
-- **Advanced must win on cost** — Formula vs advanced compare is invalid for showcase/deck unless advanced `best_pass` prov cost < formula; formula winning = rerun or investigate (UP @ 200/220/240 failed this bar).
+## Perfect run (must pass all — per round)
 
-- **Gate on request cpu%** — PASS/FAIL must use `cpu_util_request_pct`; limit-based `cpu_util_pct` alone is unfair across optimizers.
+- **Independent arms** — Default: each arm measures its own iter 1 after baseline reset + iter-1 YAML restore. Row 1 **will differ** in burn/cpu% (different measure windows) — that is expected; do not use row 1 as a side-by-side fairness test.
 
-- **Rows are not matched configs** — Combined table aligns iteration index only; row N formula ≠ row N llm.
+- **Ach RPS = target** — Every iteration: `achieved_requests_per_second` = target RPS (e.g. 25 / 35 / 45). Any shortfall = invalid run.
 
-- **Opposite PASS/FAIL expected** — Same-index status mismatch is normal; do not treat as measurement contradiction.
+- **Request-% gate only** — PASS/FAIL uses `cpu_util_request_pct` @ 95%; `telemetry.utilization_trustworthy` true on cpu FAIL rows. Limit-based `cpu_util_pct` is diagnostic only.
 
-- **Strict resource paradox rare** — Flag only when PASS side has ≤ cpu, ≤ mem, ≤ repl vs FAIL at same index.
+- **Both arms `first_fail`** — `stopped_reason=first_fail`, `first_fail_dir` set, ≥1 FAIL row each arm. `empty_recommended_diff` with zero FAIL = invalid.
 
-- **Advanced DOWN needs first_fail** — `stopped_reason=empty_recommended_diff` with zero FAIL rows invalidates advanced arm.
+- **Advanced wins cost** — LLM `best_pass` prov cost **<** formula `best_pass` prov cost. Formula winning = investigate (not deck-ready).
 
-- **Vanilla DOWN should first_fail** — Vanilla must end with at least one FAIL; all-PASS vanilla DOWN is broken.
+- **No early-stop bugs** — No `guard.hot_boundary_stop` in `analysis.json`; iter-2 applied iter-1 step (`deployment-recommended.yaml` on disk; measured replicas/resources match recommendation).
 
-- **Both arms need stopped_reason** — Compare `first_fail` vs `empty_recommended_diff` per arm before calling winner.
+- **SLO held until FAIL** — FAIL rows should be `cpu_utilization_exceeded` with p95 still within SLO (expected DOWN physics at fixed RPS).
 
-- **Check hot_boundary_stop evidence** — `guard.hot_boundary_stop` in `analysis.json` means advanced stopped early.
+## Warnings (run still usable)
 
-- **cpu fail p95 pass suspicious** — `cpu_utilization_exceeded` with p95 within SLO often means limit-ratio telemetry bug.
+- **Row-1 burn mismatch** — Normal in independent mode; judge the run on `best_pass` + boundaries, not row 1.
 
-- **Limit ratio skews cpu%** — Formula ~2× limit:request; llm up to 12×; do not compare raw cpu% across arms.
+- **Iteration count mismatch** — Different iter counts per arm OK; `—` rows are not paired.
 
-- **Utilization is k6-window mean** — `cpu_util_request_pct` / `mem_util_pct` are mean samples over the k6 run (not padded-window max). `*_peak` fields keep window max for burst diagnostics.
+- **Rows ≠ matched configs** — Combined table is zippered trajectories; row N formula ≠ row N llm. Opposite PASS/FAIL at same index is normal.
 
-- **best_pass valid row table weak** — Headline `best_pass` prov cost can be OK while row-by-row table misleads.
+## Optional paired iter-1 (`SQUEEZE_COMPARE_PAIRED_MEASURE=1`)
 
-- **Iteration count mismatch OK** — Different iteration counts per arm expected; missing `—` rows are not paired tests.
+- One shared k6 window at baseline; row 1 forced to match (diagnostic / deck row-1 only).
+- Does not pair iter 2+; does not change `best_pass` race.
+- Probe jitter in `paired-baseline-probe.md` is warning only.
 
-- **Sequential arms same cluster** — Formula/advanced runs before llm/vanilla; note order bias on reruns.
+## RPS ladder expectations (25 / 35 / 45 DOWN)
 
-- **One analyzer job on PVC** — Never run stress-analyzer-down-demo and stress-analyzer-up-demo concurrently; stale job overwrites boundary JSON (formula row shows wrong RPS).
+- **@25** — Baseline 150/75/5; both arms squeeze ~4–8 iters; boundary ~70–90m cpu × 3–4 repl; LLM win ~5–20% prov cost typical.
 
-- **Achieved RPS must match target** — If `ach RPS` ≪ target RPS, run is invalid regardless of PASS.
+- **@35** — Leaner boundary than @25; may FAIL sooner; configs lower than @25 best_pass.
 
-- **utilization_trustworthy required for cpu gate** — No cpu-util FAIL when `telemetry.utilization_trustworthy` is false.
+- **@45** — Tightest boundary; formula often hits cpu% req gate fast; LLM should still win cost.
 
-- **Until violation needs real FAIL** — DOWN compare with `SQUEEZE_UNTIL_VIOLATION=1` must record `first_fail_dir`.
+- **Cross-RPS** — Higher RPS → lower absolute resources at best_pass.
 
-- **Empty diff needs probe fallback** — `SQUEEZE_UNTIL_VIOLATION_PROBE_LLM=1` when LLM returns empty `recommended.diff`.
+## Deck / archive bar (full sweep)
 
-- **Rebuild image after telemetry fixes** — Old artifact runs pre-fix are case studies only, not deck numbers.
+- **3 RPS rounds** — 25 + 35 + 45.
+
+- **All 3 pass perfect-run checklist** — Each round independently valid.
+
+- **LLM wins all 3 on `best_pass`** — Required for `GOOD_COST_WIN` archive under `artifacts_latest/`.
+
+- **Post-fix image only** — Runs before `deployment-recommended.yaml` arm restore (≈ before `compare-sweep-20260608-151017`) are case studies only.
+
+## Disqualifiers (do not archive)
+
+- Pre-fix `artifacts/` runs (limit-only gate).
+
+- Concurrent analyzer jobs on PVC (stale/wrong RPS in boundary).
+
+- All-PASS either arm on DOWN until-violation.
+
+- Vanilla DOWN with no FAIL (vanilla-specific).
+
+- `utilization_trustworthy: false` on a cpu-gate FAIL used as boundary.
+
+## Telemetry notes
+
+- **Burn** = `cpu_usage_avg_m` (mean Prometheus aggregate over k6 window).
+
+- **Utilization** = k6-window mean; `*_peak` for burst diagnostics.
+
+- **Limit ratio** — Formula ~2× limit:request; LLM wider; never compare raw limit `cpu_util_pct` across arms.
+
+- **Sequential arms** — Formula then LLM in one job; each arm: baseline reset + iter-1 YAML restore before subprocess.
