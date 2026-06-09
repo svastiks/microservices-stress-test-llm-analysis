@@ -179,15 +179,47 @@ def _deployment_pod_re(namespace: str, deployment_name: str) -> str:
 
 def _first_non_empty_range(
     base_url: str, queries: list[str], start: float, end: float, step: str
-) -> tuple[list[dict], int]:
-    """Try queries in order; return first non-empty result and attempt count."""
+) -> tuple[list[dict], int, str | None]:
+    """Try queries in order; return first non-empty result, attempt count, winning query."""
     attempts = 0
     for q in queries:
         attempts += 1
         out = _query_range(base_url, q, start, end, step=step)
         if out:
-            return out, attempts
-    return [], attempts
+            return out, attempts, q
+    return [], attempts, None
+
+
+def _per_pod_cpu_diagnostics(
+    prometheus_url: str,
+    pod_selector: str,
+    q_start: float,
+    q_end: float,
+    step: str,
+) -> list[dict[str, Any]]:
+    """Per-pod/container CPU means over the k6 window (burn divergence debugging)."""
+    q = f"rate(container_cpu_usage_seconds_total{{{pod_selector}}}[1m])"
+    results = _query_range(prometheus_url, q, q_start, q_end, step=step)
+    out: list[dict[str, Any]] = []
+    for r in results:
+        metric = r.get("metric") or {}
+        pod = metric.get("pod") or metric.get("pod_name") or "?"
+        container = metric.get("container") or metric.get("container_name") or "?"
+        mean_cores = _mean_value([r])
+        peak_cores = _max_value([r])
+        out.append(
+            {
+                "pod": pod,
+                "container": container,
+                "cpu_mean_cores": round(mean_cores, 4),
+                "cpu_mean_m": round(mean_cores * 1000.0, 1),
+                "cpu_peak_cores": round(peak_cores, 4),
+                "cpu_peak_m": round(peak_cores * 1000.0, 1),
+                "sample_count": len(r.get("values") or []),
+            }
+        )
+    out.sort(key=lambda row: row["cpu_mean_m"], reverse=True)
+    return out
 
 
 def get_prometheus_observed(
@@ -308,7 +340,8 @@ def get_prometheus_observed(
         # Older scrape label variants
         f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[5m]))',
     ]
-    cpu_results, cpu_query_attempts = _first_non_empty_range(
+    cpu_query_used: str | None = None
+    cpu_results, cpu_query_attempts, cpu_query_used = _first_non_empty_range(
         prometheus_url, cpu_queries, q_start, q_end, step
     )
     cpu_usage_mean_cores = _mean_value(cpu_results)
@@ -325,6 +358,7 @@ def get_prometheus_observed(
             inst = _query(prometheus_url, iq, time_ts=k6_end)
             if inst:
                 cpu_results = inst
+                cpu_query_used = iq
                 cpu_collection_mode = "instant_query"
                 try:
                     instant_cores = float((inst[0].get("value") or [0, "0"])[1])
@@ -343,7 +377,7 @@ def get_prometheus_observed(
             f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[1m])',
             f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[5m])',
         ]
-        cpu_per_pod_results, cpu_per_pod_attempts = _first_non_empty_range(
+        cpu_per_pod_results, cpu_per_pod_attempts, cpu_query_used = _first_non_empty_range(
             prometheus_url, cpu_per_pod_queries, q_start, q_end, step
         )
         cpu_query_attempts += cpu_per_pod_attempts
@@ -364,7 +398,8 @@ def get_prometheus_observed(
         # Older scrape label variants
         f'sum(container_memory_working_set_bytes{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}})',
     ]
-    mem_results, mem_query_attempts = _first_non_empty_range(
+    mem_query_used: str | None = None
+    mem_results, mem_query_attempts, mem_query_used = _first_non_empty_range(
         prometheus_url, mem_queries, q_start, q_end, step
     )
     mem_bytes_mean = _mean_value(mem_results)
@@ -376,7 +411,7 @@ def get_prometheus_observed(
             f'container_memory_working_set_bytes{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}',
             f'container_memory_working_set_bytes{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}',
         ]
-        mem_per_pod_results, mem_per_pod_attempts = _first_non_empty_range(
+        mem_per_pod_results, mem_per_pod_attempts, mem_query_used = _first_non_empty_range(
             prometheus_url, mem_per_pod_queries, q_start, q_end, step
         )
         mem_query_attempts += mem_per_pod_attempts
@@ -443,6 +478,14 @@ def get_prometheus_observed(
         and (replicas_series_matched or replicas_inferred)
     )
 
+    cpu_per_pod = _per_pod_cpu_diagnostics(
+        prometheus_url, dep_pod, q_start, q_end, step
+    )
+    cpu_per_pod_sum_m = round(sum(row["cpu_mean_m"] for row in cpu_per_pod), 1)
+    cpu_aggregate_vs_pods_delta_m = round(
+        float(observed["cpu_usage_avg_m"]) - cpu_per_pod_sum_m, 1
+    )
+
     observed["telemetry"] = {
         "k6_window_start_ts": k6_start,
         "k6_window_end_ts": k6_end,
@@ -456,17 +499,31 @@ def get_prometheus_observed(
         "mem_series_matched": mem_series_matched,
         "cpu_query_attempts": cpu_query_attempts,
         "mem_query_attempts": mem_query_attempts,
+        "cpu_query_used": cpu_query_used,
+        "mem_query_used": mem_query_used,
         "cpu_collection_mode": cpu_collection_mode,
         "mem_collection_mode": mem_collection_mode,
+        "cpu_per_pod": cpu_per_pod,
+        "cpu_per_pod_sum_m": cpu_per_pod_sum_m,
+        "cpu_aggregate_vs_pods_delta_m": cpu_aggregate_vs_pods_delta_m,
         "utilization_trustworthy": utilization_trustworthy,
     }
     _log(
         f"collect_done cpu_util_request_pct={observed.get('cpu_util_request_pct')} "
+        f"burn_m={observed.get('cpu_usage_avg_m')} "
         f"cpu_util_request_pct_peak={observed.get('cpu_util_request_pct_peak')} "
         f"mem_util_pct={observed.get('mem_util_pct')} "
         f"cpu_series_matched={cpu_series_matched} mem_series_matched={mem_series_matched} "
         f"cpu_attempts={cpu_query_attempts} mem_attempts={mem_query_attempts} "
-        f"cpu_mode={cpu_collection_mode} mem_mode={mem_collection_mode}"
+        f"cpu_mode={cpu_collection_mode} mem_mode={mem_collection_mode} "
+        f"cpu_query_used={cpu_query_used!r} "
+        f"per_pod_sum_m={cpu_per_pod_sum_m} aggregate_delta_m={cpu_aggregate_vs_pods_delta_m}"
     )
+    for row in cpu_per_pod:
+        _log(
+            f"collect_per_pod pod={row['pod']} container={row['container']} "
+            f"mean_m={row['cpu_mean_m']} peak_m={row['cpu_peak_m']} "
+            f"samples={row['sample_count']}"
+        )
 
     return observed

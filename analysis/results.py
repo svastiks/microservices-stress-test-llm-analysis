@@ -1636,6 +1636,15 @@ def _up_recovery_throughput_near_target(experiment: dict) -> bool:
     return _up_recovery_ratios(experiment)["throughput_ratio"] >= _up_recovery_throughput_ratio_floor()
 
 
+def _up_recovery_latency_slo_met(experiment: dict) -> bool:
+    """p95 and throughput OK but row may still FAIL on cpu_util_request_pct gate."""
+    r = _up_recovery_ratios(experiment)
+    return (
+        r["p95_ms"] <= r["slo_p95_ms"]
+        and r["throughput_ratio"] >= _up_recovery_throughput_ratio_floor()
+    )
+
+
 def _up_recovery_prefers_replica_step(experiment: dict) -> bool:
     """+1 replica when single-pod UP recovery needs horizontal headroom (any target RPS)."""
     if not _up_recovery_replica_eligible(experiment):
@@ -1838,6 +1847,8 @@ def _compute_step_pct(experiment: dict) -> float:
         return round(_bound(down_base + (0.25 * slack), down_floor, 0.30), 3)
 
     if scaling_hint == "UP":
+        if _in_up_recovery_path(experiment) and _up_recovery_latency_slo_met(experiment):
+            return 0.15
         err = float(observed.get("error_rate") or 0.0)
         p95 = float((observed.get("latency_ms") or {}).get("p95") or 0.0)
         slo_err = float(slo.get("error_rate") or 0.01)
@@ -2136,6 +2147,20 @@ def _maybe_apply_deterministic_efficiency_yaml(
             result, experiment, deployment_yaml_path, hpa_yaml_path
         ):
             return
+        if _in_up_recovery_path(experiment) and _up_recovery_latency_slo_met(experiment):
+            metrics = _metric_up_step_from_file(
+                experiment, deployment_yaml_path, step_override=0.15
+            )
+            if metrics:
+                req["cpu"] = f"{metrics['cpu_req']}m"
+                lim["cpu"] = f"{metrics['cpu_lim']}m"
+                req["memory"] = f"{metrics['mem_req']}Mi"
+                lim["memory"] = f"{metrics['mem_lim']}Mi"
+                result["deployment_yaml_new"] = yaml.safe_dump(dep_doc, sort_keys=False)
+                _sync_up_recovery_hpa_after_vertical(
+                    result, experiment, dep_doc, hpa_doc, 0.15
+                )
+                return
         req["cpu"] = _scale_millicpu(req.get("cpu", "100m"), factor)
         lim["cpu"] = _scale_millicpu(lim.get("cpu", "200m"), factor)
         req["memory"] = _scale_mib(req.get("memory", "50Mi"), factor)

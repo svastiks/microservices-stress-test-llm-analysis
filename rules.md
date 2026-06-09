@@ -18,6 +18,14 @@
 
 - **SLO held until FAIL** — FAIL rows should be `cpu_utilization_exceeded` with p95 still within SLO (expected DOWN physics at fixed RPS).
 
+## UP telemetry bug (investigate before archive)
+
+- **Near-matched config paradox** — Similar resources (~65–71m cpu, ~29–37Mi, same repl) must not show ~60%+ `cpu_util_request_pct` gap (e.g. 144% vs 88%) at same RPS without explanation. That indicates **burn** divergence (`cpu_usage_avg_m` e.g. 205m vs 115m), not just request-denominator math.
+
+- **Root cause unknown until replay** — Independent sequential arms measure at different times; suspected causes: extra traffic to web pods, dependency/cache warmth, Prometheus window/pod attribution. **Required:** matched-config replay (same YAML, back-to-back k6) before trusting compare rows.
+
+- **Do not cite paradox rows as proof** — Zippered table row N ≠ same config; opposite PASS/FAIL at near-matched resources = open bug until replay passes.
+
 ## Warnings (run still usable)
 
 - **Row-1 burn mismatch** — Normal in independent mode; judge the run on `best_pass` + boundaries, not row 1.
@@ -63,6 +71,8 @@
 - Vanilla DOWN with no FAIL (vanilla-specific).
 
 - `utilization_trustworthy: false` on a cpu-gate FAIL used as boundary.
+
+- **UP near-matched burn mismatch** — replay not run or replay shows >15% burn/cpu% drift at same YAML.
 
 ## Telemetry notes
 
