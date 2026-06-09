@@ -674,6 +674,149 @@ spec:
         self.assertIn("maxReplicas: 2", result["hpa_yaml_new"])
         self.assertIn("replicas_clamp", " ".join(result.get("evidence") or []))
 
+    def test_guard_holds_replicas_when_latency_slo_met_cpu_gate_only(self) -> None:
+        from analysis.results import _guard_llm_up_recovery_yaml
+        import tempfile
+        from pathlib import Path
+
+        exp = {
+            "analysis_goal": "efficiency",
+            "squeeze_optimizer": "llm",
+            "mode": "squeeze",
+            "up_recovery": True,
+            "failure": {"failed": True, "reason": "cpu_utilization_exceeded"},
+            "workload": {"target_requests_per_second": 220},
+            "slo": {"p95_latency_ms": 500},
+            "config": {
+                "deployment_replicas": 2,
+                "cpu_request_m": 58,
+                "mem_request_mib": 25,
+                "hpa": {"max_replicas": 2},
+            },
+            "observed": {
+                "replicas": 2,
+                "replicas_max": 2,
+                "achieved_requests_per_second_target_window": 218.0,
+                "latency_ms": {"p95": 214},
+                "cpu_util_request_pct": 176.1,
+            },
+        }
+        result = {
+            "deployment_yaml_new": """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 58m
+            memory: 25Mi
+""",
+            "hpa_yaml_new": """apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+spec:
+  minReplicas: 2
+  maxReplicas: 3
+""",
+            "evidence": [],
+        }
+        with tempfile.TemporaryDirectory() as td:
+            dep_path = Path(td) / "dep.yaml"
+            hpa_path = Path(td) / "hpa.yaml"
+            dep_path.write_text(
+                "apiVersion: apps/v1\nkind: Deployment\nspec:\n  replicas: 2\n"
+            )
+            hpa_path.write_text(
+                "apiVersion: autoscaling/v2\nkind: HorizontalPodAutoscaler\n"
+                "spec:\n  minReplicas: 2\n  maxReplicas: 2\n"
+            )
+            _guard_llm_up_recovery_yaml(result, exp, dep_path, hpa_path)
+        self.assertIn("replicas: 2", result["deployment_yaml_new"])
+        self.assertIn("replicas_hold_latency_slo_met", " ".join(result.get("evidence") or []))
+
+    def test_up_recovery_precision_mem_violation_detects_coupled_bump(self) -> None:
+        from analysis.results import (
+            _llm_up_recovery_precision_mem_violation,
+            _up_recovery_cpu_gate_precision_active,
+        )
+        import tempfile
+        from pathlib import Path
+
+        exp = {
+            "up_recovery": True,
+            "failure": {"failed": True, "reason": "cpu_utilization_exceeded"},
+            "workload": {"target_requests_per_second": 220},
+            "slo": {"p95_latency_ms": 500},
+            "config": {
+                "cpu_request_m": 129,
+                "mem_request_mib": 66,
+                "deployment_replicas": 2,
+            },
+            "observed": {
+                "replicas": 2,
+                "achieved_requests_per_second_target_window": 220.0,
+                "latency_ms": {"p95": 224},
+                "cpu_util_request_pct": 96.0,
+                "mem_util_pct": 15.4,
+            },
+        }
+        self.assertTrue(_up_recovery_cpu_gate_precision_active(exp))
+        dep_on_disk = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 129m
+            memory: 66Mi
+          limits:
+            cpu: 230m
+            memory: 118Mi
+"""
+        bad_llm = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 138m
+            memory: 73Mi
+          limits:
+            cpu: 270m
+            memory: 138Mi
+"""
+        good_llm = bad_llm.replace("73Mi", "66Mi").replace("138Mi", "118Mi")
+        with tempfile.TemporaryDirectory() as td:
+            dep_path = Path(td) / "dep.yaml"
+            dep_path.write_text(dep_on_disk)
+            self.assertTrue(
+                _llm_up_recovery_precision_mem_violation(
+                    {"deployment_yaml_new": bad_llm}, exp, dep_path
+                )
+            )
+            self.assertFalse(
+                _llm_up_recovery_precision_mem_violation(
+                    {"deployment_yaml_new": good_llm}, exp, dep_path
+                )
+            )
+
     def test_guard_passes_through_near_pass_vertical(self) -> None:
         """Near-pass vertical sizing is LLM/prompt-owned; guard does not cap CPU/mem."""
         from analysis.results import _guard_llm_up_recovery_yaml
@@ -828,11 +971,30 @@ class TestFormulaUpRecovery(unittest.TestCase):
             },
             "observed": {
                 "achieved_requests_per_second_target_window": 258.0,
+                "latency_ms": {"p95": 620},
                 "cpu_util_pct": 69.0,
                 "mem_util_pct": 84.0,
             },
+            "slo": {"p95_latency_ms": 500},
         }
         self.assertTrue(_up_recovery_prefers_replica_step(exp))
+
+    def test_no_replica_when_latency_slo_met_cpu_gate_only(self) -> None:
+        from analysis.results import _up_recovery_prefers_replica_step
+
+        exp = {
+            "up_recovery": True,
+            "failure": {"failed": True, "reason": "cpu_utilization_exceeded"},
+            "workload": {"target_requests_per_second": 220},
+            "config": {"deployment_replicas": 1, "hpa": {"max_replicas": 1}},
+            "observed": {
+                "achieved_requests_per_second_target_window": 218.0,
+                "latency_ms": {"p95": 214},
+                "cpu_util_request_pct": 176.1,
+            },
+            "slo": {"p95_latency_ms": 500},
+        }
+        self.assertFalse(_up_recovery_prefers_replica_step(exp))
 
     def test_replica_step_respects_max_replicas(self) -> None:
         from analysis.results import _apply_up_recovery_replica_step

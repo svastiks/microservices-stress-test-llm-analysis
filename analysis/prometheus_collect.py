@@ -1,10 +1,12 @@
 """
 Query Prometheus over the k6 window and return observed metrics for experiment JSON.
 
-Primary utilization (cpu_util_request_pct, cpu_util_pct, mem_util_pct) uses the mean of
-Prometheus samples in [start_ts, end_ts]. Peak variants (*_peak) use the window maximum.
+Burn/cpu% use per-pod rate() summed over web pods (canonical). Requires >=12 samples
+in the k6 window (5s step on 90s tests) before utilization_trustworthy.
 """
 from typing import Any
+
+import os
 
 import requests
 
@@ -150,8 +152,50 @@ def _util_pct(usage: float, capacity: float) -> float:
     return round(100 * usage / capacity, 1)
 
 
-def _range_step(start: float, end: float) -> str:
-    return "15s" if (end - start) < 150 else "30s"
+def _cpu_rate_window() -> str:
+    return os.environ.get("SQUEEZE_PROM_CPU_RATE_WINDOW", "1m").strip() or "1m"
+
+
+def _prom_range_step(start: float, end: float) -> str:
+    span = end - start
+    if span < 150:
+        return os.environ.get("SQUEEZE_PROM_RANGE_STEP", "5s").strip() or "5s"
+    if span < 300:
+        return "15s"
+    return "30s"
+
+
+def _min_prom_samples() -> int:
+    return max(1, int(os.environ.get("SQUEEZE_PROM_MIN_SAMPLES", "12")))
+
+
+def _max_sample_count(results: list[dict]) -> int:
+    if not results:
+        return 0
+    return max(len(r.get("values") or []) for r in results)
+
+
+def _per_pod_rows_from_results(results: list[dict]) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for r in results:
+        metric = r.get("metric") or {}
+        pod = metric.get("pod") or metric.get("pod_name") or "?"
+        container = metric.get("container") or metric.get("container_name") or "?"
+        mean_cores = _mean_value([r])
+        peak_cores = _max_value([r])
+        out.append(
+            {
+                "pod": pod,
+                "container": container,
+                "cpu_mean_cores": round(mean_cores, 4),
+                "cpu_mean_m": round(mean_cores * 1000.0, 1),
+                "cpu_peak_cores": round(peak_cores, 4),
+                "cpu_peak_m": round(peak_cores * 1000.0, 1),
+                "sample_count": len(r.get("values") or []),
+            }
+        )
+    out.sort(key=lambda row: row["cpu_mean_m"], reverse=True)
+    return out
 
 
 def _cadvisor_pod_selector(namespace: str, deployment_name: str) -> str:
@@ -198,7 +242,7 @@ def _per_pod_cpu_diagnostics(
     step: str,
 ) -> list[dict[str, Any]]:
     """Per-pod/container CPU means over the k6 window (burn divergence debugging)."""
-    q = f"rate(container_cpu_usage_seconds_total{{{pod_selector}}}[1m])"
+    q = f"rate(container_cpu_usage_seconds_total{{{pod_selector}}}[{_cpu_rate_window()}])"
     results = _query_range(prometheus_url, q, q_start, q_end, step=step)
     out: list[dict[str, Any]] = []
     for r in results:
@@ -263,7 +307,8 @@ def get_prometheus_observed(
     k6_end = float(end_ts)
     q_start = k6_start - time_pad_s
     q_end = k6_end + time_pad_s
-    step = _range_step(k6_start, k6_end)
+    step = _prom_range_step(k6_start, k6_end)
+    rate_w = _cpu_rate_window()
     hpa_name = f"{deployment_name}-hpa"
     _log(
         f"collect_start namespace={namespace} deployment={deployment_name} "
@@ -316,110 +361,66 @@ def get_prometheus_observed(
     cadv = _cadvisor_pod_selector(namespace, deployment_name)
     cadv_loose = _cadvisor_pod_selector_loose(namespace, deployment_name)
     dep_pod = _deployment_pod_re(namespace, deployment_name)
-    cpu_queries = [
-        # Deployment-shaped pod names, loose labels, longer rate window (sparse scrapes / k3s)
-        f"sum(rate(container_cpu_usage_seconds_total{{{dep_pod}}}[5m]))",
-        f"sum(rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[5m]))",
-        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{dep_pod}}}[5m]))',
-        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv_loose}}}[5m]))',
-        f'sum(rate(container_cpu_usage_seconds_total{{job=~"(kubelet|.*cadvisor.*)",namespace="{namespace}",pod=~"{deployment_name}-.+",container!="",container!="POD"}}[5m]))',
-        # kubelet/cadvisor explicit labels (matches many kube-prometheus setups)
-        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}[1m]))',
-        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}[5m]))',
-        # same but without image label constraint
-        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[1m]))',
-        f'sum(rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m]))',
-        # Preferred strict selector
-        f"sum(rate(container_cpu_usage_seconds_total{{{cadv}}}[1m]))",
-        f"sum(rate(container_cpu_usage_seconds_total{{{cadv}}}[5m]))",
-        # Fallback when image label is absent in exporter payload
-        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m]))',
-        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[1m]))',
-        # Final fallback: pod-only selector
-        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+"}}[5m]))',
-        # Older scrape label variants
-        f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[5m]))',
+    cpu_per_pod_queries = [
+        f"rate(container_cpu_usage_seconds_total{{{dep_pod}}}[{rate_w}])",
+        f"rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[{rate_w}])",
+        f'rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{dep_pod}}}[{rate_w}])',
+        f'rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv_loose}}}[{rate_w}])',
+        f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[{rate_w}])',
+        f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[{rate_w}])',
     ]
     cpu_query_used: str | None = None
     cpu_results, cpu_query_attempts, cpu_query_used = _first_non_empty_range(
-        prometheus_url, cpu_queries, q_start, q_end, step
+        prometheus_url, cpu_per_pod_queries, q_start, q_end, step
     )
-    cpu_usage_mean_cores = _mean_value(cpu_results)
-    cpu_usage_peak_cores = _max_value(cpu_results)
-    cpu_collection_mode = "aggregate_query"
-    if not cpu_results:
-        instant_cpu_queries = [
+    cpu_collection_mode = "per_pod_series_sum"
+    if cpu_results:
+        cpu_usage_mean_cores = _sum_series_means(cpu_results)
+        cpu_usage_peak_cores = _sum_series_maxima(cpu_results)
+    else:
+        cpu_aggregate_queries = [
+            f"sum(rate(container_cpu_usage_seconds_total{{{dep_pod}}}[{rate_w}]))",
+            f"sum(rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[{rate_w}]))",
+            f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[{rate_w}]))',
             f"sum(rate(container_cpu_usage_seconds_total{{{dep_pod}}}[5m]))",
-            f"sum(rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[5m]))",
             f'sum(rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m]))',
         ]
-        for iq in instant_cpu_queries:
-            cpu_query_attempts += 1
-            inst = _query(prometheus_url, iq, time_ts=k6_end)
-            if inst:
-                cpu_results = inst
-                cpu_query_used = iq
-                cpu_collection_mode = "instant_query"
-                try:
-                    instant_cores = float((inst[0].get("value") or [0, "0"])[1])
-                except (TypeError, ValueError, IndexError):
-                    instant_cores = 0.0
-                cpu_usage_mean_cores = instant_cores
-                cpu_usage_peak_cores = instant_cores
-                break
-    if not cpu_results:
-        cpu_per_pod_queries = [
-            f"rate(container_cpu_usage_seconds_total{{{dep_pod}}}[5m])",
-            f"rate(container_cpu_usage_seconds_total{{{cadv_loose}}}[5m])",
-            f'rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{dep_pod}}}[5m])',
-            f'rate(container_cpu_usage_seconds_total{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}[1m])',
-            f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[5m])',
-            f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}[1m])',
-            f'rate(container_cpu_usage_seconds_total{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}[5m])',
-        ]
-        cpu_per_pod_results, cpu_per_pod_attempts, cpu_query_used = _first_non_empty_range(
-            prometheus_url, cpu_per_pod_queries, q_start, q_end, step
+        agg_results, agg_attempts, cpu_query_used = _first_non_empty_range(
+            prometheus_url, cpu_aggregate_queries, q_start, q_end, step
         )
-        cpu_query_attempts += cpu_per_pod_attempts
-        if cpu_per_pod_results:
-            cpu_usage_mean_cores = _sum_series_means(cpu_per_pod_results)
-            cpu_usage_peak_cores = _sum_series_maxima(cpu_per_pod_results)
-            cpu_results = cpu_per_pod_results
-            cpu_collection_mode = "per_pod_series_sum"
+        cpu_query_attempts += agg_attempts
+        cpu_results = agg_results
+        cpu_collection_mode = "aggregate_query"
+        cpu_usage_mean_cores = _mean_value(cpu_results)
+        cpu_usage_peak_cores = _max_value(cpu_results)
 
-    mem_queries = [
-        # kubelet/cadvisor explicit labels (matches many kube-prometheus setups)
-        f'sum(container_memory_working_set_bytes{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}})',
-        # same but without image label constraint
-        f'sum(container_memory_working_set_bytes{{job="kubelet",metrics_path="/metrics/cadvisor",namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}})',
-        f"sum(container_memory_working_set_bytes{{{cadv}}})",
-        f'sum(container_memory_working_set_bytes{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}})',
-        f'sum(container_memory_working_set_bytes{{namespace="{namespace}",pod=~"{deployment_name}.+"}})',
-        # Older scrape label variants
-        f'sum(container_memory_working_set_bytes{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}})',
+    mem_per_pod_queries = [
+        f'container_memory_working_set_bytes{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}',
+        f'container_memory_working_set_bytes{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}',
+        f'container_memory_working_set_bytes{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}',
     ]
     mem_query_used: str | None = None
     mem_results, mem_query_attempts, mem_query_used = _first_non_empty_range(
-        prometheus_url, mem_queries, q_start, q_end, step
+        prometheus_url, mem_per_pod_queries, q_start, q_end, step
     )
-    mem_bytes_mean = _mean_value(mem_results)
-    mem_bytes_peak = _max_value(mem_results)
-    mem_collection_mode = "aggregate_query"
-    if not mem_results:
-        mem_per_pod_queries = [
-            f'container_memory_working_set_bytes{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}}',
-            f'container_memory_working_set_bytes{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}}',
-            f'container_memory_working_set_bytes{{namespace="{namespace}",pod_name=~"{deployment_name}.+",container_name!=""}}',
+    mem_collection_mode = "per_pod_series_sum"
+    if mem_results:
+        mem_bytes_mean = _sum_series_means(mem_results)
+        mem_bytes_peak = _sum_series_maxima(mem_results)
+    else:
+        mem_aggregate_queries = [
+            f'sum(container_memory_working_set_bytes{{job="kubelet",metrics_path="/metrics/cadvisor",{cadv}}})',
+            f"sum(container_memory_working_set_bytes{{{cadv}}})",
+            f'sum(container_memory_working_set_bytes{{namespace="{namespace}",pod=~"{deployment_name}.+",container!="",container!="POD"}})',
         ]
-        mem_per_pod_results, mem_per_pod_attempts, mem_query_used = _first_non_empty_range(
-            prometheus_url, mem_per_pod_queries, q_start, q_end, step
+        agg_mem, agg_mem_attempts, mem_query_used = _first_non_empty_range(
+            prometheus_url, mem_aggregate_queries, q_start, q_end, step
         )
-        mem_query_attempts += mem_per_pod_attempts
-        if mem_per_pod_results:
-            mem_bytes_mean = _sum_series_means(mem_per_pod_results)
-            mem_bytes_peak = _sum_series_maxima(mem_per_pod_results)
-            mem_results = mem_per_pod_results
-            mem_collection_mode = "per_pod_series_sum"
+        mem_query_attempts += agg_mem_attempts
+        mem_results = agg_mem
+        mem_collection_mode = "aggregate_query"
+        mem_bytes_mean = _mean_value(mem_results)
+        mem_bytes_peak = _max_value(mem_results)
 
     observed["cpu_usage_avg_m"] = round(cpu_usage_mean_cores * 1000.0, 1)
     observed["mem_usage_avg_mib"] = round(mem_bytes_mean / (1024 * 1024), 1)
@@ -472,25 +473,47 @@ def get_prometheus_observed(
 
     cpu_series_matched = bool(cpu_results)
     mem_series_matched = bool(mem_results)
+    cpu_sample_count = _max_sample_count(cpu_results)
+    mem_sample_count = _max_sample_count(mem_results)
+    min_samples = _min_prom_samples()
     utilization_trustworthy = bool(
         cpu_series_matched
         and mem_series_matched
         and (replicas_series_matched or replicas_inferred)
+        and cpu_sample_count >= min_samples
     )
 
-    cpu_per_pod = _per_pod_cpu_diagnostics(
-        prometheus_url, dep_pod, q_start, q_end, step
-    )
+    if cpu_collection_mode == "per_pod_series_sum" and cpu_results:
+        cpu_per_pod = _per_pod_rows_from_results(cpu_results)
+    else:
+        cpu_per_pod = _per_pod_cpu_diagnostics(
+            prometheus_url, dep_pod, q_start, q_end, step
+        )
     cpu_per_pod_sum_m = round(sum(row["cpu_mean_m"] for row in cpu_per_pod), 1)
     cpu_aggregate_vs_pods_delta_m = round(
         float(observed["cpu_usage_avg_m"]) - cpu_per_pod_sum_m, 1
     )
+    prom_pod_count = len(cpu_per_pod)
+    replica_count_mismatch = (
+        prom_pod_count > 0 and prom_pod_count != denom_replicas_mean
+    )
+    if replica_count_mismatch:
+        _log(
+            f"collect_warn prom_pod_count={prom_pod_count} "
+            f"yaml_replicas={denom_replicas_mean} "
+            f"prom_replicas_mean={round(mean_replicas, 2)} MISMATCH"
+        )
 
     observed["telemetry"] = {
         "k6_window_start_ts": k6_start,
         "k6_window_end_ts": k6_end,
         "window_start_ts": q_start,
         "window_end_ts": q_end,
+        "prom_range_step": step,
+        "cpu_rate_window": rate_w,
+        "prom_min_samples": min_samples,
+        "cpu_sample_count": cpu_sample_count,
+        "mem_sample_count": mem_sample_count,
         "utilization_aggregation": "mean",
         "replicas_mean": round(mean_replicas, 2),
         "replicas_series_matched": replicas_series_matched,
@@ -506,6 +529,9 @@ def get_prometheus_observed(
         "cpu_per_pod": cpu_per_pod,
         "cpu_per_pod_sum_m": cpu_per_pod_sum_m,
         "cpu_aggregate_vs_pods_delta_m": cpu_aggregate_vs_pods_delta_m,
+        "prom_pod_count": prom_pod_count,
+        "yaml_replicas_expected": denom_replicas_mean,
+        "replica_count_mismatch": replica_count_mismatch,
         "utilization_trustworthy": utilization_trustworthy,
     }
     _log(
@@ -517,7 +543,9 @@ def get_prometheus_observed(
         f"cpu_attempts={cpu_query_attempts} mem_attempts={mem_query_attempts} "
         f"cpu_mode={cpu_collection_mode} mem_mode={mem_collection_mode} "
         f"cpu_query_used={cpu_query_used!r} "
-        f"per_pod_sum_m={cpu_per_pod_sum_m} aggregate_delta_m={cpu_aggregate_vs_pods_delta_m}"
+        f"samples={cpu_sample_count}/{min_samples} step={step} rate={rate_w} "
+        f"per_pod_sum_m={cpu_per_pod_sum_m} aggregate_delta_m={cpu_aggregate_vs_pods_delta_m} "
+        f"trustworthy={utilization_trustworthy}"
     )
     for row in cpu_per_pod:
         _log(

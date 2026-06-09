@@ -1,4 +1,5 @@
 import json
+import math
 import os
 
 SYSTEM_PROMPT = """You are an expert in microservice performance analysis and Kubernetes autoscaling. Your task is to analyze stress-test results and identify failure archetypes, estimate critical load thresholds (lambda_crit), and produce actionable diagnoses.
@@ -179,8 +180,13 @@ CPU / MEMORY (derive step size from metrics — no fixed % cap):
 - SLO PASS + trustworthy telemetry: when live ≥ 3, **replica drop beats resource-only trim** (even when util ≥ 55%; consecutive replica drops OK). When live = 2 and util is 55–85%, one **10–15%** CPU/mem trim. When live ≤ 2 and util ≥ 85%, return **empty** YAML.
 - SLO PASS but util not trustworthy: prefer a small CPU/mem trim or replica-only step; explain missing telemetry in the report.
 - SLO FAIL: increase enough to clear the bottleneck suggested by failure_archetype and metrics (CPU vs memory vs replicas/HPA); larger steps only when saturation is clear (e.g. cpu_util_pct very high or repeated FAIL after small UP).
-- SLO FAIL / UP recovery: use experiment.up_recovery_signals when present — bottleneck, throughput_ratio (achieved/target), latency_ratio (p95/SLO). Never assume fixed RPS; size from ratios only. **One axis per iteration.** When still at thin baseline (~50m/25Mi/1 pod) and prefer_replica_step is true: return YAML with **only** spec.replicas+1 and matching hpa maxReplicas — leave CPU/memory requests/limits unchanged vs on-disk. **After replica-first** (2+ repl but CPU/mem still at thin ~50m/25Mi) and failure.failed is still true: apply **one vertical metric step only** (~15% cpu/mem vs on-disk, e.g. 50m→58m not 70m) — do not add another replica in the same iteration. Do not jump to 70m/35Mi when a smaller step may suffice.
+- SLO FAIL / UP recovery: use experiment.up_recovery_signals when present — bottleneck, throughput_ratio (achieved/target), latency_ratio (p95/SLO). Never assume fixed RPS; size from ratios only. **One axis per iteration.** Primary objective: **lowest cost_score at PASS** — beat the deterministic formula ladder on provisioned_request_cpu_m (CPU ~90% of cost). PASS cpu gate uses **observed.cpu_util_request_pct** (request-relative) — **not** observed.cpu_util_pct. When still at thin baseline with prefer_replica_step: +1 replica only, hold CPU/mem. After replica-first: **coupled ~15%** on both CPU and memory. **CPU-gate precision finish** (p95 PASS, failure.reason=cpu_utilization_exceeded, cpu_util_request_pct 96–105%, mem_util_pct < 25%): **CPU request ONLY** — hold memory byte-identical to on-disk; see FRONTIER EXAMPLE below. If a repair prompt rejects coupled memory bump, return CPU-only. When cpu_util_request_pct > 110%: coupled ~15% on both axes. Hold replicas unless prefer_replica_step at single pod.
 - Replicas follow the one-step rule above; coordinate CPU/mem sizes with observed utilization on every DOWN step.
+
+UP RECOVERY FRONTIER EXAMPLE (mandatory pattern when cpu gate is the only remaining FAIL):
+- Observed: p95=224ms PASS, cpu_util_request_pct=96%, mem_util_pct=15%, replicas=2, on-disk requests **129m CPU / 66Mi mem**, failure.reason=cpu_utilization_exceeded
+- **WRONG**: 138m/73Mi — raises memory though mem_util is low → overshoots cost_score vs formula
+- **RIGHT**: **135m/66Mi** — CPU-only micro-bump (~ceil(129×96/92)); memory requests/limits **unchanged** vs on-disk; targets ~90–93% cpu_util_request_pct at PASS
 """
 
 VANILLA_LLM_SQUEEZE_PROMPT = """You are helping tune Kubernetes Deployment and HPA YAML after a stress test.
@@ -342,8 +348,13 @@ def build_user_prompt(
             at_single_pod and cfg_cpu <= thin_cpu and cfg_mem <= thin_mem
         )
         slo = experiment_json.get("slo") or {}
+        failure = experiment_json.get("failure") or {}
+        fail_reason = str(failure.get("reason") or "")
         p95 = float((obs.get("latency_ms") or {}).get("p95") or 0)
         slo_p95 = float(slo.get("p95_latency_ms") or 500)
+        cpu_req_pct = float(obs.get("cpu_util_request_pct") or 0.0)
+        cpu_lim_pct = float(obs.get("cpu_util_pct") or 0.0)
+        mem_util_pct = float(obs.get("mem_util_pct") or 0.0)
         sig = experiment_json.get("up_recovery_signals") or {}
         thr_ratio = sig.get("throughput_ratio")
         lat_ratio = sig.get("latency_ratio")
@@ -364,13 +375,20 @@ def build_user_prompt(
             f"bottleneck={bottleneck}, prefer_replica_step={prefer_rep}.\n"
             "- **One axis per iteration** — never combine a vertical CPU/mem bump with a replica bump at thin baseline.\n"
             "- Throughput collapse or prefer_replica_step at single pod → +1 replica + HPA maxReplicas (horizontal only).\n"
-            "- After horizontal step or when not at thin baseline: vertical CPU/mem from bottleneck; mem_util>100% → raise memory ≥ CPU step.\n"
+            "- After horizontal step or when not at thin baseline: **coupled vertical** — raise CPU **and** memory requests/limits by the same step factor (low mem_util does NOT excuse skipping memory; starving mem inflates CPU need and cost_score).\n"
+            "- mem_util>100% → memory step ≥ CPU step.\n"
             "- At most **one** replica per iteration when prefer_replica_step is true.\n"
             "- PASS requires p95 ≤ slo.p95_latency_ms, error_rate ≤ slo.error_rate, and (when telemetry "
-            "is trustworthy) cpu_util_pct ≤ 95%.\n"
+            "is trustworthy) **cpu_util_request_pct** ≤ 95% (request-relative — matches Python squeeze gate).\n"
+            "- **cpu_util_pct** is limit-relative (burn vs CPU limit); do NOT use it for PASS or replica "
+            "decisions and do NOT compare it to HPA target_cpu_util_pct (60%).\n"
+            "- When p95 and throughput already meet SLO but failure.reason is cpu_utilization_exceeded: "
+            "**vertical CPU/mem only** — hold spec.replicas and hpa maxReplicas unchanged.\n"
             "- Never scale DOWN while failure.failed is true.\n"
             f"- Current: deployment_replicas={dep_rep}, hpa max={hpa_max}, live={live_rep}, "
-            f"p95={p95:.0f}ms vs slo={slo_p95:.0f}ms, single_pod={at_single_pod}, "
+            f"p95={p95:.0f}ms vs slo={slo_p95:.0f}ms, "
+            f"cpu_util_request_pct={cpu_req_pct:.1f}%, cpu_util_pct(limit)={cpu_lim_pct:.1f}%, "
+            f"failure.reason={fail_reason or 'n/a'}, single_pod={at_single_pod}, "
             f"thin_baseline={at_thin_baseline}.\n"
         )
         if at_thin_baseline and prefer_rep:
@@ -391,10 +409,45 @@ def build_user_prompt(
         ):
             parts.append(
                 f"\n**VERTICAL-ONLY UP (mandatory this iteration)**: replicas are already ≥2 but CPU/mem are still "
-                f"thin (~{thin_cpu}m/{thin_mem}Mi) and SLO still fails. Raise CPU/memory **one ~15% metric step** "
-                f"from on-disk (e.g. 50m→58m, 25Mi→29Mi) — **hold spec.replicas and hpa maxReplicas unchanged**. "
-                f"Do NOT jump to 70m/35Mi in one step.\n"
+                f"thin (~{thin_cpu}m/{thin_mem}Mi) and SLO still fails. Raise CPU **and** memory requests/limits "
+                f"**one coupled ~15% step** from on-disk (e.g. 50m/25Mi→58m/29Mi) — **hold spec.replicas and "
+                f"hpa maxReplicas unchanged**. Do NOT bump CPU alone.\n"
             )
+        elif (
+            in_up_recovery
+            and failed
+            and p95 > 0
+            and p95 <= slo_p95
+            and fail_reason == "cpu_utilization_exceeded"
+        ):
+            if cpu_req_pct <= 105.0:
+                micro_cpu = max(
+                    cfg_cpu + 1,
+                    int(math.ceil(cfg_cpu * cpu_req_pct / 92.0)),
+                ) if cfg_cpu > 0 and cpu_req_pct > 0 else cfg_cpu
+                if mem_util_pct < 25.0:
+                    parts.append(
+                        "\n**CPU-GATE PRECISION UP (mandatory this iteration)**: p95 and throughput already meet SLO; "
+                        f"cpu_util_request_pct={cpu_req_pct:.1f}% is just above the 95% gate and mem_util_pct="
+                        f"{mem_util_pct:.1f}% is low — **CPU request only**, hold memory requests/limits **identical** "
+                        f"to on-disk. Set requests.cpu≈{micro_cpu}m (≈ceil(current×cpu_util_request_pct/92)) to land "
+                        "**90–93%** at PASS; scale limits ~2× request. **Hold replicas**. Do NOT add memory or replicas.\n"
+                    )
+                else:
+                    parts.append(
+                        "\n**CPU-GATE PRECISION UP (mandatory this iteration)**: p95 and throughput already meet SLO; "
+                        f"cpu_util_request_pct={cpu_req_pct:.1f}% is just above the 95% gate. "
+                        "Apply a **minimal coupled** CPU+memory bump (~5–8% vs on-disk) sized to land "
+                        "**90–93%** cpu_util_request_pct at PASS — **hold replicas**. Prefer the smallest step that "
+                        "clears the gate; do not overshoot CPU or memory.\n"
+                    )
+            else:
+                parts.append(
+                    "\n**CPU-GATE-ONLY UP (mandatory this iteration)**: p95 and throughput already meet SLO; "
+                    f"cpu_util_request_pct={cpu_req_pct:.1f}% exceeds the 95% squeeze gate. "
+                    "Raise CPU **and** memory requests/limits **one coupled ~15% step** from on-disk — "
+                    "**hold spec.replicas and hpa maxReplicas unchanged**. Do NOT add replicas or bump CPU alone.\n"
+                )
     if mode == "squeeze" and not in_up_recovery:
         prev = experiment_json.get("_prev_iteration") or {}
         prev_axis = prev.get("squeeze_down_axis") or "none"

@@ -1,0 +1,8 @@
+- Current deployment has 2 replicas with CPU and memory thresholds at 100m and 50Mi respectively.
+- Achieved 220 RPS but failure due to CPU utilization exceeding (cpu_util_request_pct: 172.5%).
+- p95 latency at 364ms, well below the SLO target of 500ms.
+- Memory utilization is acceptable (47.2%) while CPU is over-committed.
+- Scaling should be vertical since both metrics show sustained pressure, allowing for a coupled step process.
+- Proposed changes will maintain the current number of replicas while increasing resource requests and limits.
+- A 15% increase suggests adjustments to CPU/memory to improve request handling capacity without scaling out prematurely.
+- Current cost score is relatively low at 0.0949, with a focus on maintaining this post adjustment.

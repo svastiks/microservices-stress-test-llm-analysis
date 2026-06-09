@@ -315,6 +315,16 @@ def _run_once(
     )
     if mode == "squeeze":
         _run_squeeze_warmup_k6(profile_config, script, base_url)
+    cluster_snapshot_pre_k6 = None
+    if k8s_namespace and k8s_deployment:
+        from analysis.apply_diff import snapshot_measure_context
+
+        cluster_snapshot_pre_k6 = snapshot_measure_context(
+            deployment_name=k8s_deployment,
+            namespace=k8s_namespace,
+            deployment_yaml_path=REPO_ROOT / deployment_yaml,
+            phase="pre_k6",
+        )
     start_ts = time.time()
     k6_exit = run_k6(profile_config, script, base_url=base_url)
     k6_snapshot = _read_k6_snapshot()
@@ -355,6 +365,8 @@ def _run_once(
         run_meta["up_recovery"] = True
     if squeeze_optimizer and squeeze_optimizer != "hybrid":
         run_meta["squeeze_optimizer"] = squeeze_optimizer
+    if cluster_snapshot_pre_k6 is not None:
+        run_meta["cluster_snapshot_pre_k6"] = cluster_snapshot_pre_k6
     _write_run_meta(run_meta)
     _log("analysis_start")
     run_dir = analysis_main()
@@ -362,12 +374,17 @@ def _run_once(
     if run_dir is not None:
         status, exp = _read_experiment_status(run_dir)
         failure_reason = (exp.get("failure") or {}).get("reason")
-        telemetry = ((exp.get("observed") or {}).get("telemetry") or {})
+        obs = exp.get("observed") or {}
+        telemetry = obs.get("telemetry") or {}
+        cpu_pp = telemetry.get("cpu_per_pod") or []
         _log(
             f"experiment_status={status} failure_reason={failure_reason} "
-            f"cpu_util_pct={(exp.get('observed') or {}).get('cpu_util_pct')} "
-            f"mem_util_pct={(exp.get('observed') or {}).get('mem_util_pct')} "
-            f"utilization_trustworthy={telemetry.get('utilization_trustworthy')}"
+            f"burn_m={obs.get('cpu_usage_avg_m')} cpu_pct_req={obs.get('cpu_util_request_pct')} "
+            f"repl={obs.get('replicas')} prom_pods={telemetry.get('prom_pod_count')} "
+            f"repl_mismatch={telemetry.get('replica_count_mismatch')} "
+            f"cpu_util_pct={obs.get('cpu_util_pct')} mem_util_pct={obs.get('mem_util_pct')} "
+            f"utilization_trustworthy={telemetry.get('utilization_trustworthy')} "
+            f"per_pod={[p.get('pod') + ':' + str(p.get('cpu_mean_m')) for p in cpu_pp]}"
         )
     if run_dir is not None:
         try:

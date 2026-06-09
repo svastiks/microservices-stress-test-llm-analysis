@@ -1,0 +1,27 @@
+{
+  "phase": "pre_k6",
+  "ts": 1781009407.644265,
+  "live": {
+    "dep_spec": 1,
+    "ready": 1,
+    "updated": 1,
+    "available": 1,
+    "hpa_current": 1,
+    "hpa_desired": 1,
+    "hpa_max": 1
+  },
+  "yaml_replicas": 1,
+  "pods": [
+    {
+      "name": "web-68b6d445c6-2h5zt",
+      "phase": "Running",
+      "ready_containers": 1,
+      "container_count": 1,
+      "pod_ip": "10.42.7.138",
+      "start_time": "2026-06-09T12:46:51Z",
+      "node": "worker2"
+    }
+  ],
+  "pod_count": 1,
+  "endpoint_addrs": []
+}

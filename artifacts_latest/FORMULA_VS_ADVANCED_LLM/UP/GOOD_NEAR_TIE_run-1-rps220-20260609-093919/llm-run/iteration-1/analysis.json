@@ -1,0 +1,49 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 1,
+    "provisioned_request_cpu_m": 50,
+    "provisioned_request_mem_mib": 25,
+    "provisioned_limit_cpu_m": 100,
+    "provisioned_limit_mem_mib": 50,
+    "per_pod_unit_cost": 0.047441,
+    "per_pod_unit_cost_util": 0.044861,
+    "cost_score": 0.0474,
+    "cost_score_util": 0.0449,
+    "cost_score_legacy": 0.0744
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "NONE",
+  "over_provisioned": false,
+  "evidence": [
+    "Current CPU request utilization (cpu_util_request_pct) is 189.7%, indicating over-provisioning.",
+    "p95 latency of 3965ms significantly exceeds the SLO of 500ms, triggering a failure.",
+    "This iteration increases replicas from 1 to 2 to address the immediate scaling needs.",
+    "observed.replicas: 1",
+    "observed.replicas_max: 1"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "SLO/error stress while replicas are at HPA max; scale up CPU/memory limits and/or raise HPA max to recover headroom.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 216.7,
+    "error_rate": 0.0,
+    "latency_ms_p95": 3965.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 94.9,
+    "mem_util_pct": 88.3,
+    "replicas": 1,
+    "replicas_max": 1,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.95,
+    "total_requests": 19771
+  }
+}

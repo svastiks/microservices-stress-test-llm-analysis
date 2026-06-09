@@ -1,0 +1,10 @@
+- Current configuration is under-provisioned for the workload with high CPU utilization.
+- The SLO has failed due to p95 latency exceeding the target.
+- Achieved RPS is equal to the target, but with excess CPU utilization and memory usage.
+- Utilization metrics indicate a CPU bottleneck, suggesting a need for horizontal scaling.
+- A replica-first approach is mandated given the thin baseline and preference for horizontal scaling.
+- No changes to CPU or memory requests/limits this iteration are proposed.
+- Transitioning to 2 replicas should improve CPU request distribution and reduce latency.
+- Cost metrics are acceptable, and scaling up should minimize further cost escalation if SLO is met.
+- Evidence includes a p95 latency of 3005ms (exceeds 500ms SLO) and cpu_util_request_pct of 187.8%, confirming the need for replicas.
+- The current YAML configuration is kept the same, with scaling changes reflected in the HPA.

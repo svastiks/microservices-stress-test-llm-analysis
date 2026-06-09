@@ -428,6 +428,96 @@ def read_yaml_target_replicas(deployment_yaml_path: Path) -> int:
         return 0
 
 
+def snapshot_measure_context(
+    *,
+    deployment_name: str,
+    namespace: str,
+    deployment_yaml_path: Path | None = None,
+    phase: str = "pre_k6",
+    service_name: str | None = None,
+) -> dict:
+    """Low-level cluster snapshot before/around k6 (pods, replicas, endpoints)."""
+    live = live_replica_state(deployment_name=deployment_name, namespace=namespace)
+    yaml_repl = (
+        read_yaml_target_replicas(deployment_yaml_path)
+        if deployment_yaml_path and deployment_yaml_path.exists()
+        else None
+    )
+    pods: list[dict] = []
+    try:
+        raw = subprocess.run(
+            ["kubectl", "-n", namespace, "get", "pods", "-o", "json"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        )
+        prefix = f"{deployment_name}-"
+        for item in json.loads(raw.stdout).get("items") or []:
+            name = (item.get("metadata") or {}).get("name") or ""
+            if not name.startswith(prefix):
+                continue
+            st = item.get("status") or {}
+            cs = st.get("containerStatuses") or []
+            pods.append(
+                {
+                    "name": name,
+                    "phase": st.get("phase"),
+                    "ready_containers": sum(1 for c in cs if c.get("ready")),
+                    "container_count": len(cs),
+                    "pod_ip": st.get("podIP"),
+                    "start_time": st.get("startTime"),
+                    "node": (item.get("spec") or {}).get("nodeName"),
+                }
+            )
+    except Exception as exc:
+        pods = [{"error": str(exc)}]
+
+    endpoint_addrs: list[str] = []
+    svc = service_name or deployment_name
+    try:
+        ep = _kubectl_get_json("endpoints", svc, namespace)
+        for subset in ep.get("subsets") or []:
+            for addr in subset.get("addresses") or []:
+                target = addr.get("targetRef") or {}
+                endpoint_addrs.append(
+                    f"{addr.get('ip')}:{subset.get('ports', [{}])[0].get('port', '?')} "
+                    f"pod={target.get('name', '?')}"
+                )
+    except Exception:
+        pass
+
+    snap = {
+        "phase": phase,
+        "ts": time.time(),
+        "live": live,
+        "yaml_replicas": yaml_repl,
+        "pods": pods,
+        "pod_count": len([p for p in pods if "error" not in p]),
+        "endpoint_addrs": endpoint_addrs,
+    }
+    print(
+        f"[measure-ctx] {phase} yaml_repl={yaml_repl} dep_spec={live['dep_spec']} "
+        f"ready={live['ready']} updated={live['updated']} available={live['available']} "
+        f"hpa_cur={live['hpa_current']} hpa_des={live['hpa_desired']} hpa_max={live['hpa_max']} "
+        f"pod_count={snap['pod_count']} endpoints={len(endpoint_addrs)}",
+        flush=True,
+    )
+    for p in pods:
+        if "error" in p:
+            print(f"[measure-ctx] pod_list_error={p['error']}", flush=True)
+            continue
+        print(
+            f"[measure-ctx] pod name={p['name']} phase={p['phase']} "
+            f"ready={p['ready_containers']}/{p['container_count']} "
+            f"ip={p['pod_ip']} node={p.get('node')} start={p.get('start_time')}",
+            flush=True,
+        )
+    for ep in endpoint_addrs:
+        print(f"[measure-ctx] endpoint {ep}", flush=True)
+    return snap
+
+
 def live_replica_state(
     *,
     deployment_name: str,
@@ -535,6 +625,12 @@ def ensure_squeeze_cluster_ready_before_k6(
         deployment_name=deployment_name,
         namespace=namespace,
         timeout_s=timeout_s,
+    )
+    snapshot_measure_context(
+        deployment_name=deployment_name,
+        namespace=namespace,
+        deployment_yaml_path=deployment_yaml_path,
+        phase="post_pin_pre_k6",
     )
 
 

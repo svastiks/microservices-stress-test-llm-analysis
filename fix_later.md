@@ -1,0 +1,1 @@
+Mostly yes — the main fix is a prompt change so the LLM uses request-relative CPU and goes vertical-only when p95 passes; there’s also a small Python guard that blocks replica bumps in that same case if the LLM still tries.

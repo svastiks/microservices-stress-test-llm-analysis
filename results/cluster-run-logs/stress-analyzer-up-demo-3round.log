@@ -1,0 +1,155 @@
+[2026-06-09 15:52:46] [compare-up-sweep] sweep artifacts root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-up-sweep-20260609-155246
+[2026-06-09 15:52:46] [compare-up-sweep] mode=rps_overrides profile=up_demo rounds=3: rps=220 rps=240 rps=260
+[2026-06-09 15:52:46] [compare-up-sweep] all rounds write under RESULTS_DEST=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-up-sweep-20260609-155246 (local run-1..run-N per sweep round)
+[2026-06-09 15:52:46] [compare-up-sweep] === round 1/3 profile=up_demo STRESS_K6_RPS=220 STRESS_K6_DURATION=90s (compare) ===
+[2026-06-09 15:52:46] [compare-up-sweep] squeeze env: until_violation=false max_iter=16 formula_max=16 formula_uv=0 llm_pure=1 llm_down_boundary=0
+[2026-06-09 15:52:46] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-09 15:52:46] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-09 15:52:46] [cluster-run] switching context to: monitoring
+[2026-06-09 15:52:47] [cluster-run] context: monitoring
+[2026-06-09 15:52:47] [cluster-run] namespace: svastik
+[2026-06-09 15:52:47] [cluster-run] profiles: up_demo
+[2026-06-09 15:52:47] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-09 15:52:47] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-09 15:52:47] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-09 15:52:47] [cluster-run] build_analyzer_image: true
+[2026-06-09 15:52:47] [cluster-run] stream_job_logs: true
+[2026-06-09 15:52:47] [cluster-run] cleanup_completed_jobs: true
+[2026-06-09 15:52:47] [cluster-run] cleanup_terminal_pods: true
+[2026-06-09 15:52:47] [cluster-run] cleanup_failed_jobs: true
+[2026-06-09 15:52:47] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-09 15:52:47] [cluster-run] up_demo_stabilize_user: true
+[2026-06-09 15:52:47] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-09 15:52:47] [cluster-run] results_pvc_snapshots: false
+[2026-06-09 15:52:47] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-09 15:52:47] [cluster-run] results_stamped_comparison_md: false
+[2026-06-09 15:52:47] [cluster-run] compare_sweep_round: 1
+[2026-06-09 15:52:47] [cluster-run] extra args for analyzer job: --compare-squeeze-optimizers
+[2026-06-09 15:52:47] [cluster-run] building and pushing analyzer image: docker.io/svastik/microservices-stress-analyzer:latest
+#0 building with "multiarch-builder" instance using docker-container driver
+
+#1 [internal] load build definition from Dockerfile.analyzer
+#1 transferring dockerfile: 1.29kB 0.0s done
+#1 DONE 0.0s
+
+#2 [linux/amd64 internal] load metadata for docker.io/grafana/k6:0.55.0
+#2 ...
+
+#3 [auth] grafana/k6:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [linux/arm64 internal] load metadata for docker.io/grafana/k6:0.55.0
+#5 DONE 0.5s
+
+#6 [linux/arm64 internal] load metadata for docker.io/library/python:3.12-slim-bookworm
+#6 DONE 0.5s
+
+#2 [linux/amd64 internal] load metadata for docker.io/grafana/k6:0.55.0
+#2 DONE 0.5s
+
+#7 [linux/amd64 internal] load metadata for docker.io/library/python:3.12-slim-bookworm
+#7 DONE 0.5s
+
+#8 [internal] load .dockerignore
+#8 transferring context: 244B done
+#8 DONE 0.0s
+
+#9 [linux/amd64 k6bin 1/1] FROM docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2
+#9 resolve docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2 0.0s done
+#9 DONE 0.0s
+
+#10 [linux/arm64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:93ab4b7fa528b25124c97bcc755415e60eb671a86b4dbe0328df2fe2d1c1193d
+#10 resolve docker.io/library/python:3.12-slim-bookworm@sha256:93ab4b7fa528b25124c97bcc755415e60eb671a86b4dbe0328df2fe2d1c1193d 0.0s done
+#10 DONE 0.0s
+
+#11 [linux/arm64 k6bin 1/1] FROM docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2
+#11 resolve docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2 0.0s done
+#11 DONE 0.0s
+
+#12 [internal] load build context
+#12 transferring context: 7.60kB 0.0s done
+#12 DONE 0.0s
+
+#13 [linux/amd64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:93ab4b7fa528b25124c97bcc755415e60eb671a86b4dbe0328df2fe2d1c1193d
+#13 resolve docker.io/library/python:3.12-slim-bookworm@sha256:93ab4b7fa528b25124c97bcc755415e60eb671a86b4dbe0328df2fe2d1c1193d 0.0s done
+#13 DONE 0.0s
+
+#14 [linux/arm64 stage-1  5/10] COPY requirements.txt .
+#14 CACHED
+
+#15 [linux/arm64 stage-1  7/10] COPY start.py experiments.json ./
+#15 CACHED
+
+#16 [linux/arm64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#16 CACHED
+
+#17 [linux/arm64 stage-1  2/10] WORKDIR /app
+#17 CACHED
+
+#18 [linux/arm64 stage-1  9/10] COPY benchmarks/load-tests ./benchmarks/load-tests
+#18 CACHED
+
+#19 [linux/arm64 stage-1  4/10] COPY --from=k6bin /usr/bin/k6 /usr/local/bin/k6
+#19 CACHED
+
+#20 [linux/arm64 stage-1  6/10] RUN pip install --no-cache-dir -r requirements.txt
+#20 CACHED
+
+#21 [linux/arm64 stage-1  8/10] COPY analysis ./analysis
+#21 CACHED
+
+#22 [linux/arm64 stage-1 10/10] COPY infra/k8s/spark ./infra/k8s/spark
+#22 CACHED
+
+#23 [linux/amd64 stage-1  6/10] RUN pip install --no-cache-dir -r requirements.txt
+#23 CACHED
+
+#24 [linux/amd64 stage-1  7/10] COPY start.py experiments.json ./
+#24 CACHED
+
+#25 [linux/amd64 stage-1  9/10] COPY benchmarks/load-tests ./benchmarks/load-tests
+#25 CACHED
+
+#26 [linux/amd64 stage-1  2/10] WORKDIR /app
+#26 CACHED
+
+#27 [linux/amd64 stage-1  5/10] COPY requirements.txt .
+#27 CACHED
+
+#28 [linux/amd64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#28 CACHED
+
+#29 [linux/amd64 stage-1  4/10] COPY --from=k6bin /usr/bin/k6 /usr/local/bin/k6
+#29 CACHED
+
+#30 [linux/amd64 stage-1  8/10] COPY analysis ./analysis
+#30 CACHED
+
+#31 [linux/amd64 stage-1 10/10] COPY infra/k8s/spark ./infra/k8s/spark
+#31 CACHED
+
+#32 [auth] svastik/microservices-stress-analyzer:pull,push token for registry-1.docker.io
+#32 DONE 0.0s
+
+#33 exporting to image
+#33 exporting layers done
+#33 exporting manifest sha256:ae6c4807b060931ffea3fd206cb8495403246507ea21a80c98138626221c006e done
+#33 exporting config sha256:ac04fc96060c34a2b439efcd3c6423e302cc4931ab9b5307a518e08e44e14a62 done
+#33 exporting attestation manifest sha256:88f579288e20abc1fea63e8ad4eb48bd1c9d2b04169c58a562463c113ac6ae09 0.0s done
+#33 exporting manifest sha256:59726a7258f07f6db9883e0168b76d32eb2352e982f30c8526007134ec0d9c06 done
+#33 exporting config sha256:d53197287b1ab9643fd4951174c6896f9675ddbc2628d49e65f8929a4ceb1454 done
+#33 exporting attestation manifest sha256:cc95ba46cf83c0a00703016fbfe02e1ddfa219e3fa730d3dfcdf881f3bc69eae 0.0s done
+#33 exporting manifest list sha256:72d8ac7879bf770aee9d0bc15631e785b37688c570dea035a1a257027a7a6f57 done
+#33 pushing layers
+#33 pushing layers 1.2s done
+#33 pushing manifest for docker.io/svastik/microservices-stress-analyzer:latest@sha256:72d8ac7879bf770aee9d0bc15631e785b37688c570dea035a1a257027a7a6f57
+#33 pushing manifest for docker.io/svastik/microservices-stress-analyzer:latest@sha256:72d8ac7879bf770aee9d0bc15631e785b37688c570dea035a1a257027a7a6f57 4.2s done
+#33 DONE 5.5s
+
+View build details: docker-desktop://dashboard/build/multiarch-builder/multiarch-builder0/cxvap28hfokqvjjavvuat802u

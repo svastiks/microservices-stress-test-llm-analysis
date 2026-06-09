@@ -1639,6 +1639,8 @@ def _up_recovery_throughput_near_target(experiment: dict) -> bool:
 def _up_recovery_latency_slo_met(experiment: dict) -> bool:
     """p95 and throughput OK but row may still FAIL on cpu_util_request_pct gate."""
     r = _up_recovery_ratios(experiment)
+    if r["p95_ms"] <= 0:
+        return False
     return (
         r["p95_ms"] <= r["slo_p95_ms"]
         and r["throughput_ratio"] >= _up_recovery_throughput_ratio_floor()
@@ -1653,6 +1655,9 @@ def _up_recovery_prefers_replica_step(experiment: dict) -> bool:
         return False
     r = _up_recovery_ratios(experiment)
     thr_floor = _up_recovery_throughput_ratio_floor()
+    # Latency SLO already met — remaining FAIL is cpu gate (or similar); vertical only.
+    if r["p95_ms"] > 0 and r["p95_ms"] <= r["slo_p95_ms"] and r["throughput_ratio"] >= thr_floor:
+        return False
     # Throughput already near target but latency still failing → scale out.
     if r["throughput_ratio"] >= thr_floor:
         return True
@@ -1782,9 +1787,19 @@ def _guard_llm_up_recovery_yaml(
     max_rep = int(os.environ.get("SQUEEZE_UP_RECOVERY_MAX_REPLICAS", "6"))
     spec = dep_doc.setdefault("spec", {})
     proposed = int(spec.get("replicas") or file_repl)
-    cap = min(max_rep, max(live, file_repl) + 1)
+    hold_rep = max(live, file_repl)
+    cap = min(max_rep, hold_rep + 1)
     changed = False
     notes: list[str] = []
+    if _up_recovery_latency_slo_met(experiment) and proposed > hold_rep:
+        spec["replicas"] = hold_rep
+        changed = True
+        notes.append(
+            f"replicas_hold_latency_slo_met: llm={proposed} -> {hold_rep} "
+            "(p95+throughput OK; cpu gate only)"
+        )
+        result["deployment_yaml_new"] = yaml.safe_dump(dep_doc, sort_keys=False)
+        proposed = hold_rep
     if proposed > cap:
         spec["replicas"] = cap
         changed = True
@@ -1816,6 +1831,146 @@ def _guard_llm_up_recovery_yaml(
         ev = list(result.get("evidence") or [])
         ev.append("guard.up_recovery: " + "; ".join(notes))
         result["evidence"] = ev
+
+
+def _deployment_container_requests(doc: dict | None) -> tuple[int, int] | None:
+    if not isinstance(doc, dict) or doc.get("kind") != "Deployment":
+        return None
+    containers = (
+        ((doc.get("spec") or {}).get("template") or {}).get("spec") or {}
+    ).get("containers") or []
+    if not containers:
+        return None
+    req = (containers[0].get("resources") or {}).get("requests") or {}
+    return _millicpu_value(req.get("cpu")), _mib_value(req.get("memory"))
+
+
+def _up_recovery_cpu_gate_precision_active(experiment: dict) -> bool:
+    """p95 OK, only cpu_util_request_pct gate fails, near threshold, low mem."""
+    if not _in_up_recovery_path(experiment):
+        return False
+    failure = experiment.get("failure") or {}
+    if not failure.get("failed"):
+        return False
+    if failure.get("reason") != "cpu_utilization_exceeded":
+        return False
+    if not _up_recovery_latency_slo_met(experiment):
+        return False
+    obs = experiment.get("observed") or {}
+    cpu_req_pct = float(obs.get("cpu_util_request_pct") or 0.0)
+    mem_util = float(obs.get("mem_util_pct") or 0.0)
+    return cpu_req_pct <= 105.0 and mem_util < 25.0
+
+
+def _llm_up_recovery_precision_mem_violation(
+    result: dict,
+    experiment: dict,
+    deployment_yaml_path: Path,
+) -> bool:
+    """True when LLM raised memory during CPU-gate precision finish (should be CPU-only)."""
+    if not _up_recovery_cpu_gate_precision_active(experiment):
+        return False
+    dep_new = (result.get("deployment_yaml_new") or "").strip()
+    if not dep_new or not deployment_yaml_path.exists():
+        return False
+    try:
+        prop_doc = yaml.safe_load(dep_new)
+        file_doc = yaml.safe_load(deployment_yaml_path.read_text())
+    except Exception:
+        return False
+    prop_req = _deployment_container_requests(prop_doc)
+    file_req = _deployment_container_requests(file_doc)
+    if not prop_req or not file_req:
+        return False
+    _, prop_mem = prop_req
+    _, file_mem = file_req
+    return prop_mem > file_mem
+
+
+def _repair_llm_up_recovery_cpu_gate_precision(
+    result: dict,
+    experiment: dict,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+    *,
+    rejected_deployment_yaml: str,
+    rejected_hpa_yaml: str,
+) -> bool:
+    """One-shot LLM repair: CPU-only micro-bump at UP cpu-gate precision finish."""
+    cfg = experiment.get("config") or {}
+    obs = experiment.get("observed") or {}
+    cfg_cpu = int(cfg.get("cpu_request_m") or 0)
+    cfg_mem = int(cfg.get("mem_request_mib") or 0)
+    cpu_req_pct = float(obs.get("cpu_util_request_pct") or 0.0)
+    micro_cpu = (
+        max(cfg_cpu + 1, int(math.ceil(cfg_cpu * cpu_req_pct / 92.0)))
+        if cfg_cpu > 0 and cpu_req_pct > 0
+        else cfg_cpu
+    )
+    baseline_yaml = load_current_yaml(deployment_yaml_path, hpa_yaml_path)
+    rejected_blocks: list[str] = []
+    if rejected_deployment_yaml.strip():
+        rejected_blocks.append(
+            "## Your rejected proposal (raised memory at CPU-gate precision finish)\n"
+            "```yaml\n"
+            f"{rejected_deployment_yaml.strip()}\n"
+            "```"
+        )
+    if rejected_hpa_yaml.strip():
+        rejected_blocks.append(
+            "## Your rejected HPA proposal\n"
+            "```yaml\n"
+            f"{rejected_hpa_yaml.strip()}\n"
+            "```"
+        )
+    repair_user = (
+        build_user_prompt(experiment, baseline_yaml, mode="squeeze")
+        + "\n\nREPAIR (mandatory): UP recovery cpu-gate **precision finish**. p95 and throughput "
+        "already PASS; only cpu_util_request_pct exceeds 95%. mem_util_pct is low — your previous "
+        "YAML **raised memory** vs on-disk. That is forbidden at this frontier (cost_score is "
+        "CPU-heavy; formula wins when you overshoot memory).\n\n"
+        f"Return FULL deployment_yaml_new with requests.cpu≈{micro_cpu}m (target ~90–93% "
+        f"cpu_util_request_pct), memory requests/limits **identical** to on-disk ({cfg_mem}Mi), "
+        "spec.replicas unchanged. Scale limits ~2× CPU request. hpa_yaml_new only if needed.\n\n"
+        + ("\n\n".join(rejected_blocks) if rejected_blocks else "")
+    )
+    repaired = analyze_with_llm(EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT, repair_user)
+    repaired = _postprocess_llm_result(repaired, experiment)
+    if (repaired.get("deployment_yaml_new") or "").strip():
+        result["deployment_yaml_new"] = repaired["deployment_yaml_new"]
+    if (repaired.get("hpa_yaml_new") or "").strip():
+        result["hpa_yaml_new"] = repaired["hpa_yaml_new"]
+    if not (result.get("deployment_yaml_new") or "").strip():
+        return False
+    _guard_llm_up_recovery_yaml(result, experiment, deployment_yaml_path, hpa_yaml_path)
+    ev = list(result.get("evidence") or [])
+    ev.append("guard.llm_repair_up_cpu_gate_precision")
+    result["evidence"] = ev
+    return True
+
+
+def _maybe_repair_llm_up_recovery_precision(
+    result: dict,
+    experiment: dict,
+    deployment_yaml_path: Path,
+    hpa_yaml_path: Path,
+) -> None:
+    if experiment.get("squeeze_optimizer") != "llm":
+        return
+    if not _llm_up_recovery_precision_mem_violation(
+        result, experiment, deployment_yaml_path
+    ):
+        return
+    rejected_dep = (result.get("deployment_yaml_new") or "").strip()
+    rejected_hpa = (result.get("hpa_yaml_new") or "").strip()
+    _repair_llm_up_recovery_cpu_gate_precision(
+        result,
+        experiment,
+        deployment_yaml_path,
+        hpa_yaml_path,
+        rejected_deployment_yaml=rejected_dep,
+        rejected_hpa_yaml=rejected_hpa,
+    )
 
 
 def _compute_step_pct(experiment: dict) -> float:
@@ -2470,6 +2625,9 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             telem = (observed_override or {}).get("telemetry") or {}
             _log(
                 "prometheus_collect_done "
+                f"burn_m={(observed_override or {}).get('cpu_usage_avg_m')} "
+                f"cpu_pct_req={(observed_override or {}).get('cpu_util_request_pct')} "
+                f"prom_pods={telem.get('prom_pod_count')} repl_mismatch={telem.get('replica_count_mismatch')} "
                 f"cpu_util_pct={(observed_override or {}).get('cpu_util_pct')} "
                 f"mem_util_pct={(observed_override or {}).get('mem_util_pct')} "
                 f"cpu_series_matched={telem.get('cpu_series_matched')} "
@@ -2484,6 +2642,11 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
         experiment_config=experiment_config,
         observed_override=observed_override,
     )
+    if meta and meta.get("cluster_snapshot_pre_k6"):
+        exp_data["cluster_snapshot_pre_k6"] = meta["cluster_snapshot_pre_k6"]
+        (run_dir / "cluster-snapshot-prek6.json").write_text(
+            json.dumps(meta["cluster_snapshot_pre_k6"], indent=2)
+        )
     if start_ts is not None:
         exp_data["start_ts"] = start_ts
     if end_ts is not None:
@@ -2595,6 +2758,9 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
         if use_efficiency and squeeze_opt == "llm" and not _llm_vanilla_squeeze():
             if _in_up_recovery_path(exp_data):
                 _guard_llm_up_recovery_yaml(
+                    result, exp_data, deployment_yaml_path, hpa_yaml_path
+                )
+                _maybe_repair_llm_up_recovery_precision(
                     result, exp_data, deployment_yaml_path, hpa_yaml_path
                 )
         if use_efficiency and squeeze_opt == "hybrid":

@@ -1,0 +1,8 @@
+- The observed CPU utilization relative to the request is at 124.9%, indicating under-provisioning for the required workload.
+- The workload is achieving the target RPS but fails due to exceeding CPU request utilization which leads to a failure status.
+- The current SLO targets are met in terms of latency and error rate, suggesting operational efficiency but insufficient resource allocation.
+- It is critical to only adjust the CPU and memory requests and limits this iteration, maintaining the replica count stable at two to ensure stability.
+- Increasing both CPU and memory requests and limits by about 15% each is essential to ensure the application can handle the workload without failing.
+- There is no change in the number of replicas or HPA configuration this iteration as it is prudent to stabilize the deployment after adjusting resource requests/limits.
+- This coupled vertical step aims to prevent future failures due to resource exhaustion whilst minimizing the overall cost score based on current and projected metrics.
+- Observed values for cost score highlight potential cost optimization is possible if the adjustments increase efficiency without surpassing current limits excessively.

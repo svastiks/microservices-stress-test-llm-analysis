@@ -1,0 +1,6 @@
+- Conducted an UP recovery iteration to meet SLO as the previous test failed due to exceeding CPU request utilization. 
+- Current p95 latency (246ms) and throughput (220 RPS) are within SLO limits, while cpu_util_request_pct (138.7%) is too high for efficient operation. 
+- Horizontal scaling was avoided this iteration, as per existing conditions — deployment stable with 2 pods. 
+- Implemented a coupled vertical increase of approximately 15% for both CPU and memory requests/limits, as current resource consumption indicates above threshold utilization and seeks to optimize cost while meeting performance requirements. 
+- The deployment and HPA configurations remain consistent to stabilize CPU utilization after increasing capacity. 
+- Expected outcome: lower CPU utilization and confirmation of SLO under updated resources, driving down cost_score to enhance efficiency.

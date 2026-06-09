@@ -1,0 +1,28 @@
+--- infra/k8s/spark/robot-shop-web-deployment.yaml
++++ infra/k8s/spark/robot-shop-web-deployment.yaml
+@@ -1,5 +1,3 @@
+-# FILE: infra/k8s/spark/robot-shop-web-deployment.yaml
+-
+ apiVersion: apps/v1
+ kind: Deployment
+ metadata:
+
+--- infra/k8s/spark/robot-shop-web-hpa.yaml
++++ infra/k8s/spark/robot-shop-web-hpa.yaml
+@@ -9,14 +9,14 @@
+     kind: Deployment
+     name: web
+   minReplicas: 1
+-  maxReplicas: 2
++  maxReplicas: 3
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0
+       selectPolicy: Max
+       policies:
+       - type: Pods
+-        value: 2
++        value: 3
+         periodSeconds: 15
+     scaleDown:
+       stabilizationWindowSeconds: 60

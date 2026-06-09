@@ -1,8 +1,11 @@
 import unittest
 
 from analysis.prometheus_collect import (
+    _max_sample_count,
     _mean_value,
     _max_value,
+    _min_prom_samples,
+    _prom_range_step,
     _sum_series_means,
     _sum_series_maxima,
     _util_pct,
@@ -35,6 +38,15 @@ class PrometheusCollectAggTests(unittest.TestCase):
     def test_mean_lower_than_peak_for_same_series(self) -> None:
         s = _series(40.0, 80.0, 60.0)
         self.assertLess(_mean_value(s), _max_value(s))
+
+    def test_prom_range_step_90s_window(self) -> None:
+        self.assertEqual(_prom_range_step(0.0, 90.0), "5s")
+
+    def test_min_samples_default(self) -> None:
+        self.assertGreaterEqual(_min_prom_samples(), 12)
+
+    def test_max_sample_count(self) -> None:
+        self.assertEqual(_max_sample_count(_series(1.0, 2.0, 3.0, 4.0)), 4)
 
 
 if __name__ == "__main__":
