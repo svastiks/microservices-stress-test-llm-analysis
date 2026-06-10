@@ -1,0 +1,48 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 178,
+    "provisioned_request_mem_mib": 90,
+    "provisioned_limit_cpu_m": 348,
+    "provisioned_limit_mem_mib": 174,
+    "per_pod_unit_cost": 0.084495,
+    "per_pod_unit_cost_util": 0.058332,
+    "cost_score": 0.169,
+    "cost_score_util": 0.1167,
+    "cost_score_legacy": 0.2659
+  },
+  "failure_archetype": "CPU_THROTTLING",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "LOW",
+  "over_provisioned": false,
+  "evidence": [
+    "Observed CPU utilization request percentage is at 140.1%, causing failure.reason=cpu_utilization_exceeded.",
+    "Cost score calculated at 0.169; provisioned_request_cpu_m = 178; provisioned_request_mem_mib = 90.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "Under-provisioning recovery sweep: keep increasing capacity until SLO passes.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 239.4,
+    "error_rate": 0.0,
+    "latency_ms_p95": 316.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 71.6,
+    "mem_util_pct": 22.3,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.72,
+    "total_requests": 21600
+  }
+}

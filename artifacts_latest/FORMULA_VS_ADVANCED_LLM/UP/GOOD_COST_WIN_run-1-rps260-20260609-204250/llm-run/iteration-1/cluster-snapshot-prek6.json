@@ -1,0 +1,27 @@
+{
+  "phase": "pre_k6",
+  "ts": 1781054494.4247272,
+  "live": {
+    "dep_spec": 1,
+    "ready": 1,
+    "updated": 1,
+    "available": 1,
+    "hpa_current": 1,
+    "hpa_desired": 1,
+    "hpa_max": 1
+  },
+  "yaml_replicas": 1,
+  "pods": [
+    {
+      "name": "web-7c756d6d8f-xhjbn",
+      "phase": "Running",
+      "ready_containers": 1,
+      "container_count": 1,
+      "pod_ip": "10.42.7.194",
+      "start_time": "2026-06-10T01:18:41Z",
+      "node": "worker2"
+    }
+  ],
+  "pod_count": 1,
+  "endpoint_addrs": []
+}

@@ -33,7 +33,7 @@ def _iter1_up_recovery_gate(
         return "down_squeeze_continue"
     fail_1 = failed
     up_demo_fail_recovery = (
-        is_up_demo and fail_1 and scaling_hint in ("UP", "HOLD", None)
+        is_up_demo and fail_1 and scaling_hint in ("UP", "HOLD", None, "UNKNOWN")
     )
     if (has_diff and scaling_hint == "UP") or up_demo_fail_recovery:
         return "up_recovery"
@@ -737,7 +737,85 @@ spec:
             )
             _guard_llm_up_recovery_yaml(result, exp, dep_path, hpa_path)
         self.assertIn("replicas: 2", result["deployment_yaml_new"])
-        self.assertIn("replicas_hold_latency_slo_met", " ".join(result.get("evidence") or []))
+        evidence = " ".join(result.get("evidence") or [])
+        self.assertTrue(
+            "replicas_hold_multi_pod" in evidence or "replicas_hold_latency_slo_met" in evidence,
+            evidence,
+        )
+
+    def test_enforce_cpu_only_vertical_blocks_coupled_mem_bump(self) -> None:
+        """240 iter-8 shape: p95 OK, cpu 106.8%, mem slack — hold 60Mi, +8m CPU not 132/69."""
+        from analysis.results import _enforce_llm_up_recovery_cpu_only_vertical
+        import tempfile
+        from pathlib import Path
+
+        exp = {
+            "analysis_goal": "efficiency",
+            "squeeze_optimizer": "llm",
+            "up_recovery": True,
+            "failure": {"failed": True, "reason": "cpu_utilization_exceeded"},
+            "workload": {"target_requests_per_second": 240},
+            "slo": {"p95_latency_ms": 500},
+            "config": {
+                "cpu_request_m": 115,
+                "mem_request_mib": 60,
+                "deployment_replicas": 2,
+            },
+            "observed": {
+                "replicas": 2,
+                "replicas_max": 2,
+                "achieved_requests_per_second_target_window": 240.0,
+                "latency_ms": {"p95": 283},
+                "cpu_util_request_pct": 106.8,
+                "mem_util_pct": 15.5,
+            },
+        }
+        coupled = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 132m
+            memory: 69Mi
+          limits:
+            cpu: 264m
+            memory: 138Mi
+"""
+        file_dep = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 115m
+            memory: 60Mi
+          limits:
+            cpu: 230m
+            memory: 120Mi
+"""
+        result = {"deployment_yaml_new": coupled, "evidence": []}
+        with tempfile.TemporaryDirectory() as td:
+            dep_path = Path(td) / "dep.yaml"
+            dep_path.write_text(file_dep)
+            _enforce_llm_up_recovery_cpu_only_vertical(result, exp, dep_path)
+        out = result["deployment_yaml_new"]
+        self.assertIn("cpu: 123m", out)
+        self.assertIn("memory: 60Mi", out)
+        self.assertNotIn("memory: 69Mi", out)
+        self.assertIn("guard.cpu_only_vertical", " ".join(result.get("evidence") or []))
 
     def test_up_recovery_precision_mem_violation_detects_coupled_bump(self) -> None:
         from analysis.results import (

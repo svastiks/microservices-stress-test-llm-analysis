@@ -1788,10 +1788,23 @@ def _guard_llm_up_recovery_yaml(
     spec = dep_doc.setdefault("spec", {})
     proposed = int(spec.get("replicas") or file_repl)
     hold_rep = max(live, file_repl)
-    cap = min(max_rep, hold_rep + 1)
+    prefer_rep = _up_recovery_prefers_replica_step(experiment)
+    if hold_rep >= 2 or not prefer_rep:
+        cap = hold_rep
+    else:
+        cap = min(max_rep, hold_rep + 1)
     changed = False
     notes: list[str] = []
-    if _up_recovery_latency_slo_met(experiment) and proposed > hold_rep:
+    if hold_rep >= 2 and proposed > hold_rep:
+        spec["replicas"] = hold_rep
+        changed = True
+        notes.append(
+            f"replicas_hold_multi_pod: llm={proposed} -> {hold_rep} "
+            "(≥2 pods; vertical-only UP recovery)"
+        )
+        result["deployment_yaml_new"] = yaml.safe_dump(dep_doc, sort_keys=False)
+        proposed = hold_rep
+    elif _up_recovery_latency_slo_met(experiment) and proposed > hold_rep:
         spec["replicas"] = hold_rep
         changed = True
         notes.append(
@@ -1846,7 +1859,12 @@ def _deployment_container_requests(doc: dict | None) -> tuple[int, int] | None:
 
 
 def _up_recovery_cpu_gate_precision_active(experiment: dict) -> bool:
-    """p95 OK, only cpu_util_request_pct gate fails, near threshold, low mem."""
+    """p95 OK, only cpu_util_request_pct gate fails, low mem — CPU-only vertical finish."""
+    return _up_recovery_cpu_only_vertical_active(experiment)
+
+
+def _up_recovery_cpu_only_vertical_active(experiment: dict) -> bool:
+    """p95+throughput OK, cpu gate fails, mem slack — forbid coupled mem bumps."""
     if not _in_up_recovery_path(experiment):
         return False
     failure = experiment.get("failure") or {}
@@ -1859,7 +1877,24 @@ def _up_recovery_cpu_gate_precision_active(experiment: dict) -> bool:
     obs = experiment.get("observed") or {}
     cpu_req_pct = float(obs.get("cpu_util_request_pct") or 0.0)
     mem_util = float(obs.get("mem_util_pct") or 0.0)
-    return cpu_req_pct <= 105.0 and mem_util < 25.0
+    max_pct = float(os.environ.get("SQUEEZE_UP_RECOVERY_CPU_ONLY_MAX_PCT", "130"))
+    return mem_util < 25.0 and cpu_req_pct <= max_pct
+
+
+def _up_recovery_cpu_precision_target_m(experiment: dict) -> int:
+    """Sized CPU request for cpu-gate finish; capped per-iteration step for cost."""
+    cfg = experiment.get("config") or {}
+    obs = experiment.get("observed") or {}
+    cfg_cpu = int(cfg.get("cpu_request_m") or 0)
+    cpu_req_pct = float(obs.get("cpu_util_request_pct") or 0.0)
+    max_step = int(os.environ.get("SQUEEZE_UP_RECOVERY_CPU_PRECISION_MAX_STEP_M", "8"))
+    target_pct = float(os.environ.get("SQUEEZE_UP_RECOVERY_CPU_PRECISION_TARGET_PCT", "93.0"))
+    sized = (
+        max(cfg_cpu + 1, int(math.ceil(cfg_cpu * cpu_req_pct / target_pct)))
+        if cfg_cpu > 0 and cpu_req_pct > 0
+        else cfg_cpu
+    )
+    return min(sized, cfg_cpu + max_step)
 
 
 def _llm_up_recovery_precision_mem_violation(
@@ -1902,11 +1937,7 @@ def _repair_llm_up_recovery_cpu_gate_precision(
     cfg_cpu = int(cfg.get("cpu_request_m") or 0)
     cfg_mem = int(cfg.get("mem_request_mib") or 0)
     cpu_req_pct = float(obs.get("cpu_util_request_pct") or 0.0)
-    micro_cpu = (
-        max(cfg_cpu + 1, int(math.ceil(cfg_cpu * cpu_req_pct / 92.0)))
-        if cfg_cpu > 0 and cpu_req_pct > 0
-        else cfg_cpu
-    )
+    micro_cpu = _up_recovery_cpu_precision_target_m(experiment)
     baseline_yaml = load_current_yaml(deployment_yaml_path, hpa_yaml_path)
     rejected_blocks: list[str] = []
     if rejected_deployment_yaml.strip():
@@ -1947,6 +1978,65 @@ def _repair_llm_up_recovery_cpu_gate_precision(
     ev.append("guard.llm_repair_up_cpu_gate_precision")
     result["evidence"] = ev
     return True
+
+
+def _enforce_llm_up_recovery_cpu_only_vertical(
+    result: dict,
+    experiment: dict,
+    deployment_yaml_path: Path,
+) -> None:
+    """Deterministic CPU-only micro-step when p95 OK and mem is slack (cost frontier)."""
+    if experiment.get("squeeze_optimizer") != "llm":
+        return
+    if not _up_recovery_cpu_only_vertical_active(experiment):
+        return
+    dep_new = (result.get("deployment_yaml_new") or "").strip()
+    if not dep_new or not deployment_yaml_path.exists():
+        return
+    try:
+        prop_doc = yaml.safe_load(dep_new)
+        file_doc = yaml.safe_load(deployment_yaml_path.read_text())
+    except Exception:
+        return
+    if not isinstance(prop_doc, dict) or not isinstance(file_doc, dict):
+        return
+    if prop_doc.get("kind") != "Deployment" or file_doc.get("kind") != "Deployment":
+        return
+
+    file_req, file_lim = _container_requests(file_doc)
+    prop_req, prop_lim = _container_requests(prop_doc)
+    file_cpu = _millicpu_value(file_req.get("cpu"))
+    file_mem = _mib_value(file_req.get("memory"))
+    file_lim_cpu = _millicpu_value(file_lim.get("cpu"))
+    file_lim_mem = _mib_value(file_lim.get("memory"))
+    target_cpu = max(file_cpu + 1, _up_recovery_cpu_precision_target_m(experiment))
+    prop_cpu = _millicpu_value(prop_req.get("cpu"))
+    prop_mem = _mib_value(prop_req.get("memory"))
+
+    if prop_cpu == target_cpu and prop_mem == file_mem:
+        return
+
+    tmpl = prop_doc.setdefault("spec", {}).setdefault("template", {}).setdefault("spec", {})
+    containers = tmpl.get("containers") or []
+    if not containers:
+        return
+    res = containers[0].setdefault("resources", {})
+    req = res.setdefault("requests", {})
+    lim = res.setdefault("limits", {})
+    req["cpu"] = f"{target_cpu}m"
+    req["memory"] = f"{file_mem}Mi"
+    lim["memory"] = f"{file_lim_mem}Mi"
+    new_lim_cpu = max(target_cpu * 2, file_lim_cpu, _millicpu_value(prop_lim.get("cpu")))
+    lim["cpu"] = f"{new_lim_cpu}m"
+
+    result["deployment_yaml_new"] = yaml.safe_dump(prop_doc, sort_keys=False)
+    ev = list(result.get("evidence") or [])
+    ev.append(
+        "guard.cpu_only_vertical: "
+        f"cpu {prop_cpu}->{target_cpu}m mem_hold={file_mem}Mi "
+        f"(llm_mem={prop_mem} cpu_req_pct={float((experiment.get('observed') or {}).get('cpu_util_request_pct') or 0):.1f}%)"
+    )
+    result["evidence"] = ev
 
 
 def _maybe_repair_llm_up_recovery_precision(
@@ -2759,6 +2849,9 @@ def run_analysis(run_dir: Path | None = None) -> tuple[dict, Path, Path, Path]:
             if _in_up_recovery_path(exp_data):
                 _guard_llm_up_recovery_yaml(
                     result, exp_data, deployment_yaml_path, hpa_yaml_path
+                )
+                _enforce_llm_up_recovery_cpu_only_vertical(
+                    result, exp_data, deployment_yaml_path
                 )
                 _maybe_repair_llm_up_recovery_precision(
                     result, exp_data, deployment_yaml_path, hpa_yaml_path

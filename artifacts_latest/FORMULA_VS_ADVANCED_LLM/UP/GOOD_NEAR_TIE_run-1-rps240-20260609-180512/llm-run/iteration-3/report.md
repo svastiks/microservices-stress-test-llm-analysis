@@ -1,0 +1,7 @@
+- Current SLO status: FAIL due to cpu_utilization_exceeded.
+- Observed cpu_util_request_pct is 176.6%, which is well above the 95% threshold needed for SLO PASS.
+- p95 latency (317 ms) and error rate (0%) meet SLO, indicating throughput-related success.
+- No growth in replicas is necessary since already at 2.
+- Planned action: Execute a coupled vertical up-scaling of CPU and memory requests/limits by approximately 15% to reduce cpu_util_request_pct and align with SLO criteria.
+- This change is aimed to improve resource allocation while keeping costs in check.
+- Updated YAML includes adjustments for CPU and memory requests/limits to ensure optimal performance under the existing load while maintaining two replicas.

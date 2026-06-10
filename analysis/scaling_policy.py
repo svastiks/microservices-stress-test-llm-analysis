@@ -43,6 +43,13 @@ def attach_scaling_hint(experiment: dict) -> None:
     )
 
     if not trustworthy:
+        if slo_stress:
+            experiment["scaling_hint"] = "UP"
+            experiment["scaling_rationale"] = (
+                "k6/SLO stress despite unreliable Prometheus utilization; "
+                "treat as under-provisioned and scale up capacity."
+            )
+            return
         experiment["scaling_hint"] = "UNKNOWN"
         experiment["scaling_rationale"] = (
             "CPU/memory/replica utilization from Prometheus is missing or unreliable "

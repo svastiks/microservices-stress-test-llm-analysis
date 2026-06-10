@@ -2204,7 +2204,7 @@ if __name__ == "__main__":
                 up_demo_fail_recovery = (
                     is_up_demo_profile
                     and fail_1
-                    and first_hint in ("UP", "HOLD", None)
+                    and first_hint in ("UP", "HOLD", None, "UNKNOWN")
                 )
                 if (first_diff and first_hint == "UP") or up_demo_fail_recovery:
                     up_recovery_active = True

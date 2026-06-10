@@ -86,7 +86,7 @@ class TestUpRecoveryPrompts(unittest.TestCase):
         prompt = build_user_prompt(exp, "deployment yaml", mode="squeeze")
         self.assertIn("CPU-GATE PRECISION UP (mandatory", prompt)
         self.assertIn("CPU request only", prompt)
-        self.assertIn("135m", prompt)
+        self.assertIn("134m", prompt)
         self.assertIn("hold memory", prompt.lower())
         self.assertNotIn("CPU-GATE-ONLY UP (mandatory", prompt)
 

@@ -384,6 +384,8 @@ def build_user_prompt(
             "decisions and do NOT compare it to HPA target_cpu_util_pct (60%).\n"
             "- When p95 and throughput already meet SLO but failure.reason is cpu_utilization_exceeded: "
             "**vertical CPU/mem only** — hold spec.replicas and hpa maxReplicas unchanged.\n"
+            "- When deployment_replicas and live replicas are already ≥2: **never add replicas** — "
+            "use coupled vertical CPU+memory only (even if p95 is slightly above SLO).\n"
             "- Never scale DOWN while failure.failed is true.\n"
             f"- Current: deployment_replicas={dep_rep}, hpa max={hpa_max}, live={live_rep}, "
             f"p95={p95:.0f}ms vs slo={slo_p95:.0f}ms, "
@@ -420,18 +422,29 @@ def build_user_prompt(
             and p95 <= slo_p95
             and fail_reason == "cpu_utilization_exceeded"
         ):
-            if cpu_req_pct <= 105.0:
-                micro_cpu = max(
-                    cfg_cpu + 1,
-                    int(math.ceil(cfg_cpu * cpu_req_pct / 92.0)),
-                ) if cfg_cpu > 0 and cpu_req_pct > 0 else cfg_cpu
+            if cpu_req_pct <= float(
+                os.environ.get("SQUEEZE_UP_RECOVERY_CPU_ONLY_MAX_PCT", "130")
+            ):
+                max_step = int(
+                    os.environ.get("SQUEEZE_UP_RECOVERY_CPU_PRECISION_MAX_STEP_M", "8")
+                )
+                target_pct = float(
+                    os.environ.get("SQUEEZE_UP_RECOVERY_CPU_PRECISION_TARGET_PCT", "93.0")
+                )
+                sized = (
+                    max(cfg_cpu + 1, int(math.ceil(cfg_cpu * cpu_req_pct / target_pct)))
+                    if cfg_cpu > 0 and cpu_req_pct > 0
+                    else cfg_cpu
+                )
+                micro_cpu = min(sized, cfg_cpu + max_step)
                 if mem_util_pct < 25.0:
                     parts.append(
                         "\n**CPU-GATE PRECISION UP (mandatory this iteration)**: p95 and throughput already meet SLO; "
-                        f"cpu_util_request_pct={cpu_req_pct:.1f}% is just above the 95% gate and mem_util_pct="
+                        f"cpu_util_request_pct={cpu_req_pct:.1f}% exceeds the 95% gate and mem_util_pct="
                         f"{mem_util_pct:.1f}% is low — **CPU request only**, hold memory requests/limits **identical** "
-                        f"to on-disk. Set requests.cpu≈{micro_cpu}m (≈ceil(current×cpu_util_request_pct/92)) to land "
-                        "**90–93%** at PASS; scale limits ~2× request. **Hold replicas**. Do NOT add memory or replicas.\n"
+                        f"to on-disk ({cfg_mem}Mi). Set requests.cpu≈{micro_cpu}m "
+                        f"(≤+{max_step}m vs on-disk; target ~93% cpu_util_request_pct at PASS); "
+                        "scale limits ≥2× request. **Hold replicas**. Do NOT add memory, coupled bumps, or replicas.\n"
                     )
                 else:
                     parts.append(
