@@ -1,0 +1,5 @@
+- Stress test failed due to p95 latency violation.
+- p95 latency was 1547.0 ms, exceeding the SLO of 500 ms.
+- Achieved throughput was close to target load at 218.1 RPS.
+- Only 1 replica was observed during the test.
+- Increased capacity is necessary to meet performance requirements.

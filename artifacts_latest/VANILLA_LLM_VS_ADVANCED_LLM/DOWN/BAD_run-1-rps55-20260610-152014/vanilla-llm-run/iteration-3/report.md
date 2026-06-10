@@ -1,0 +1,5 @@
+- Stress test passed with a p95 latency of 74.0 ms (well below 500 ms SLO).
+- Achieved throughput was 54.9 RPS, which is satisfactory for the target of 55 RPS.
+- The current resource requests and limits seem to be appropriate, as no high error rates or latency issues were observed.
+- As per the SLO requirements, we will scale down the resources slightly.
+- Revamping the deployment will also ensure efficient resource usage.

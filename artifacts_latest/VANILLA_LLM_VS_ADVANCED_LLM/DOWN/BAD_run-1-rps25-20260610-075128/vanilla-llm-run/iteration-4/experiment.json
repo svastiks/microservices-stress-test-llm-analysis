@@ -1,0 +1,180 @@
+{
+  "experiment_id": "down_demo-20260610T123105Z-e618f689",
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "service": "robot-shop-web",
+  "endpoint": "POST /api/user/login",
+  "config": {
+    "cpu_request_m": 100,
+    "cpu_limit_m": 200,
+    "mem_request_mib": 45,
+    "mem_limit_mib": 90,
+    "deployment_replicas": 2,
+    "hpa": {
+      "min_replicas": 1,
+      "max_replicas": 2,
+      "target_cpu_util_pct": 60
+    }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate",
+    "target_requests_per_second": 25,
+    "duration_s": 90,
+    "scenario": "normal_login_with_headroom"
+  },
+  "slo": {
+    "p95_latency_ms": 500,
+    "error_rate": 0.01
+  },
+  "observed": {
+    "total_requests": 2251,
+    "observed_duration_s": 90.2,
+    "achieved_requests_per_second": 25.0,
+    "achieved_requests_per_second_target_window": 25.0,
+    "dropped_iterations": 0,
+    "latency_ms": {
+      "p95": 74.0,
+      "p99": 0
+    },
+    "error_rate": 0.0,
+    "replicas": 2,
+    "replicas_max": 2,
+    "cpu_util_pct": 38.0,
+    "cpu_util_pct_peak": 39.8,
+    "cpu_util_request_pct": 76.0,
+    "cpu_util_request_pct_peak": 79.6,
+    "mem_util_pct": 16.2,
+    "mem_util_pct_peak": 16.5,
+    "cpu_usage_avg_m": 152.0,
+    "mem_usage_avg_mib": 29.2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.38,
+    "cpu_util_to_request": 0.76,
+    "cpu_util_to_request_peak": 0.8,
+    "telemetry": {
+      "k6_window_start_ts": 1781094575.341492,
+      "k6_window_end_ts": 1781094665.8826525,
+      "window_start_ts": 1781094575.341492,
+      "window_end_ts": 1781094665.8826525,
+      "prom_range_step": "5s",
+      "cpu_rate_window": "1m",
+      "prom_min_samples": 12,
+      "cpu_sample_count": 19,
+      "mem_sample_count": 19,
+      "utilization_aggregation": "mean",
+      "replicas_mean": 2.0,
+      "replicas_series_matched": true,
+      "replicas_inferred_from_config": false,
+      "cpu_series_matched": true,
+      "mem_series_matched": true,
+      "cpu_query_attempts": 1,
+      "mem_query_attempts": 1,
+      "cpu_query_used": "rate(container_cpu_usage_seconds_total{namespace=\"svastik\",pod=~\"web-.+\",container!=\"\",container!=\"POD\"}[1m])",
+      "mem_query_used": "container_memory_working_set_bytes{job=\"kubelet\",metrics_path=\"/metrics/cadvisor\",namespace=\"svastik\",pod=~\"web.+\",container!=\"\",container!=\"POD\",image!=\"\"}",
+      "cpu_collection_mode": "per_pod_series_sum",
+      "mem_collection_mode": "per_pod_series_sum",
+      "cpu_per_pod": [
+        {
+          "pod": "web-6d86d86696-vc2t2",
+          "container": "web",
+          "cpu_mean_cores": 0.103,
+          "cpu_mean_m": 103.0,
+          "cpu_peak_cores": 0.1073,
+          "cpu_peak_m": 107.3,
+          "sample_count": 19
+        },
+        {
+          "pod": "web-6d86d86696-mr9l8",
+          "container": "web",
+          "cpu_mean_cores": 0.049,
+          "cpu_mean_m": 49.0,
+          "cpu_peak_cores": 0.0519,
+          "cpu_peak_m": 51.9,
+          "sample_count": 19
+        }
+      ],
+      "cpu_per_pod_sum_m": 152.0,
+      "cpu_aggregate_vs_pods_delta_m": 0.0,
+      "prom_pod_count": 2,
+      "yaml_replicas_expected": 2,
+      "replica_count_mismatch": false,
+      "utilization_trustworthy": true
+    }
+  },
+  "failure": {
+    "failed": false,
+    "reason": ""
+  },
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 200,
+    "provisioned_request_mem_mib": 90,
+    "provisioned_limit_cpu_m": 400,
+    "provisioned_limit_mem_mib": 180,
+    "per_pod_unit_cost": 0.094395,
+    "per_pod_unit_cost_util": 0.034912,
+    "cost_score": 0.1888,
+    "cost_score_util": 0.0698,
+    "cost_score_legacy": 0.2879
+  },
+  "cluster_snapshot_pre_k6": {
+    "phase": "pre_k6",
+    "ts": 1781094575.3413897,
+    "live": {
+      "dep_spec": 2,
+      "ready": 2,
+      "updated": 2,
+      "available": 2,
+      "hpa_current": 2,
+      "hpa_desired": 2,
+      "hpa_max": 2
+    },
+    "yaml_replicas": 2,
+    "pods": [
+      {
+        "name": "web-6d86d86696-mr9l8",
+        "phase": "Running",
+        "ready_containers": 1,
+        "container_count": 1,
+        "pod_ip": "10.42.4.79",
+        "start_time": "2026-06-10T12:28:06Z",
+        "node": "ceras2"
+      },
+      {
+        "name": "web-6d86d86696-vc2t2",
+        "phase": "Running",
+        "ready_containers": 1,
+        "container_count": 1,
+        "pod_ip": "10.42.7.124",
+        "start_time": "2026-06-10T12:27:42Z",
+        "node": "worker2"
+      }
+    ],
+    "pod_count": 2,
+    "endpoint_addrs": []
+  },
+  "start_ts": 1781094575.341492,
+  "end_ts": 1781094665.8826525,
+  "prometheus": true,
+  "base_url": "http://web.svastik.svc.cluster.local:8080",
+  "k8s_namespace": "svastik",
+  "k8s_deployment": "web",
+  "deployment_yaml": "infra/k8s/spark/robot-shop-web-deployment.yaml",
+  "hpa_yaml": "infra/k8s/spark/robot-shop-web-hpa.yaml",
+  "prometheus_url": "http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090",
+  "squeeze_optimizer": "llm",
+  "llm_vanilla_squeeze": true,
+  "scaling_rationale": "Vanilla LLM squeeze: coarse outcome summary + current YAML only (no detailed telemetry in the prompt).",
+  "_prev_iteration": {
+    "slo_status": "PASS",
+    "latency_ms_p95": 74.0,
+    "cpu_util_pct": 37.0,
+    "mem_util_pct": 15.3,
+    "deployment_replicas": 3,
+    "cpu_request_m": 110,
+    "mem_request_mib": 50,
+    "squeeze_down_axis": "",
+    "resource_pass_streak": 0
+  }
+}

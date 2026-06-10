@@ -1,0 +1,6 @@
+- Stress test outcome: PASS
+- p95 latency: 74.0 ms (SLO limit: 500 ms)
+- Error rate: 0.0%
+- Achieved throughput: 25.0 RPS
+- Replicas observed: 2
+- Propose reducing resources and replicas to optimize

@@ -1,0 +1,5 @@
+- Stress test failed due to CPU utilization exceeding limits.
+- p95 latency was at 328.0 ms, below the SLO but throughput was slightly under target.
+- Error rate was 0.0, indicating no request failures.
+- Current configuration may not handle the load efficiently.
+- Plan to increase CPU/memory requests and limits to meet capacity needs.

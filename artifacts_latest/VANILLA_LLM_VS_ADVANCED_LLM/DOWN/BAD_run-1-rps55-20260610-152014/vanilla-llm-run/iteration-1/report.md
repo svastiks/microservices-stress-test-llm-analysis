@@ -1,0 +1,5 @@
+- Stress test passed with a high p95 latency of 74.0 ms, well within the SLO limit.
+- Achieved throughput was 54.9 RPS against a target of 55 RPS, indicating good performance.
+- Error rate was 0.0%, indicating a successful handling of the load.
+- Configured with 5 replicas during the test, but there is room to reduce capacity.
+- Suggest reducing CPU and memory requests by approximately 10-20%.

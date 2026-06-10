@@ -1,0 +1,6 @@
+- Target load was 45 RPS for 90s
+- Test result: PASS
+- p95 latency of 74.0 ms well within SLO
+- Error rate recorded: 0.0
+- Achieved throughput: 44.9 RPS
+- Replica count was sufficient at 5

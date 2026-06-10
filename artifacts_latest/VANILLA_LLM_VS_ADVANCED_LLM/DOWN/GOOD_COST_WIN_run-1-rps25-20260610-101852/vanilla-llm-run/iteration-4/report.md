@@ -1,0 +1,5 @@
+- Test PASSED with comfortable latency
+- p95 latency: 75.0 ms (well below SLO limit)
+- Achieved throughput: 25.0 RPS
+- Error rate: 0.0
+- Replicas observed during test: 2

@@ -1,0 +1,7 @@
+- Current SLO failed due to `cpu_utilization_exceeded` with `cpu_util_request_pct` at 95.6%.
+- Observed usage indicates significant CPU headroom for reduction, particularly with `cpu_util_pct` at 47.8% and `cpu_util_request_pct` at 95.6%. 
+- The cost score of 0.1702 suggests over-provisioning, allowing for adjustments without impacting performance. 
+- Previous iteration had `squeeze_down_axis` set to resources, indicating a pass on resource limits. 
+- Proposal involves a replica reduction while also trimming CPU and memory requests for cost-efficiency. 
+- Reducing replicas from 2 to 1 and trimming CPU requests to 80m and memory to 40Mi aligns with observed metrics and aims for cost reduction. 
+- This targeted approach aims to balance between performance and costs, ensuring safe scaling without hitting resource limits.

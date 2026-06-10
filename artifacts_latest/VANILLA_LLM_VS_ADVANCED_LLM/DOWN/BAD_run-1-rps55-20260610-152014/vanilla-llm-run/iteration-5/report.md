@@ -1,0 +1,5 @@
+- Stress test resulted in failure due to CPU utilization exceeded.
+- Achieved 54.9 RPS with 1 replica, indicating resource constraints.
+- p95 latency comfortably below SLO with no errors.
+- Current HPA configuration does not allow for scaling.
+- Recommendations include increasing CPU requests and limits, and allowing for additional replicas.

@@ -1,0 +1,217 @@
+{
+  "experiment_id": "down_demo-20260610T142854Z-f5cd211f",
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "service": "robot-shop-web",
+  "endpoint": "POST /api/user/login",
+  "config": {
+    "cpu_request_m": 128,
+    "cpu_limit_m": 255,
+    "mem_request_mib": 64,
+    "mem_limit_mib": 127,
+    "deployment_replicas": 4,
+    "hpa": {
+      "min_replicas": 1,
+      "max_replicas": 4,
+      "target_cpu_util_pct": 60
+    }
+  },
+  "workload": {
+    "mode": "constant_arrival_rate",
+    "target_requests_per_second": 25,
+    "duration_s": 90,
+    "scenario": "normal_login_with_headroom"
+  },
+  "slo": {
+    "p95_latency_ms": 500,
+    "error_rate": 0.01
+  },
+  "observed": {
+    "total_requests": 2251,
+    "observed_duration_s": 90.1,
+    "achieved_requests_per_second": 25.0,
+    "achieved_requests_per_second_target_window": 25.0,
+    "dropped_iterations": 0,
+    "latency_ms": {
+      "p95": 74.0,
+      "p99": 0
+    },
+    "error_rate": 0.0,
+    "replicas": 4,
+    "replicas_max": 4,
+    "cpu_util_pct": 36.8,
+    "cpu_util_pct_peak": 39.3,
+    "cpu_util_request_pct": 73.4,
+    "cpu_util_request_pct_peak": 78.3,
+    "mem_util_pct": 19.5,
+    "mem_util_pct_peak": 19.9,
+    "cpu_usage_avg_m": 375.7,
+    "mem_usage_avg_mib": 99.3,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.37,
+    "cpu_util_to_request": 0.73,
+    "cpu_util_to_request_peak": 0.78,
+    "telemetry": {
+      "k6_window_start_ts": 1781101643.8017879,
+      "k6_window_end_ts": 1781101734.2993789,
+      "window_start_ts": 1781101643.8017879,
+      "window_end_ts": 1781101734.2993789,
+      "prom_range_step": "5s",
+      "cpu_rate_window": "1m",
+      "prom_min_samples": 12,
+      "cpu_sample_count": 19,
+      "mem_sample_count": 19,
+      "utilization_aggregation": "mean",
+      "replicas_mean": 4.0,
+      "replicas_series_matched": true,
+      "replicas_inferred_from_config": false,
+      "cpu_series_matched": true,
+      "mem_series_matched": true,
+      "cpu_query_attempts": 1,
+      "mem_query_attempts": 1,
+      "cpu_query_used": "rate(container_cpu_usage_seconds_total{namespace=\"svastik\",pod=~\"web-.+\",container!=\"\",container!=\"POD\"}[1m])",
+      "mem_query_used": "container_memory_working_set_bytes{job=\"kubelet\",metrics_path=\"/metrics/cadvisor\",namespace=\"svastik\",pod=~\"web.+\",container!=\"\",container!=\"POD\",image!=\"\"}",
+      "cpu_collection_mode": "per_pod_series_sum",
+      "mem_collection_mode": "per_pod_series_sum",
+      "cpu_per_pod": [
+        {
+          "pod": "web-65fbcdb476-v4lhl",
+          "container": "web",
+          "cpu_mean_cores": 0.1378,
+          "cpu_mean_m": 137.8,
+          "cpu_peak_cores": 0.1432,
+          "cpu_peak_m": 143.2,
+          "sample_count": 19
+        },
+        {
+          "pod": "web-65fbcdb476-4glcv",
+          "container": "web",
+          "cpu_mean_cores": 0.0987,
+          "cpu_mean_m": 98.7,
+          "cpu_peak_cores": 0.1039,
+          "cpu_peak_m": 103.9,
+          "sample_count": 19
+        },
+        {
+          "pod": "web-65fbcdb476-fx252",
+          "container": "web",
+          "cpu_mean_cores": 0.0948,
+          "cpu_mean_m": 94.8,
+          "cpu_peak_cores": 0.1068,
+          "cpu_peak_m": 106.8,
+          "sample_count": 19
+        },
+        {
+          "pod": "web-65fbcdb476-4ml4m",
+          "container": "web",
+          "cpu_mean_cores": 0.0444,
+          "cpu_mean_m": 44.4,
+          "cpu_peak_cores": 0.047,
+          "cpu_peak_m": 47.0,
+          "sample_count": 19
+        }
+      ],
+      "cpu_per_pod_sum_m": 375.7,
+      "cpu_aggregate_vs_pods_delta_m": 0.0,
+      "prom_pod_count": 4,
+      "yaml_replicas_expected": 4,
+      "replica_count_mismatch": false,
+      "utilization_trustworthy": true
+    }
+  },
+  "failure": {
+    "failed": false,
+    "reason": ""
+  },
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 512,
+    "provisioned_request_mem_mib": 256,
+    "provisioned_limit_cpu_m": 1020,
+    "provisioned_limit_mem_mib": 508,
+    "per_pod_unit_cost": 0.12145,
+    "per_pod_unit_cost_util": 0.043612,
+    "cost_score": 0.4858,
+    "cost_score_util": 0.1744,
+    "cost_score_legacy": 0.762
+  },
+  "cluster_snapshot_pre_k6": {
+    "phase": "pre_k6",
+    "ts": 1781101643.8017046,
+    "live": {
+      "dep_spec": 4,
+      "ready": 4,
+      "updated": 4,
+      "available": 4,
+      "hpa_current": 4,
+      "hpa_desired": 4,
+      "hpa_max": 4
+    },
+    "yaml_replicas": 4,
+    "pods": [
+      {
+        "name": "web-65fbcdb476-4glcv",
+        "phase": "Running",
+        "ready_containers": 1,
+        "container_count": 1,
+        "pod_ip": "10.42.6.247",
+        "start_time": "2026-06-10T14:25:45Z",
+        "node": "worker1"
+      },
+      {
+        "name": "web-65fbcdb476-4ml4m",
+        "phase": "Running",
+        "ready_containers": 1,
+        "container_count": 1,
+        "pod_ip": "10.42.4.114",
+        "start_time": "2026-06-10T14:25:52Z",
+        "node": "ceras2"
+      },
+      {
+        "name": "web-65fbcdb476-fx252",
+        "phase": "Running",
+        "ready_containers": 1,
+        "container_count": 1,
+        "pod_ip": "10.42.7.164",
+        "start_time": "2026-06-10T14:25:30Z",
+        "node": "worker2"
+      },
+      {
+        "name": "web-65fbcdb476-v4lhl",
+        "phase": "Running",
+        "ready_containers": 1,
+        "container_count": 1,
+        "pod_ip": "10.42.5.232",
+        "start_time": "2026-06-10T14:26:23Z",
+        "node": "worker3"
+      }
+    ],
+    "pod_count": 4,
+    "endpoint_addrs": []
+  },
+  "start_ts": 1781101643.8017879,
+  "end_ts": 1781101734.2993789,
+  "prometheus": true,
+  "base_url": "http://web.svastik.svc.cluster.local:8080",
+  "k8s_namespace": "svastik",
+  "k8s_deployment": "web",
+  "deployment_yaml": "infra/k8s/spark/robot-shop-web-deployment.yaml",
+  "hpa_yaml": "infra/k8s/spark/robot-shop-web-hpa.yaml",
+  "prometheus_url": "http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090",
+  "squeeze_optimizer": "llm",
+  "llm_pure_squeeze": true,
+  "scaling_rationale": "SLO pass with slack on at least one resource; small reduction may be safe.",
+  "scaling_hint": "DOWN",
+  "_prev_iteration": {
+    "slo_status": "PASS",
+    "latency_ms_p95": 74.0,
+    "cpu_util_pct": 24.9,
+    "mem_util_pct": 10.5,
+    "deployment_replicas": 5,
+    "cpu_request_m": 150,
+    "mem_request_mib": 75,
+    "squeeze_down_axis": "replica",
+    "resource_pass_streak": 0
+  }
+}

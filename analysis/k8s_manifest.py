@@ -220,6 +220,24 @@ def align_llm_deployment_replicas_for_squeeze(
     )
 
 
+def _squeeze_down_two_pod_floor(experiment: dict) -> bool:
+    """On PASS DOWN, hold at 2 replicas — 2→1 often collapses p95 before cpu gate."""
+    if bool((experiment.get("failure") or {}).get("failed")):
+        return False
+    if experiment.get("mode") != "squeeze" or experiment.get("squeeze_optimizer") != "llm":
+        return False
+    if experiment.get("up_recovery"):
+        return False
+    if os.environ.get("SQUEEZE_LLM_DOWN_BOUNDARY", "1").strip().lower() in (
+        "0",
+        "false",
+        "no",
+        "off",
+    ):
+        return False
+    return True
+
+
 def clamp_llm_squeeze_replicas_to_one_step(
     result: dict,
     experiment: dict,
@@ -237,6 +255,7 @@ def clamp_llm_squeeze_replicas_to_one_step(
     if live < 2:
         return False
     target = max(1, live - 1)
+    two_pod_floor = _squeeze_down_two_pod_floor(experiment)
     dump_kw = {
         "sort_keys": False,
         "default_flow_style": False,
@@ -260,12 +279,16 @@ def clamp_llm_squeeze_replicas_to_one_step(
     if isinstance(dep_doc, dict) and dep_doc.get("kind") == "Deployment":
         spec = dep_doc.setdefault("spec", {})
         proposed = int(spec.get("replicas") or live)
-        new_rep = proposed
-        if proposed >= live:
+        if proposed == live:
+            new_rep = live
+        elif proposed > live:
             new_rep = target
-        elif proposed < target:
-            new_rep = target
-        if new_rep != proposed:
+        else:
+            new_rep = max(proposed, target)
+        if two_pod_floor and live == 2 and new_rep < 2:
+            new_rep = 2
+            notes.append("deployment.replicas_floor: live=2 two-pod DOWN minimum")
+        elif new_rep != proposed:
             notes.append(f"deployment.replicas_clamp: llm={proposed} -> {new_rep} (live={live})")
         if new_rep != int(spec.get("replicas") or 0):
             changed = True

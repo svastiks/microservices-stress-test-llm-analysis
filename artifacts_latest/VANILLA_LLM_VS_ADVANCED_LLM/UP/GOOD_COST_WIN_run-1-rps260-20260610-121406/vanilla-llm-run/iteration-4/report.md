@@ -1,0 +1,6 @@
+- Target load: 260 RPS for 90s
+- Result: FAIL due to p95 latency SLO violation
+- p95 latency: 586.0 ms (SLO limit: 500 ms)
+- Achieved throughput: 259.5 RPS
+- Scaling up resources and replicas is necessary to meet the SLO
+- No errors reported during the test.

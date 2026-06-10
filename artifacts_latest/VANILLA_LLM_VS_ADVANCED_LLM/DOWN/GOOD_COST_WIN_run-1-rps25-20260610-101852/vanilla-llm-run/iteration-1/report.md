@@ -1,0 +1,5 @@
+- Test passed with comfortable latency
+- p95 latency at 74.0 ms, well below SLO of 500 ms
+- Achieved throughput of 25.0 RPS
+- No errors reported
+- Consider reducing resources due to the slack observed

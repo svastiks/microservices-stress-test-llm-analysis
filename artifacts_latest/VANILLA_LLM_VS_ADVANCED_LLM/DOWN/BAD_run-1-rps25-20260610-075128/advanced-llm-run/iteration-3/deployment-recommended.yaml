@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: svastik
+  labels:
+    service: web
+  annotations:
+    squeeze/reconcile-ts: '1781093089'
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      service: web
+  template:
+    metadata:
+      labels:
+        service: web
+    spec:
+      containers:
+      - name: web
+        image: robotshop/rs-web:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 215m
+            memory: 108Mi
+          requests:
+            cpu: 93m
+            memory: 47Mi
+      restartPolicy: Always

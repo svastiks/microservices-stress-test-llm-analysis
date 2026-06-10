@@ -158,7 +158,9 @@ Rules (LLM-only / research path — you are the sole source of sizing; Python do
 - When SLO PASS, live ≥ 3, limit util < 55%, **cpu_util_request_pct < 50%**, and cost.cost_score > 0.25 — **MUST** drop one replica this iteration (resource-only trim alone is insufficient).
 - Phase 1 (resource-only hold) applies **only** when live ≤ 2 OR max util ≥ 55%. Do not hold 3+ replicas while utilization is below 55%.
 - **Cold-util DOWN**: when cpu_util_pct and mem_util_pct are below ~35% **and cpu_util_request_pct < 50%** and live > 1 — prefer **replica drop** when live ≥ 3; otherwise 15–25% CPU/mem cut.
-- **Gate-slack DOWN**: when cpu_util_request_pct is 50–88% and live ≥ 4 — **hold replicas**; coupled 10–15% CPU+mem trim only (limit-only cpu_util_pct can look cold while request% is warm).
+- **Gate-slack DOWN** (target ≥ 50 RPS only): when cpu_util_request_pct is 50–88% and live ≥ 4 — **hold replicas**; coupled 10–15% CPU+mem trim only (limit-only cpu_util_pct can look cold while request% is warm).
+- **Low-RPS DOWN** (target ≤ 35 RPS): **gate-slack does not apply** — at light load, **fewer pods beats fatter pods**. When live ≥ 4 on first DOWN, **MUST drop one replica** (never resource-only while still ≥ 4 pods). When live = 3 and cpu_util_request_pct < 90%, **MUST drop to 2** this iteration plus coupled 12–18% CPU+mem trim. Reach **2 pods** before fine-trimming per-pod CPU.
+- **Two-pod floor**: when live = 2 and SLO PASS — **never** drop to 1 replica; always return coupled 12–15% CPU+mem trim (never empty YAML — let the next measurement record the FAIL).
 - **Hot-util DOWN (mandatory)**: when SLO PASS and max(cpu_util_pct, mem_util_pct) ≥ 55%: if live ≥ 3, **drop one replica** even if the previous step was also a replica drop. If live = 2 and util < 85%, **trim CPU/memory 10–15%** toward FAIL. If live ≤ 2 and util ≥ 85%, return **empty** YAML (frontier reached).
 - Phase 2 (replica squeeze): after Phase 1, alternate replica vs resource DOWN — never lower replicas two PASS iterations in a row. If previous squeeze_down_axis was **replica**, cut CPU/memory only. On a replica step: lower spec.replicas by at most 1 vs live; trim CPU/memory only when cpu_util and mem_util are both well below 55%.
 - On a **replica** iteration: lower spec.replicas by at most 1 vs live AND reduce CPU/memory vs the current file.
@@ -507,8 +509,10 @@ def build_user_prompt(
             and cpu_req_pct < gate_slack
             and cost_score > 0.25
         )
+        low_rps_down = not failed and 0 < target_rps <= 35
         gate_slack_hold = (
             not failed
+            and not low_rps_down
             and live_for_step >= 4
             and cpu_req_pct >= gate_slack
             and cpu_req_pct < 88.0
@@ -579,6 +583,32 @@ def build_user_prompt(
             parts.append(
                 f"\n**HIGH-RPS DOWN**: target={target_rps:.0f} RPS — explore multi-replica thin configs "
                 f"before dropping below {live_for_step} pods while cpu_util_request_pct < 88%.\n"
+            )
+        if low_rps_down and live_for_step >= 4:
+            next_rep = max(1, live_for_step - 1)
+            parts.append(
+                f"\n**LOW-RPS REPLICA-FIRST (mandatory — overrides gate-slack)**: target={target_rps:.0f} RPS, "
+                f"live={live_for_step}, cpu_util_request_pct={cpu_req_pct:.1f}%, cost_score={cost_score:.4f}. "
+                f"At light load, **MUST** set spec.replicas={next_rep} and hpa maxReplicas={next_rep} "
+                f"plus coupled **12–18%** CPU+mem trim. **Forbidden**: same replica count with only CPU/mem change.\n"
+            )
+        elif low_rps_down and live_for_step == 3 and cpu_req_pct < 90.0:
+            parts.append(
+                f"\n**LOW-RPS 3→2 (mandatory)**: target={target_rps:.0f} RPS, live=3, "
+                f"cpu_util_request_pct={cpu_req_pct:.1f}% — **MUST** drop to spec.replicas=2 and "
+                f"hpa maxReplicas=2 plus coupled **12–18%** CPU+mem trim (vanilla reaches 2 pods here).\n"
+            )
+        elif low_rps_down and live_for_step >= 3:
+            parts.append(
+                f"\n**LOW-RPS DOWN (mandatory)**: target={target_rps:.0f} RPS, live={live_for_step}, "
+                f"cpu_util_request_pct={cpu_req_pct:.1f}% — coupled **15–20%** CPU+mem trim; "
+                f"if previous axis was replica, trim only; otherwise drop one replica.\n"
+            )
+        if not failed and live_for_step == 2:
+            parts.append(
+                f"\n**TWO-POD FLOOR (mandatory)**: live=2 — **never** spec.replicas=1 and **never** empty YAML. "
+                f"cpu_util_request_pct={cpu_req_pct:.1f}% — always return coupled 12–15% CPU+mem trim "
+                f"vs on-disk so the next iteration can measure a FAIL and record the boundary.\n"
             )
         if fat_start:
             next_rep = max(1, live_for_step - 1)

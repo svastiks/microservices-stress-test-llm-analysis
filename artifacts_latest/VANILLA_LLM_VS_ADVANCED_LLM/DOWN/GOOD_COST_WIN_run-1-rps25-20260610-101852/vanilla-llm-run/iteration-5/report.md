@@ -1,0 +1,5 @@
+- Stress test resulted in failure due to CPU utilization exceeding limits.
+- p95 latency was well within SLO limits.
+- Achieved throughput matched target load, but with only one replica.
+- Suggested to increase CPU and memory resources, as well as the number of replicas.
+- No errors were recorded during the test.

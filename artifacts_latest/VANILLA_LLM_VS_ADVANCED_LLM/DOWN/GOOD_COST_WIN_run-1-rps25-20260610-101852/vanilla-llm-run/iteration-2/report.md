@@ -1,0 +1,5 @@
+- Stress test passed with a p95 latency of 74.0 ms, well below the SLO of 500 ms.
+- Achieved throughput was exactly 25.0 RPS, matching the target load.
+- No errors were recorded during the test, indicating stable performance.
+- Current deployment uses 4 replicas, which are no longer necessary given the comfortable slack.
+- Recommend reducing capacity to optimize resource usage.

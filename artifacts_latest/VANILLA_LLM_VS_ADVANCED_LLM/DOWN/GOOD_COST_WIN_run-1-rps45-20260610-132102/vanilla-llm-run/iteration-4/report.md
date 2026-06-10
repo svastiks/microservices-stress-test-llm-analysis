@@ -1,0 +1,5 @@
+- Test passed with p95 latency of 74.0 ms (well below SLO of 500 ms)
+- Achieved throughput of 44.9 RPS
+- Error rate of 0.0% indicates stable performance
+- Maintaining the same load with a comfortable margin allows for resource reduction
+- Current deployment has not shown signs of over-provisioning

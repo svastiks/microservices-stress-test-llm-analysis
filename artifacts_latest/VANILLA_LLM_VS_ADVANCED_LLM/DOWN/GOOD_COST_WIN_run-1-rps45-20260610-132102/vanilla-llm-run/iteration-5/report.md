@@ -1,0 +1,5 @@
+- Stress test failed due to CPU utilization exceeding limits.
+- Achieved throughput of 45.0 RPS while maintaining a p95 latency well below SLO at 5.0 ms.
+- Only 1 replica was observed during the test, which is insufficient to handle the load.
+- Proposal: Increase CPU and memory requests/limits and set HPA maxReplicas to allow for scaling.
+- Adjusted limits to meet the demand for a safer capacity margin.

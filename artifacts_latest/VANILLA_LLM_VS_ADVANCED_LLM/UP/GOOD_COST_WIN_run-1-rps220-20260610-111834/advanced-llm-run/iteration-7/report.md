@@ -1,0 +1,5 @@
+- Current scaling reflects an under-provisioned state, with CPU utilization exceeding the threshold (cpu_util_request_pct > 95%).
+- Achieved RPS (219.2) remains very close to the target (220) while maintaining a low error rate (0.0%).
+- The p95 latency is within acceptable bounds, significantly lower than the SLO (219ms vs 500ms).
+- CPU requests are currently higher than ideal, necessitating a targeted adjustment to mitigate the over-provisioning cost.
+- Aim to optimize costs by addressing CPU requests while keeping memory requests stable for this iteration.

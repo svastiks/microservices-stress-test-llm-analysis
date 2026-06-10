@@ -581,7 +581,7 @@ def _apply_down_boundary_stop(
     if not _llm_at_down_boundary_stop(experiment):
         if (
             _llm_live_replicas(experiment) <= 2
-            and _llm_max_util_pct(experiment)
+            and _llm_squeeze_gate_util_pct(experiment)
             >= float(os.environ.get("SQUEEZE_LLM_HOT_BOUNDARY_UTIL_PCT", "85"))
             and not (result.get("deployment_yaml_new") or "").strip()
         ):

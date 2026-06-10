@@ -1,0 +1,5 @@
+- The test passed comfortably with p95 latency at 74.0 ms, well below the SLO limit of 500 ms.
+- Achieved throughput matched the target load at 25.0 RPS.
+- The current configuration used 4 replicas which were sufficient for the workload.
+- There is an opportunity to reduce resource requests and limits as well as the number of replicas.
+- HPA parameters also allow for adjustment to better reflect current load performance.

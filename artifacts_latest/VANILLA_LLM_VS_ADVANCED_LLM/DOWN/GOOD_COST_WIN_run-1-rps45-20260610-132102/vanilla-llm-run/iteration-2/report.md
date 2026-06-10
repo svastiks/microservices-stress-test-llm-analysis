@@ -1,0 +1,5 @@
+- The test passed successfully with a p95 latency of 74.0 ms, well under the SLO limit of 500 ms.
+- Achieved throughput was 44.9 RPS, near the target of 45 RPS.
+- Error rate was 0.0, indicating no issues during the test.
+- The current configuration (4 replicas, CPU requests/limits) has enough capacity but can be optimized downward.
+- Reducing resources and replicas slightly could improve efficiency and reduce costs.

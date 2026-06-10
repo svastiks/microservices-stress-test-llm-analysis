@@ -1,0 +1,5 @@
+- Stress test failed due to CPU utilization exceeding limits.
+- P95 latency was comfortable but near SLO threshold.
+- Achieved throughput was slightly below target RPS.
+- Current replicas could not handle peak load effectively.
+- Recommendations include increasing resource requests and limits.

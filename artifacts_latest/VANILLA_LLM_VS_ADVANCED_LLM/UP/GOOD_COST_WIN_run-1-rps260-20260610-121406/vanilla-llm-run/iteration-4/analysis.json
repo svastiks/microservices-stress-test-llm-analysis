@@ -1,0 +1,48 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 160,
+    "provisioned_request_mem_mib": 80,
+    "provisioned_limit_cpu_m": 320,
+    "provisioned_limit_mem_mib": 160,
+    "per_pod_unit_cost": 0.075906,
+    "per_pod_unit_cost_util": 0.054987,
+    "cost_score": 0.1518,
+    "cost_score_util": 0.11,
+    "cost_score_legacy": 0.2381
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "LOW",
+  "over_provisioned": false,
+  "evidence": [
+    "p95 latency: 586.0 ms (SLO limit: 500 ms)",
+    "Scaling up resources and replicas is necessary to meet the SLO",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Vanilla LLM squeeze: coarse outcome summary + current YAML only (no detailed telemetry in the prompt).",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 259.5,
+    "error_rate": 0.0,
+    "latency_ms_p95": 586.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 74.9,
+    "mem_util_pct": 27.1,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.75,
+    "total_requests": 23401
+  }
+}

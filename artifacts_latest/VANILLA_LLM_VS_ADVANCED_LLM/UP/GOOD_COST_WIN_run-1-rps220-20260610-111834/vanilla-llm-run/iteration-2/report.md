@@ -1,0 +1,6 @@
+- Stress test failed due to CPU utilization exceeding limits.
+- Achieved throughput was close to target but not sufficient.
+- p95 latency was well within SLO limits.
+- No errors occurred during the test.
+- Current resource requests and limits were insufficient for the workload.
+- Suggested changes involve increasing CPU and memory requests and limits.

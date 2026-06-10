@@ -1499,5 +1499,144 @@ spec:
         self.assertEqual((out.get("deployment_yaml_new") or "").strip(), "")
 
 
+class TestDownAdvVanillaPromptAndClamp(unittest.TestCase):
+    """BAD_run-1-rps25-20260610-003414: resource-only @ 2 pods must not force 2→1."""
+
+    def test_system_prompt_low_rps_and_two_pod_floor(self) -> None:
+        from analysis.prompts import EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT
+
+        self.assertIn("Low-RPS DOWN", EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT)
+        self.assertIn("Two-pod floor", EFFICIENCY_LLM_ONLY_SQUEEZE_PROMPT)
+
+    def test_low_rps_replica_first_overrides_gate_slack(self) -> None:
+        from analysis.prompts import build_user_prompt
+
+        exp = {
+            "mode": "squeeze",
+            "analysis_goal": "efficiency",
+            "failure": {"failed": False},
+            "workload": {"target_requests_per_second": 25},
+            "config": {"deployment_replicas": 5, "cpu_request_m": 150},
+            "observed": {
+                "cpu_util_pct": 50.7,
+                "mem_util_pct": 12.7,
+                "cpu_util_request_pct": 56.5,
+                "replicas": 5,
+                "replicas_max": 5,
+            },
+            "cost": {"cost_score": 0.7116},
+            "_prev_iteration": {},
+        }
+        prompt = build_user_prompt(exp, "apiVersion: v1\n", mode="squeeze")
+        self.assertIn("LOW-RPS REPLICA-FIRST", prompt)
+        self.assertIn("spec.replicas=4", prompt)
+        self.assertNotIn("GATE-SLACK MULTI-REPLICA", prompt)
+
+    def test_low_rps_mandates_3_to_2(self) -> None:
+        from analysis.prompts import build_user_prompt
+
+        exp = {
+            "mode": "squeeze",
+            "analysis_goal": "efficiency",
+            "failure": {"failed": False},
+            "workload": {"target_requests_per_second": 25},
+            "config": {"deployment_replicas": 3, "cpu_request_m": 109},
+            "observed": {
+                "cpu_util_pct": 45.0,
+                "mem_util_pct": 16.4,
+                "cpu_util_request_pct": 86.6,
+                "replicas": 3,
+                "replicas_max": 3,
+            },
+            "cost": {"cost_score": 0.4139},
+            "_prev_iteration": {"squeeze_down_axis": "replica"},
+        }
+        prompt = build_user_prompt(exp, "apiVersion: v1\n", mode="squeeze")
+        self.assertIn("LOW-RPS 3→2", prompt)
+        self.assertIn("spec.replicas=2", prompt)
+
+    def test_bad_run_iter5_two_pod_floor_in_prompt(self) -> None:
+        from analysis.prompts import build_user_prompt
+
+        exp = {
+            "mode": "squeeze",
+            "analysis_goal": "efficiency",
+            "failure": {"failed": False},
+            "workload": {"target_requests_per_second": 25},
+            "config": {"deployment_replicas": 2, "cpu_request_m": 93},
+            "observed": {
+                "cpu_util_pct": 45.0,
+                "mem_util_pct": 16.6,
+                "cpu_util_request_pct": 86.8,
+                "replicas": 2,
+                "replicas_max": 2,
+            },
+            "cost": {"cost_score": 0.1762},
+            "_prev_iteration": {"squeeze_down_axis": "resources"},
+        }
+        prompt = build_user_prompt(exp, "apiVersion: v1\n", mode="squeeze")
+        self.assertIn("TWO-POD FLOOR", prompt)
+        self.assertIn("never", prompt.lower())
+
+    def test_clamp_holds_replicas_on_resource_only_down(self) -> None:
+        from analysis.k8s_manifest import clamp_llm_squeeze_replicas_to_one_step
+
+        exp = {
+            "squeeze_optimizer": "llm",
+            "mode": "squeeze",
+            "failure": {"failed": False},
+            "observed": {"replicas": 2, "replicas_max": 2},
+        }
+        dep_yaml = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 85m
+            memory: 40Mi
+"""
+        result = {"deployment_yaml_new": dep_yaml, "hpa_yaml_new": "", "evidence": []}
+        with mock.patch.dict(os.environ, {"SQUEEZE_LLM_DOWN_BOUNDARY": "1"}, clear=False):
+            clamp_llm_squeeze_replicas_to_one_step(result, exp)
+        self.assertIn("replicas: 2", result["deployment_yaml_new"])
+
+    def test_clamp_two_pod_floor_blocks_explicit_drop_to_one(self) -> None:
+        from analysis.k8s_manifest import clamp_llm_squeeze_replicas_to_one_step
+
+        exp = {
+            "squeeze_optimizer": "llm",
+            "mode": "squeeze",
+            "failure": {"failed": False},
+            "observed": {"replicas": 2, "replicas_max": 2},
+        }
+        dep_yaml = """apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: web
+        resources:
+          requests:
+            cpu: 85m
+            memory: 40Mi
+"""
+        result = {"deployment_yaml_new": dep_yaml, "hpa_yaml_new": "", "evidence": []}
+        with mock.patch.dict(os.environ, {"SQUEEZE_LLM_DOWN_BOUNDARY": "1"}, clear=False):
+            clamp_llm_squeeze_replicas_to_one_step(result, exp)
+        self.assertIn("replicas: 2", result["deployment_yaml_new"])
+        self.assertIn("two-pod DOWN minimum", " ".join(result.get("evidence") or []))
+
+
 if __name__ == "__main__":
     unittest.main()

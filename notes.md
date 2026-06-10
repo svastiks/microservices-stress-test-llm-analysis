@@ -62,3 +62,5 @@ Paired probe — both configs in one job, back-to-back, after shared warmup (the
 - Replica denominator uses mean replicas not max
 - Peak CPU fields kept separately for spike debugging
 - DOWN decisions use request percent not limit util
+
+Title confirmation: Finding Cost-Optimal Microservice Configurations via Iterative LLM-Guided Stress Testing with Deterministic Guardrails

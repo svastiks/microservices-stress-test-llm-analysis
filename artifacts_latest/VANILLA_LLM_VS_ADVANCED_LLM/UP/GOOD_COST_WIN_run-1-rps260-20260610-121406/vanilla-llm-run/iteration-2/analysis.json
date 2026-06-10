@@ -1,0 +1,48 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 120,
+    "provisioned_request_mem_mib": 60,
+    "provisioned_limit_cpu_m": 240,
+    "provisioned_limit_mem_mib": 120,
+    "per_pod_unit_cost": 0.05693,
+    "per_pod_unit_cost_util": 0.047107,
+    "cost_score": 0.1139,
+    "cost_score_util": 0.0942,
+    "cost_score_legacy": 0.1786
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": false,
+  "evidence": [
+    "Stress test failed due to p95 latency violation.",
+    "Achieved p95 latency: 588.0 ms, exceeding SLO of 500 ms.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": null,
+  "scaling_rationale": "Vanilla LLM squeeze: coarse outcome summary + current YAML only (no detailed telemetry in the prompt).",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 259.2,
+    "error_rate": 0.0,
+    "latency_ms_p95": 588.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 85.0,
+    "mem_util_pct": 41.2,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.85,
+    "total_requests": 23401
+  }
+}
