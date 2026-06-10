@@ -1,0 +1,33 @@
+[2026-06-09 23:00:50] [compare-sweep] sweep artifacts root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260609-230050
+[2026-06-09 23:00:50] [compare-sweep] mode=rps_overrides profile=down_demo rounds=1: rps=55
+[2026-06-09 23:00:50] [compare-sweep] all rounds write under RESULTS_DEST=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/compare-sweep-20260609-230050 (local run-1..run-N per sweep round; cluster PVC still run-1 per job)
+[2026-06-09 23:00:50] [compare-sweep] === round 1/1 profile=down_demo STRESS_K6_RPS=55 (compare) ===
+[2026-06-09 23:00:50] [compare-sweep] squeeze env: until_violation=true max_iter=16 formula_max=16 formula_uv=1
+[2026-06-09 23:00:50] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-09 23:00:50] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-09 23:00:50] [cluster-run] switching context to: monitoring
+[2026-06-09 23:00:51] [cluster-run] context: monitoring
+[2026-06-09 23:00:51] [cluster-run] namespace: svastik
+[2026-06-09 23:00:51] [cluster-run] profiles: down_demo
+[2026-06-09 23:00:51] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-09 23:00:51] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-09 23:00:51] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-09 23:00:51] [cluster-run] build_analyzer_image: false
+[2026-06-09 23:00:51] [cluster-run] stream_job_logs: true
+[2026-06-09 23:00:51] [cluster-run] cleanup_completed_jobs: true
+[2026-06-09 23:00:51] [cluster-run] cleanup_terminal_pods: true
+[2026-06-09 23:00:51] [cluster-run] cleanup_failed_jobs: true
+[2026-06-09 23:00:51] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-09 23:00:51] [cluster-run] up_demo_stabilize_user: true
+[2026-06-09 23:00:51] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-09 23:00:51] [cluster-run] results_pvc_snapshots: false
+[2026-06-09 23:00:51] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-09 23:00:51] [cluster-run] results_stamped_comparison_md: false
+[2026-06-09 23:00:51] [cluster-run] compare_sweep_round: 1
+[2026-06-09 23:00:51] [cluster-run] extra args for analyzer job: --compare-squeeze-optimizers
+[2026-06-09 23:00:52] [cluster-run] stack already present; skipping redeploy (set FORCE_DEPLOY_STACK=hard to force helm deploy)
+[2026-06-09 23:00:52] [cluster-run] pre-run: restore managed web baseline (prior runs may leave web NotReady / HPA unknown)
+[2026-06-09 23:00:52] [cluster-run] apply immutable managed baseline (web deployment + hpa)
