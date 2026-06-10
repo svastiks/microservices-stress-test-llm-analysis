@@ -159,6 +159,27 @@ spec:
         ev = " ".join(result.get("evidence") or [])
         self.assertNotIn("guard.veto_replica_down:resource_phase_gate", ev)
 
+    def test_high_rps_gate_slack_does_not_force_replica_drop(self) -> None:
+        """55 RPS iter-3 shape: limit util cold but cpu_util_request_pct ~52% — hold 4 pods."""
+        exp = {
+            "squeeze_optimizer": "llm",
+            "analysis_goal": "efficiency",
+            "mode": "squeeze",
+            "failure": {"failed": False},
+            "workload": {"target_requests_per_second": 55},
+            "config": {"deployment_replicas": 4, "cpu_request_m": 120},
+            "observed": {
+                "cpu_util_pct": 27.0,
+                "mem_util_pct": 11.6,
+                "cpu_util_request_pct": 51.8,
+                "replicas": 4,
+                "replicas_max": 4,
+            },
+            "cost": {"cost_score": 0.4554},
+            "_prev_iteration": {"squeeze_down_axis": "replica"},
+        }
+        self.assertFalse(_llm_over_replicated_replica_required(exp))
+
     def test_hot_multi_replica_requires_replica_drop(self) -> None:
         exp = {
             "squeeze_optimizer": "llm",

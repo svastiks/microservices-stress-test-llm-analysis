@@ -155,9 +155,10 @@ Return exactly this JSON:
 Rules (LLM-only / research path — you are the sole source of sizing; Python does not rewrite your YAML each iteration):
 - Primary objective: minimize iterations to the boundary while beating formula and vanilla on cost_score. Python only clamps replica steps to at most one pod vs live and vetoes illegal replica cuts.
 - **FAT-START / over-replicated (mandatory)**: when SLO PASS, live ≥ 4, and max(cpu_util_pct, mem_util_pct) < 50% — you **MUST** drop **exactly one replica** vs live and set hpa maxReplicas to match. Trim CPU/memory ~10–15% vs on-disk in the same YAML. **Forbidden**: same spec.replicas as live with only CPU/mem change.
-- When SLO PASS, live ≥ 3, max util < 55%, and cost.cost_score > 0.25 — **MUST** drop one replica this iteration (resource-only trim alone is insufficient).
+- When SLO PASS, live ≥ 3, limit util < 55%, **cpu_util_request_pct < 50%**, and cost.cost_score > 0.25 — **MUST** drop one replica this iteration (resource-only trim alone is insufficient).
 - Phase 1 (resource-only hold) applies **only** when live ≤ 2 OR max util ≥ 55%. Do not hold 3+ replicas while utilization is below 55%.
-- **Cold-util DOWN**: when both cpu_util_pct and mem_util_pct are below ~35% and live > 1 — prefer **replica drop** when live ≥ 3; otherwise 15–25% CPU/mem cut.
+- **Cold-util DOWN**: when cpu_util_pct and mem_util_pct are below ~35% **and cpu_util_request_pct < 50%** and live > 1 — prefer **replica drop** when live ≥ 3; otherwise 15–25% CPU/mem cut.
+- **Gate-slack DOWN**: when cpu_util_request_pct is 50–88% and live ≥ 4 — **hold replicas**; coupled 10–15% CPU+mem trim only (limit-only cpu_util_pct can look cold while request% is warm).
 - **Hot-util DOWN (mandatory)**: when SLO PASS and max(cpu_util_pct, mem_util_pct) ≥ 55%: if live ≥ 3, **drop one replica** even if the previous step was also a replica drop. If live = 2 and util < 85%, **trim CPU/memory 10–15%** toward FAIL. If live ≤ 2 and util ≥ 85%, return **empty** YAML (frontier reached).
 - Phase 2 (replica squeeze): after Phase 1, alternate replica vs resource DOWN — never lower replicas two PASS iterations in a row. If previous squeeze_down_axis was **replica**, cut CPU/memory only. On a replica step: lower spec.replicas by at most 1 vs live; trim CPU/memory only when cpu_util and mem_util are both well below 55%.
 - On a **replica** iteration: lower spec.replicas by at most 1 vs live AND reduce CPU/memory vs the current file.
@@ -474,22 +475,43 @@ def build_user_prompt(
         obs = experiment_json.get("observed") or {}
         cpu_util = float(obs.get("cpu_util_pct") or 0.0)
         mem_util = float(obs.get("mem_util_pct") or 0.0)
+        cpu_req_pct = float(obs.get("cpu_util_request_pct") or 0.0)
         cost = experiment_json.get("cost") or {}
         cost_score = float(cost.get("cost_score") or 0.0)
         dep_rep = int(cfg.get("deployment_replicas") or 0)
         live_rep = int(obs.get("replicas") or 0)
         live_max = int(obs.get("replicas_max") or 0)
         live_for_step = max(live_rep, live_max) if live_rep > 0 else live_max
-        max_util = max(cpu_util, mem_util)
-        cold_util = not failed and cpu_util < 35.0 and mem_util < 35.0
-        hot_util = max_util >= 55.0
-        fat_start = not failed and live_for_step >= 4 and max_util < 50.0
+        limit_util = max(cpu_util, mem_util)
+        gate_util = max(limit_util, cpu_req_pct)
+        gate_slack = float(os.environ.get("SQUEEZE_LLM_DOWN_GATE_SLACK_PCT", "50"))
+        target_rps = float((experiment_json.get("workload") or {}).get("target_requests_per_second") or 0)
+        cold_util = (
+            not failed
+            and cpu_util < 35.0
+            and mem_util < 35.0
+            and cpu_req_pct < gate_slack
+        )
+        hot_util = gate_util >= 55.0
+        fat_start = (
+            not failed
+            and live_for_step >= 4
+            and limit_util < 50.0
+            and cpu_req_pct < gate_slack
+        )
         high_cost_replica = (
             not failed
             and not hot_util
             and live_for_step >= 3
-            and max_util < 55.0
+            and limit_util < 55.0
+            and cpu_req_pct < gate_slack
             and cost_score > 0.25
+        )
+        gate_slack_hold = (
+            not failed
+            and live_for_step >= 4
+            and cpu_req_pct >= gate_slack
+            and cpu_req_pct < 88.0
         )
         replica_required = fat_start or high_cost_replica
         replica_ok = (
@@ -501,11 +523,16 @@ def build_user_prompt(
         if replica_required:
             phase = (
                 f"Over-replicated DOWN: live={live_for_step}, cost_score={cost_score:.4f}, "
-                f"max_util={max_util:.0f}%. **Replica drop required** — Phase 1 hold suspended."
+                f"gate_util={gate_util:.0f}%. **Replica drop required** — Phase 1 hold suspended."
+            )
+        elif gate_slack_hold:
+            phase = (
+                f"Gate-slack multi-replica: live={live_for_step}, cpu_util_request_pct={cpu_req_pct:.0f}% "
+                f"(squeeze gate still has headroom) — **hold replicas**, coupled 10–15% CPU+mem trim only."
             )
         elif hot_util and live_for_step >= 3 and prev_axis == "replica":
             phase = (
-                f"Hot multi-replica burst: live={live_for_step}, max_util={max_util:.0f}% — "
+                f"Hot multi-replica burst: live={live_for_step}, gate_util={gate_util:.0f}% — "
                 f"drop one more replica (consecutive replica OK when hot and live ≥ 3)."
             )
         elif replica_ok and prev_axis != "replica":
@@ -525,19 +552,34 @@ def build_user_prompt(
             )
         elif hot_util and live_for_step >= 3:
             phase = (
-                f"Hot multi-replica: live={live_for_step}, max_util={max_util:.0f}% — "
+                f"Hot multi-replica: live={live_for_step}, gate_util={gate_util:.0f}% — "
                 f"drop one replica before further resource-only trimming."
             )
         else:
             phase = (
-                f"Replica-first: live={live_for_step} with max_util={max_util:.0f}% — "
+                f"Replica-first: live={live_for_step} with gate_util={gate_util:.0f}% — "
                 f"drop one replica before further resource-only trimming."
             )
         parts.append(
             f"\nDOWN strategy: previous squeeze_down_axis={prev_axis}, "
-            f"resource_pass_streak={streak}, cost_score={cost_score:.4f}. {phase} "
-            "Never lower replicas two PASS iterations in a row.\n"
+            f"resource_pass_streak={streak}, cost_score={cost_score:.4f}, "
+            f"cpu_util_request_pct={cpu_req_pct:.1f}%. {phase} "
+            "Never lower replicas two PASS iterations in a row. "
+            "Use cpu_util_request_pct (not limit-only cpu_util_pct) for hot/cold replica vs resource choice.\n"
         )
+        if gate_slack_hold:
+            parts.append(
+                f"\n**GATE-SLACK MULTI-REPLICA DOWN (mandatory)**: live={live_for_step}, "
+                f"cpu_util_request_pct={cpu_req_pct:.1f}% is above gate-slack ({gate_slack:.0f}%) but still "
+                f"below ~88% — thinner **per-pod** CPU+memory (10–15% coupled trim) often beats fewer pods "
+                f"(e.g. 4×71m can beat 3×95m at higher RPS). **Hold spec.replicas and hpa maxReplicas** "
+                f"unchanged this iteration.\n"
+            )
+        if target_rps >= 50.0 and gate_slack_hold:
+            parts.append(
+                f"\n**HIGH-RPS DOWN**: target={target_rps:.0f} RPS — explore multi-replica thin configs "
+                f"before dropping below {live_for_step} pods while cpu_util_request_pct < 88%.\n"
+            )
         if fat_start:
             next_rep = max(1, live_for_step - 1)
             parts.append(
@@ -551,7 +593,7 @@ def build_user_prompt(
             next_rep = max(1, live_for_step - 1)
             parts.append(
                 f"\n**HIGH-COST REPLICA DOWN (mandatory)**: cost_score={cost_score:.4f}, "
-                f"live={live_for_step}, max_util={max_util:.0f}%. "
+                f"live={live_for_step}, gate_util={gate_util:.0f}%. "
                 f"**MUST** drop to spec.replicas={next_rep} and hpa maxReplicas={next_rep} "
                 f"plus modest CPU/mem trim. Resource-only step alone is insufficient.\n"
             )
@@ -572,15 +614,15 @@ def build_user_prompt(
                     f"{' (consecutive replica OK)' if burst else ''}. "
                     f"Resource-only trim alone is forbidden when util ≥ 65%.\n"
                 )
-            elif live_for_step <= 2 and max_util >= 85.0 and cpu_m > 65:
+            elif live_for_step <= 2 and gate_util >= 85.0 and cpu_m > 65:
                 parts.append(
-                    f"\n**HOT BOUNDARY TRIM (mandatory)**: live={live_for_step}, max_util={max_util:.0f}%, "
+                    f"\n**HOT BOUNDARY TRIM (mandatory)**: live={live_for_step}, gate_util={gate_util:.0f}%, "
                     f"cpu_request_m={cpu_m} — still above lean floor. **Trim CPU/memory 10–15%**; "
                     f"do NOT lower replicas. Empty YAML only when cpu_request_m ≤ 65m.\n"
                 )
-            elif live_for_step <= 2 and max_util >= 85.0:
+            elif live_for_step <= 2 and gate_util >= 85.0:
                 parts.append(
-                    f"\n**HOT BOUNDARY (mandatory)**: live={live_for_step}, max_util={max_util:.0f}% — "
+                    f"\n**HOT BOUNDARY (mandatory)**: live={live_for_step}, gate_util={gate_util:.0f}% — "
                     f"frontier reached. Return **empty** deployment_yaml_new and hpa_yaml_new "
                     f"(no further DOWN this iteration).\n"
                 )

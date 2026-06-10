@@ -1,0 +1,52 @@
+--- infra/k8s/spark/robot-shop-web-deployment.yaml
++++ infra/k8s/spark/robot-shop-web-deployment.yaml
+@@ -6,7 +6,7 @@
+   labels:
+     service: web
+ spec:
+-  replicas: 5
++  replicas: 4
+   selector:
+     matchLabels:
+       service: web
+@@ -16,16 +16,16 @@
+         service: web
+     spec:
+       containers:
+-        - name: web
+-          image: robotshop/rs-web:latest
+-          imagePullPolicy: IfNotPresent
+-          ports:
+-            - containerPort: 8080
+-          resources:
+-            limits:
+-              cpu: 300m
+-              memory: 150Mi
+-            requests:
+-              cpu: 150m
+-              memory: 75Mi
+-      restartPolicy: Always
++      - name: web
++        image: robotshop/rs-web:latest
++        imagePullPolicy: IfNotPresent
++        ports:
++        - containerPort: 8080
++        resources:
++          limits:
++            cpu: 255m
++            memory: 128Mi
++          requests:
++            cpu: 135m
++            memory: 65Mi
++      restartPolicy: Always
+--- infra/k8s/spark/robot-shop-web-hpa.yaml
++++ infra/k8s/spark/robot-shop-web-hpa.yaml
+@@ -9,7 +9,7 @@
+     kind: Deployment
+     name: web
+   minReplicas: 1
+-  maxReplicas: 5
++  maxReplicas: 4
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0

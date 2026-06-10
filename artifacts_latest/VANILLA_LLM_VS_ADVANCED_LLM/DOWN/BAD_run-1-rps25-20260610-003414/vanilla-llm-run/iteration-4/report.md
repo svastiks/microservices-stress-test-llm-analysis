@@ -1,0 +1,6 @@
+- Target load: 25 RPS for 90s
+- Result: PASS
+- p95 latency: 75.0 ms (SLO limit: 500 ms)
+- Error rate: 0.0
+- Achieved throughput: 25.0 RPS
+- Reducing resource requests and limits as there is headroom.

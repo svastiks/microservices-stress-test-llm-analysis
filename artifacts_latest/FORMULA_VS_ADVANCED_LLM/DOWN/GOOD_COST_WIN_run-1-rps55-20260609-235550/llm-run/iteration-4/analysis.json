@@ -1,0 +1,52 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 440,
+    "provisioned_request_mem_mib": 200,
+    "provisioned_limit_cpu_m": 880,
+    "provisioned_limit_mem_mib": 400,
+    "per_pod_unit_cost": 0.103883,
+    "per_pod_unit_cost_util": 0.045484,
+    "cost_score": 0.4155,
+    "cost_score_util": 0.1819,
+    "cost_score_legacy": 0.6353
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "observed.replicas = 4",
+    "cost.cost_score = 0.4155",
+    "cpu_util_request_pct = 90.2%",
+    "observed.replicas: 4",
+    "observed.replicas_max: 4",
+    "guard.squeeze_replica_cap live=4 target=3 (deployment.reconcile: live=4 target=3; hpa.reconcile: live=4 target=3)",
+    "guard.enforce_hot_replica_drop",
+    "squeeze_down_axis=replica"
+  ],
+  "squeeze_down_axis": "replica",
+  "resource_pass_streak": 0,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with slack on at least one resource; small reduction may be safe.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 54.9,
+    "error_rate": 0.0,
+    "latency_ms_p95": 74.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 45.1,
+    "mem_util_pct": 17.1,
+    "replicas": 4,
+    "replicas_max": 4,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.45,
+    "total_requests": 4951
+  }
+}

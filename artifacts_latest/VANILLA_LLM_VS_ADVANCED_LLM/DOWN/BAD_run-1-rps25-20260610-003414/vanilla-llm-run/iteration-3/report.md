@@ -1,0 +1,5 @@
+- Stress test passed successfully
+- p95 latency was well below the SLO
+- Achieved throughput met the target load
+- No errors recorded
+- Configuration was stable during the test

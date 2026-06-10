@@ -1,0 +1,4 @@
+- The stress test PASSed with a p95 latency of 74.0 ms, well within the SLO limit of 500 ms.
+- Achieved a throughput of 25.0 RPS with an error rate of 0.0.
+- The current configuration utilizes 4 replicas.
+- Scaling down is advisable given the comfortable metrics.

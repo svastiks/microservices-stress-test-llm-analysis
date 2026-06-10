@@ -1,0 +1,4 @@
+- Stress test failed due to CPU utilization exceeding limits.
+- Achieved throughput met target, but with high utilization.
+- Adjusting resources to avoid future failures under the same load.
+- Increasing replicas and CPU limits to enhance performance.

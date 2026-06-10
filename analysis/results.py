@@ -451,6 +451,24 @@ def _llm_max_util_pct(experiment: dict) -> float:
     )
 
 
+def _llm_cpu_request_util_pct(experiment: dict) -> float:
+    return float((experiment.get("observed") or {}).get("cpu_util_request_pct") or 0.0)
+
+
+def _llm_squeeze_gate_util_pct(experiment: dict) -> float:
+    """Align DOWN decisions with squeeze PASS/FAIL gate (limit% can look cold while request% is warm)."""
+    obs = experiment.get("observed") or {}
+    return max(
+        float(obs.get("cpu_util_pct") or 0.0),
+        float(obs.get("mem_util_pct") or 0.0),
+        float(obs.get("cpu_util_request_pct") or 0.0),
+    )
+
+
+def _llm_down_gate_slack_pct() -> float:
+    return float(os.environ.get("SQUEEZE_LLM_DOWN_GATE_SLACK_PCT", "50"))
+
+
 def _llm_hot_replica_drop_required(experiment: dict) -> bool:
     """PASS with 3+ hot pods — must drop one replica this iteration."""
     if bool(((experiment.get("failure") or {}).get("failed"))):
@@ -458,13 +476,14 @@ def _llm_hot_replica_drop_required(experiment: dict) -> bool:
     if _llm_live_replicas(experiment) < 3:
         return False
     threshold = float(os.environ.get("SQUEEZE_LLM_HOT_REPLICA_UTIL_PCT", "65"))
-    return _llm_max_util_pct(experiment) >= threshold
+    return _llm_squeeze_gate_util_pct(experiment) >= threshold
 
 
 def _llm_hot_multi_replica_burst(experiment: dict) -> bool:
     """Hot with 3+ pods — allow consecutive replica drops (match vanilla DOWN speed)."""
     return _llm_hot_replica_drop_required(experiment) or (
-        _llm_live_replicas(experiment) >= 3 and _llm_max_util_pct(experiment) >= 55.0
+        _llm_live_replicas(experiment) >= 3
+        and _llm_squeeze_gate_util_pct(experiment) >= 55.0
     )
 
 
@@ -495,26 +514,26 @@ def _llm_over_replicated_replica_required(experiment: dict) -> bool:
     prev = experiment.get("_prev_iteration") or {}
     prev_axis = (prev.get("squeeze_down_axis") or "").strip().lower()
     live = _llm_live_replicas(experiment)
-    max_util = _llm_max_util_pct(experiment)
+    obs = experiment.get("observed") or {}
+    cpu_lim = float(obs.get("cpu_util_pct") or 0.0)
+    mem_lim = float(obs.get("mem_util_pct") or 0.0)
+    cpu_req = _llm_cpu_request_util_pct(experiment)
+    gate_util = _llm_squeeze_gate_util_pct(experiment)
+    limit_util = max(cpu_lim, mem_lim)
+    gate_slack = _llm_down_gate_slack_pct()
     if prev_axis == "replica" and not _llm_hot_multi_replica_burst(experiment):
         return False
     if live < 2:
         return False
-    if max_util >= 55.0:
+    if gate_util >= 55.0:
         return live >= 3
     cost = experiment.get("cost") or {}
     cost_score = float(cost.get("cost_score") or 0.0)
-    if live >= 4 and max_util < 50.0:
+    if live >= 4 and limit_util < 50.0 and cpu_req < gate_slack:
         return True
-    if live >= 3 and cost_score > 0.25:
+    if live >= 3 and cost_score > 0.25 and cpu_req < gate_slack and limit_util < 55.0:
         return True
-    if (
-        float((experiment.get("observed") or {}).get("cpu_util_pct") or 0.0) < 35.0
-        and float((experiment.get("observed") or {}).get("mem_util_pct") or 0.0) < 35.0
-        and live >= 3
-    ):
-        return True
-    if live >= 3:
+    if cpu_lim < 35.0 and mem_lim < 35.0 and cpu_req < gate_slack and live >= 3:
         return True
     return False
 

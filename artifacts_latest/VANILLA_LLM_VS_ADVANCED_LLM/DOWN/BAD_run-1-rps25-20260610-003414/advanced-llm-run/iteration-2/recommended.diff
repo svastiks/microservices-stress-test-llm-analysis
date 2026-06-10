@@ -1,0 +1,39 @@
+--- infra/k8s/spark/robot-shop-web-deployment.yaml
++++ infra/k8s/spark/robot-shop-web-deployment.yaml
+@@ -5,8 +5,10 @@
+   namespace: svastik
+   labels:
+     service: web
++  annotations:
++    squeeze/reconcile-ts: '1781066636'
+ spec:
+-  replicas: 4
++  replicas: 3
+   selector:
+     matchLabels:
+       service: web
+@@ -23,9 +25,9 @@
+         - containerPort: 8080
+         resources:
+           limits:
+-            cpu: 255m
+-            memory: 128Mi
++            cpu: 216m
++            memory: 109Mi
+           requests:
+-            cpu: 135m
+-            memory: 65Mi
++            cpu: 115m
++            memory: 55Mi
+       restartPolicy: Always
+--- infra/k8s/spark/robot-shop-web-hpa.yaml
++++ infra/k8s/spark/robot-shop-web-hpa.yaml
+@@ -9,7 +9,7 @@
+     kind: Deployment
+     name: web
+   minReplicas: 1
+-  maxReplicas: 4
++  maxReplicas: 3
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0

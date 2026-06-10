@@ -48,3 +48,17 @@ Warmup k6 — e.g. 60–120s load before the measured 90s window (discard warmup
 Shorter rate window — rate[1m] or irate for 90s tests instead of rate[5m].
 Drop first iteration after baseline from burn/cost comparisons (or tag cold_start: true).
 Paired probe — both configs in one job, back-to-back, after shared warmup (the real proof).
+
+## CPU utilization improvements
+
+- PASS/FAIL gate now uses request CPU percent
+- Limit-based cpu_util_pct kept for diagnostics only
+- Prometheus averages samples instead of window peak
+- Per-pod CPU series summed for accurate burn
+- Shorter one-minute rate window for ninety-second tests
+- cpu_util_request_pct added to every experiment JSON
+- Skip CPU gate when Prometheus telemetry untrustworthy
+- Comparison tables show cpu percent req column
+- Replica denominator uses mean replicas not max
+- Peak CPU fields kept separately for spike debugging
+- DOWN decisions use request percent not limit util
