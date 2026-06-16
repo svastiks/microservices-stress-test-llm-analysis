@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "PASS",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 5,
+    "provisioned_request_cpu_m": 675,
+    "provisioned_request_mem_mib": 340,
+    "provisioned_limit_cpu_m": 1350,
+    "provisioned_limit_mem_mib": 675,
+    "per_pod_unit_cost": 0.128141,
+    "per_pod_unit_cost_util": 0.035758,
+    "cost_score": 0.6407,
+    "cost_score_util": 0.1788,
+    "cost_score_legacy": 1.007
+  },
+  "failure_archetype": "NONE",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "MEDIUM",
+  "over_provisioned": true,
+  "evidence": [
+    "cpu_util_pct=28.6% and cpu_util_request_pct=57.2% indicate significant headroom for resource allocation reduction.",
+    "Current deployment with 5 replicas shows a cost score of 0.6407, indicating over-provisioning.",
+    "Observed cpu usage patterns (peak cpu_util_request_pct=60.2%) emphasize that CPU limits are higher than needed for performance.",
+    "observed.replicas: 5",
+    "observed.replicas_max: 5",
+    "squeeze_down_axis=replica"
+  ],
+  "squeeze_down_axis": "replica",
+  "resource_pass_streak": 0,
+  "scaling_hint": "DOWN",
+  "scaling_rationale": "SLO pass with low CPU and memory vs limits; candidate for modest right-sizing down.",
+  "up_recovery": null,
+  "observed_summary": {
+    "achieved_requests_per_second": 44.9,
+    "error_rate": 0.0,
+    "latency_ms_p95": 74.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 28.6,
+    "mem_util_pct": 15.2,
+    "replicas": 5,
+    "replicas_max": 5,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.29,
+    "total_requests": 4051
+  }
+}

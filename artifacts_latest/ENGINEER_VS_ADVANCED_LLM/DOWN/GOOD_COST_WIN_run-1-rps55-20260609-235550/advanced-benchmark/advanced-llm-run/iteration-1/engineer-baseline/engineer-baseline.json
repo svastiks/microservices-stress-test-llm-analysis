@@ -1,0 +1,46 @@
+{
+  "method": "engineer_autopilot_single_shot",
+  "citation": "Rzadca et al., Autopilot (EuroSys 2020); K8s VPA percentile sizing",
+  "target_rps": 55,
+  "source_experiment_id": "down_demo-20260610T041324Z-9b959c7a",
+  "parameters": {
+    "cpu_buffer": 1.3,
+    "mem_buffer": 1.2,
+    "target_util": 0.6,
+    "limit_multiplier": 2.0
+  },
+  "signals": {
+    "pod_cpu_peak_m": 146.5,
+    "pod_mem_peak_mib": 20.29,
+    "fleet_cpu_peak_m": 404.9,
+    "profiling_replicas": 5,
+    "profiling_cpu_request_m": 150,
+    "profiling_mem_request_mib": 75
+  },
+  "config": {
+    "cpu_request_m": 191,
+    "cpu_limit_m": 382,
+    "mem_request_mib": 32,
+    "mem_limit_mib": 64,
+    "deployment_replicas": 4,
+    "hpa": {
+      "min_replicas": 1,
+      "max_replicas": 4,
+      "target_cpu_util_pct": 60
+    }
+  },
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 4,
+    "provisioned_request_cpu_m": 764,
+    "provisioned_request_mem_mib": 128,
+    "provisioned_limit_cpu_m": 1528,
+    "provisioned_limit_mem_mib": 256,
+    "per_pod_unit_cost": 0.175025,
+    "per_pod_unit_cost_util": 0.044419,
+    "cost_score": 0.7001,
+    "cost_score_util": 0.1777,
+    "cost_score_legacy": 0.889
+  },
+  "profiling_slo_pass": true
+}

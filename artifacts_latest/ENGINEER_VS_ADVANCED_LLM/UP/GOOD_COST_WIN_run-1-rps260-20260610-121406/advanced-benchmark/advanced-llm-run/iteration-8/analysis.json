@@ -1,0 +1,50 @@
+{
+  "mode": "squeeze",
+  "analysis_goal": "efficiency",
+  "squeeze_optimizer": "llm",
+  "slo_status": "FAIL",
+  "cost": {
+    "cost_model": "weighted",
+    "replicas_effective": 2,
+    "provisioned_request_cpu_m": 224,
+    "provisioned_request_mem_mib": 102,
+    "provisioned_limit_cpu_m": 456,
+    "provisioned_limit_mem_mib": 204,
+    "per_pod_unit_cost": 0.10578,
+    "per_pod_unit_cost_util": 0.056684,
+    "cost_score": 0.2116,
+    "cost_score_util": 0.1134,
+    "cost_score_legacy": 0.3236
+  },
+  "failure_archetype": "UNKNOWN",
+  "lambda_crit_estimate": null,
+  "next_experiment": "Re-run the same fixed workload after applying YAML.",
+  "optimization_headroom": "LOW",
+  "over_provisioned": false,
+  "evidence": [
+    "Observed p95 latency=645ms vs SLO p95=500ms indicates performance breach.",
+    "CPU utilization request percentage=112.5% is above the target threshold.",
+    "Current configuration yields a cost_score of 0.2116, indicating potential efficiency opportunities.",
+    "Memory utilization remains low at 18.9%, presenting opportunities for growth without immediate concerns.",
+    "observed.replicas: 2",
+    "observed.replicas_max: 2"
+  ],
+  "squeeze_down_axis": null,
+  "resource_pass_streak": null,
+  "scaling_hint": "UP",
+  "scaling_rationale": "Under-provisioning recovery sweep: keep increasing capacity until SLO passes.",
+  "up_recovery": true,
+  "observed_summary": {
+    "achieved_requests_per_second": 259.1,
+    "error_rate": 0.0,
+    "latency_ms_p95": 645.0,
+    "latency_ms_p99": 0,
+    "cpu_util_pct": 55.3,
+    "mem_util_pct": 18.9,
+    "replicas": 2,
+    "replicas_max": 2,
+    "oom_kills": 0,
+    "cpu_util_to_limit": 0.55,
+    "total_requests": 23401
+  }
+}

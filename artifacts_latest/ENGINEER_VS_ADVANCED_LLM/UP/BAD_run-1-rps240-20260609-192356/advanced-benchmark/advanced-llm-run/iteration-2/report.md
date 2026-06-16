@@ -1,0 +1,8 @@
+- Vertical scaling required due to high observed CPU utilization and SLO violation.
+- Current configuration shows CPU utilization request percentage at 187.5%, indicating severe under-provisioning.
+- The last metrics indicate a p95 latency of 771ms, which exceeds the SLO target of 500ms.
+- Due to existing two replicas, only CPU and memory limits need to be increased simultaneously to improve performance.
+- A ~15% increase in CPU and memory requests/limits is recommended to address the failure.
+- Current cost score is low, but further optimization is necessary to increase efficiency while meeting SLO.
+- The cluster has sufficient headroom to support the proposed increase in resources without causing excess cost.
+- Monitoring telemetry is consistent and trustworthy, justifying the proposed resource increases.

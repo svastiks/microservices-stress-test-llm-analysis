@@ -80,8 +80,14 @@ def compare_engineer_vs_advanced(
     rps: int | None = None,
     engineer_data: str | None = None,
     advanced_data: str | None = None,
+    engineer_method: str | None = None,
 ) -> str:
-    """Engineer B1 (single experiment.json) vs advanced-llm squeeze boundary."""
+    """Engineer baseline (single experiment.json) vs advanced-llm squeeze boundary."""
+    if engineer_method is None:
+        engineer_method = (
+            "- **Engineer**: Autopilot single-shot sizing from profiling metrics; "
+            "one k6 verify pass at fixed RPS; no squeeze loop."
+        )
     text = compare_static_vs_llm(
         engineer_experiment,
         advanced_boundary,
@@ -98,11 +104,7 @@ def compare_engineer_vs_advanced(
         1,
     ).replace(
         "- **Static**: thin deployment YAML + HPA (1–5 replicas); one k6 pass; no squeeze apply loop.",
-        (
-            f"- **Engineer (B1)**: fat deployment "
-            f"(`robot-shop-web-deployment.baseline.yaml`: 5×150m/75Mi) + HPA; "
-            f"one k6 pass at fixed RPS; no squeeze (`{scenario}`)."
-        ),
+        engineer_method,
         1,
     ).replace(
         "- **LLM**: iterative squeeze until SLO-safe minimum cost (`cost-effective-boundary.json`).",

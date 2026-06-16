@@ -158,7 +158,7 @@ Rules (LLM-only / research path — you are the sole source of sizing; Python do
 - When SLO PASS, live ≥ 3, limit util < 55%, **cpu_util_request_pct < 50%**, and cost.cost_score > 0.25 — **MUST** drop one replica this iteration (resource-only trim alone is insufficient).
 - Phase 1 (resource-only hold) applies **only** when live ≤ 2 OR max util ≥ 55%. Do not hold 3+ replicas while utilization is below 55%.
 - **Cold-util DOWN**: when cpu_util_pct and mem_util_pct are below ~35% **and cpu_util_request_pct < 50%** and live > 1 — prefer **replica drop** when live ≥ 3; otherwise 15–25% CPU/mem cut.
-- **Gate-slack DOWN** (target ≥ 50 RPS only): when cpu_util_request_pct is 50–88% and live ≥ 4 — **hold replicas**; coupled 10–15% CPU+mem trim only (limit-only cpu_util_pct can look cold while request% is warm).
+- **Gate-slack DOWN** (target ≥ 50 RPS, live = 3 only): when live = 3 and cpu_util_request_pct is 50–88% — **hold replicas**; coupled 10–15% CPU+mem trim only. **Does NOT apply when live ≥ 4** — always drop one replica when live ≥ 4 (FAT-START takes precedence).
 - **Low-RPS DOWN** (target ≤ 35 RPS): **gate-slack does not apply** — at light load, **fewer pods beats fatter pods**. When live ≥ 4 on first DOWN, **MUST drop one replica** (never resource-only while still ≥ 4 pods). When live = 3 and cpu_util_request_pct < 90%, **MUST drop to 2** this iteration plus coupled 12–18% CPU+mem trim. Reach **2 pods** before fine-trimming per-pod CPU.
 - **Two-pod floor**: when live = 2 and SLO PASS — **never** drop to 1 replica; always return coupled 12–15% CPU+mem trim (never empty YAML — let the next measurement record the FAIL).
 - **Hot-util DOWN (mandatory)**: when SLO PASS and max(cpu_util_pct, mem_util_pct) ≥ 55%: if live ≥ 3, **drop one replica** even if the previous step was also a replica drop. If live = 2 and util < 85%, **trim CPU/memory 10–15%** toward FAIL. If live ≤ 2 and util ≥ 85%, return **empty** YAML (frontier reached).
@@ -513,7 +513,7 @@ def build_user_prompt(
         gate_slack_hold = (
             not failed
             and not low_rps_down
-            and live_for_step >= 4
+            and live_for_step == 3  # gate-slack only at live=3; live>=4 uses fat-start replica-first
             and cpu_req_pct >= gate_slack
             and cpu_req_pct < 88.0
         )

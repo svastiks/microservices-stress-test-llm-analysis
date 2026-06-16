@@ -481,9 +481,10 @@ def _llm_hot_replica_drop_required(experiment: dict) -> bool:
 
 def _llm_hot_multi_replica_burst(experiment: dict) -> bool:
     """Hot with 3+ pods — allow consecutive replica drops (match vanilla DOWN speed)."""
-    return _llm_hot_replica_drop_required(experiment) or (
-        _llm_live_replicas(experiment) >= 3
-        and _llm_squeeze_gate_util_pct(experiment) >= 55.0
+    return (
+        _llm_hot_replica_drop_required(experiment)
+        or _llm_live_replicas(experiment) >= 4  # fat-start: drain fast when clearly over-replicated
+        or (_llm_live_replicas(experiment) >= 3 and _llm_squeeze_gate_util_pct(experiment) >= 55.0)
     )
 
 
@@ -529,8 +530,8 @@ def _llm_over_replicated_replica_required(experiment: dict) -> bool:
         return live >= 3
     cost = experiment.get("cost") or {}
     cost_score = float(cost.get("cost_score") or 0.0)
-    if live >= 4 and limit_util < 50.0 and cpu_req < gate_slack:
-        return True
+    if live >= 4 and limit_util < 50.0:
+        return True  # fat-start: drain fast; gate_slack only applies at live<=3
     if live >= 3 and cost_score > 0.25 and cpu_req < gate_slack and limit_util < 55.0:
         return True
     if cpu_lim < 35.0 and mem_lim < 35.0 and cpu_req < gate_slack and live >= 3:
@@ -552,6 +553,8 @@ def _llm_replica_down_allowed(experiment: dict) -> bool:
     streak = int(prev.get("resource_pass_streak") or 0)
     max_util = _llm_max_util_pct(experiment)
     live = _llm_live_replicas(experiment)
+    if live >= 4:
+        return True  # fat-start: drain fast when clearly over-replicated
     if max_util >= 55.0:
         return live >= 3
     if cpu_m > 0 and cpu_m <= ceiling:

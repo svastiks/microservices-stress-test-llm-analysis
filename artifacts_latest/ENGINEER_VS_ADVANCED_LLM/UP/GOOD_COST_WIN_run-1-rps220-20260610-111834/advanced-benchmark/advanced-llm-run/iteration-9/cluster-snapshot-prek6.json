@@ -1,0 +1,36 @@
+{
+  "phase": "pre_k6",
+  "ts": 1781106655.9656677,
+  "live": {
+    "dep_spec": 2,
+    "ready": 2,
+    "updated": 2,
+    "available": 2,
+    "hpa_current": 2,
+    "hpa_desired": 2,
+    "hpa_max": 2
+  },
+  "yaml_replicas": 2,
+  "pods": [
+    {
+      "name": "web-67d966d66d-lnzb9",
+      "phase": "Running",
+      "ready_containers": 1,
+      "container_count": 1,
+      "pod_ip": "10.42.7.210",
+      "start_time": "2026-06-10T15:49:03Z",
+      "node": "worker2"
+    },
+    {
+      "name": "web-67d966d66d-r9xn9",
+      "phase": "Running",
+      "ready_containers": 1,
+      "container_count": 1,
+      "pod_ip": "10.42.4.153",
+      "start_time": "2026-06-10T15:49:27Z",
+      "node": "ceras2"
+    }
+  ],
+  "pod_count": 2,
+  "endpoint_addrs": []
+}
