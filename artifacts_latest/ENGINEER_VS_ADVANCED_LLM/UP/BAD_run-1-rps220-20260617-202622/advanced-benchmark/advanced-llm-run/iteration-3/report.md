@@ -1,0 +1,5 @@
+- Current p95 latency (282 ms) is within SLO (500 ms) and error rate is zero.
+- However, cpu_util_request_pct is very high at 176%, indicating over-provisioned CPU capacity.
+- To optimize cost while achieving SLO, a coupled vertical increase of ~15% is proposed for CPU and memory.
+- This adjustment targets a more effective use of resources without increasing the number of replicas.
+- The current configuration allows for resource adjustments while maintaining the same performance levels and ready state.

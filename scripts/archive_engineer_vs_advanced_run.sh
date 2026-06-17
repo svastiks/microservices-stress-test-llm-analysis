@@ -30,13 +30,69 @@ SUB="$(advanced_llm_subdir "${SRC_RUN}")" || {
 
 RUN_NAME="$(basename "${SRC_RUN}")"
 ARCHIVE_NAME="${RUN_NAME}"
-if [[ "${RUN_NAME}" != GOOD_* && "${RUN_NAME}" != BAD_* && "${RUN_NAME}" != NEAR_TIE_* ]]; then
-  ARCHIVE_NAME="GOOD_COST_WIN_${RUN_NAME}"
-fi
 
-VERIFY_EXP="${SRC_RUN}/${SUB}/iteration-1/engineer-baseline/verify-run/experiment.json"
-BASELINE_DIR="${SRC_RUN}/${SUB}/iteration-1/engineer-baseline"
-PROFILE_EXP="${SRC_RUN}/${SUB}/iteration-1/experiment.json"
+resolve_engineer_paths() {
+  local run="$1" sub="$2"
+  local cand
+  for cand in \
+    "${run}/${sub}/engineer-baseline" \
+    "${run}/${sub}/iteration-1/engineer-baseline"; do
+    if [[ -f "${cand}/verify-run/experiment.json" ]]; then
+      BASELINE_DIR="${cand}"
+      VERIFY_EXP="${cand}/verify-run/experiment.json"
+      if [[ -f "${cand}/profiling-experiment.json" ]]; then
+        PROFILE_EXP="${cand}/profiling-experiment.json"
+      else
+        PROFILE_EXP="${run}/${sub}/iteration-1/experiment.json"
+      fi
+      return 0
+    fi
+  done
+  return 1
+}
+
+resolve_engineer_paths "${SRC_RUN}" "${SUB}" || {
+  echo "no engineer-baseline verify-run under ${SRC_RUN}/${SUB}" >&2
+  exit 1
+}
+
+ADV_WINS="$(python3 - <<PY
+import json
+from pathlib import Path
+
+verify = json.loads(Path("${VERIFY_EXP}").read_text())
+adv = json.loads(Path("${SRC_RUN}/${SUB}/cost-effective-boundary.json").read_text())
+eng = (verify.get("cost") or {}).get("cost_score")
+adv_cost = adv.get("cost_best_pass_score")
+print("1" if eng is not None and adv_cost is not None and float(adv_cost) < float(eng) else "0")
+PY
+)"
+
+COMPARE_STAMP="$(python3 - <<PY
+import json, re
+from datetime import datetime, timezone
+from pathlib import Path
+
+exp = json.loads(Path("${VERIFY_EXP}").read_text())
+eid = exp.get("experiment_id") or ""
+m = re.search(r"(\\d{8})T(\\d{6})Z", eid)
+if m:
+    print(f"{m.group(1)}-{m.group(2)}")
+    raise SystemExit(0)
+tel = (exp.get("observed") or {}).get("telemetry") or {}
+end = tel.get("k6_window_end_ts")
+if end:
+    print(datetime.fromtimestamp(float(end), tz=timezone.utc).strftime("%Y%m%d-%H%M%S"))
+else:
+    print("$(date +%Y%m%d-%H%M%S)")
+PY
+)"
+
+if [[ "${ADV_WINS}" == "1" ]]; then
+  ARCHIVE_NAME="GOOD_COST_WIN_run-1-rps${RPS}-${COMPARE_STAMP}"
+else
+  ARCHIVE_NAME="BAD_run-1-rps${RPS}-${COMPARE_STAMP}"
+fi
 ADV_RUN="${SRC_RUN}/${SUB}"
 COMP_SRC="${ROOT}/artifacts/ENGINEER_VS_ADVANCED_LLM/${ORIENT}/run-rps${RPS}/comparison.md"
 
@@ -80,7 +136,7 @@ lines = [
     "",
     "## Contents",
     "",
-    "- profiling-source/experiment.json — advanced iter-1 metrics used to derive engineer baseline",
+    "- profiling-source/experiment.json — fat static-baseline k6 pass used to derive engineer baseline",
     "- engineer-baseline/ — derived YAML + verify-run cluster test",
     "- advanced-benchmark/advanced-llm-run/ — full advanced squeeze (from llm-run or advanced-llm-run)",
     "- advanced-benchmark/source-comparison.md — original vanilla/formula comparison",

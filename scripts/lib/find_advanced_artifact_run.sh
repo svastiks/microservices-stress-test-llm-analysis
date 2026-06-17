@@ -55,16 +55,24 @@ find_advanced_run_for_rps() {
   return 1
 }
 
+_engineer_verify_candidates() {
+  local run="$1" sub="$2"
+  printf '%s\n' \
+    "${run}/${sub}/engineer-baseline/verify-run/experiment.json" \
+    "${run}/${sub}/iteration-1/engineer-baseline/verify-run/experiment.json"
+}
+
 # Prefer a run that already has engineer verify-run for this RPS.
 find_engineer_verify_exp() {
   local orient="$1" rps="$2" run sub exp
   while IFS= read -r run; do
     sub="$(advanced_llm_subdir "${run}")" || continue
-    exp="${run}/${sub}/iteration-1/engineer-baseline/verify-run/experiment.json"
-    if [[ -f "${exp}" ]]; then
-      echo "${exp}"
-      return 0
-    fi
+    while IFS= read -r exp; do
+      if [[ -f "${exp}" ]]; then
+        echo "${exp}"
+        return 0
+      fi
+    done < <(_engineer_verify_candidates "${run}" "${sub}")
   done < <(_iter_advanced_run_candidates "${orient}" "${rps}")
   return 1
 }
@@ -97,15 +105,19 @@ find_profiling_iter1_exp() {
 
 # Run dir backing a verified engineer experiment (for archive / pairing).
 find_engineer_source_run() {
-  local orient="$1" rps="$2" exp d
+  local orient="$1" rps="$2" exp d parent
   if ! exp="$(find_engineer_verify_exp "${orient}" "${rps}")"; then
     return 1
   fi
-  d="${exp}"
-  d="$(dirname "${d}")"
-  d="$(dirname "${d}")"
-  d="$(dirname "${d}")"
-  d="$(dirname "${d}")"
-  d="$(dirname "${d}")"
+  d="$(dirname "${exp}")"       # verify-run
+  d="$(dirname "${d}")"         # engineer-baseline
+  parent="$(basename "$(dirname "${d}")")"
+  if [[ "${parent}" == "iteration-1" ]]; then
+    d="$(dirname "$(dirname "${d}")")"  # llm-run | advanced-llm-run
+    d="$(dirname "${d}")"               # compare run dir
+  else
+    d="$(dirname "${d}")"               # llm-run | advanced-llm-run
+    d="$(dirname "${d}")"               # compare run dir
+  fi
   echo "${d}"
 }

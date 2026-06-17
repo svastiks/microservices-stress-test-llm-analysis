@@ -64,3 +64,41 @@ Paired probe — both configs in one job, back-to-back, after shared warmup (the
 - DOWN decisions use request percent not limit util
 
 Title confirmation: Finding Cost-Optimal Microservice Configurations via Iterative LLM-Guided Stress Testing with Deterministic Guardrails
+
+## CALCULATIONS
+
+### Engineer baseline formulas (Autopilot single-shot)
+
+- `pod_cpu_peak_m` = max CPU peak across pods
+- `fleet_cpu_peak_m` = sum of per-pod CPU peaks
+- `pod_mem_peak_mib` = peak memory per pod from Prometheus
+- `cpu_request_m` = ceil(pod_cpu_peak_m × 1.3), min 25m
+- `mem_request_mib` = ceil(pod_mem_peak_mib × 1.2), min 32 MiB
+- `replicas` = ceil(fleet_cpu_peak_m / (cpu_request_m × 0.6)), clamp 1–5
+- `limits` = 2× requests
+- `prov_cost` = replicas × (0.9×cpu/1000 + 0.1×mem/1024)
+
+### 25 RPS DOWN (profiling: 5×150m/75Mi)
+
+Signals: pod peaks 142.0, 103.8, 107.1, 45.4m → fleet 398.3m, mem 16.08 MiB
+
+```
+cpu_request  = ceil(142.0 × 1.3) = 185m
+mem_request  = max(32, ceil(16.08 × 1.2)) = 32 MiB
+replicas     = ceil(398.3 / (185 × 0.6)) = 4
+config       = 4 × 185m / 32Mi
+prov_cost    = 4 × 0.169625 = 0.6785 (verify matched)
+```
+
+### 220 RPS UP (profiling: 1×50m/25Mi thin start)
+
+Signals: pod_cpu_peak 98.6m, fleet 98.6m, mem 45.05 MiB
+
+```
+cpu_request  = ceil(98.6 × 1.3) = 129m
+mem_request  = ceil(45.05 × 1.2) = 55 MiB
+replicas     = ceil(98.6 / (129 × 0.6)) = 1
+config       = 1 × 129m / 55Mi
+prov_cost    = 1 × 0.121471 = 0.1215 (derived)
+verify       = HPA scaled 1→4 pods → measured 0.4859
+```

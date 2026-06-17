@@ -16,10 +16,12 @@ cd "${ROOT}"
 : "${COMPARE_SWEEP_BASE_PROFILE:=up_demo}"
 : "${COMPARE_SWEEP_RPS:=220,240,260,280}"
 
-SWEEP_STAMP="$(date +%Y%m%d-%H%M%S)"
 SWEEP_PARENT="${COMPARE_SWEEP_PARENT:-${ROOT}/results-from-cluster}"
 : "${SWEEP_NAME_PREFIX:=static-up-sweep}"
-SWEEP_ROOT="${SWEEP_PARENT}/${SWEEP_NAME_PREFIX}-${SWEEP_STAMP}"
+if [[ -z "${SWEEP_ROOT:-}" ]]; then
+  SWEEP_STAMP="$(date +%Y%m%d-%H%M%S)"
+  SWEEP_ROOT="${SWEEP_PARENT}/${SWEEP_NAME_PREFIX}-${SWEEP_STAMP}"
+fi
 mkdir -p "${SWEEP_ROOT}"
 
 declare -a ROUND_LABELS=()
