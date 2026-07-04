@@ -46,6 +46,23 @@ def _env_int(name: str, default: int) -> int:
     return int(raw)
 
 
+def _profiling_hpa_max(obs: dict, hpa: dict) -> int:
+    """HPA ceiling for sizing: trust observed scale-out over a stale config snapshot."""
+    observed = max(
+        int(obs.get("replicas_max") or 0),
+        int(obs.get("replicas") or 0),
+    )
+    configured = int(hpa.get("max_replicas") or 0)
+    return max(observed, configured, 5)
+
+
+def _is_up_demo_workload(wl: dict) -> bool:
+    try:
+        return int(wl.get("target_requests_per_second") or 0) >= 100
+    except (TypeError, ValueError):
+        return False
+
+
 def _live_replicas(obs: dict, cfg: dict) -> int:
     hpa = cfg.get("hpa") or {}
     for key in ("replicas", "replicas_max"):
@@ -140,9 +157,10 @@ def derive_engineer_config(
         "ENGINEER_LIMIT_MULTIPLIER", DEFAULT_LIMIT_MULTIPLIER
     )
     hpa_min = max(1, _env_int("ENGINEER_HPA_MIN_REPLICAS", int(hpa.get("min_replicas") or 1)))
+    profile_hpa_max = _profiling_hpa_max(obs, hpa)
     hpa_max = max(
         hpa_min,
-        _env_int("ENGINEER_HPA_MAX_REPLICAS", int(hpa.get("max_replicas") or 5)),
+        _env_int("ENGINEER_HPA_MAX_REPLICAS", profile_hpa_max),
     )
     hpa_target_cpu = _env_int(
         "ENGINEER_HPA_TARGET_CPU_UTIL_PCT",
@@ -165,24 +183,31 @@ def derive_engineer_config(
     mem_limit_mib = max(mem_request_mib, int(math.ceil(mem_request_mib * lim_mult)))
 
     denom = max(cpu_request_m * tgt_util, 1e-6)
-    replicas = int(math.ceil(fleet_cpu_peak_m / denom))
-    replicas = max(hpa_min, min(replicas, hpa_max))
+    sized_replicas = int(math.ceil(fleet_cpu_peak_m / denom))
+    sized_replicas = max(hpa_min, min(sized_replicas, hpa_max))
+    up_demo = _is_up_demo_workload(wl)
+    if up_demo:
+        deploy_replicas = hpa_min
+        hpa_max_out = sized_replicas
+    else:
+        deploy_replicas = sized_replicas
+        hpa_max_out = sized_replicas
 
     derived_cfg = {
         "cpu_request_m": cpu_request_m,
         "cpu_limit_m": cpu_limit_m,
         "mem_request_mib": mem_request_mib,
         "mem_limit_mib": mem_limit_mib,
-        "deployment_replicas": replicas,
+        "deployment_replicas": deploy_replicas,
         "hpa": {
             "min_replicas": hpa_min,
-            "max_replicas": replicas,
+            "max_replicas": hpa_max_out,
             "target_cpu_util_pct": hpa_target_cpu,
         },
     }
     derived_obs = {
-        "replicas": replicas,
-        "replicas_max": replicas,
+        "replicas": sized_replicas,
+        "replicas_max": sized_replicas,
         "cpu_util_pct": obs.get("cpu_util_pct"),
         "mem_util_pct": obs.get("mem_util_pct"),
     }
@@ -259,9 +284,8 @@ def build_hpa_yaml(
     if hpa_path is None or not hpa_path.exists():
         hpa_path = Path("infra/k8s/spark/robot-shop-web-hpa.baseline.yaml")
     doc = yaml.safe_load(hpa_path.read_text())
-    replicas = int(cfg["deployment_replicas"])
     doc["spec"]["minReplicas"] = int(hpa_cfg["min_replicas"])
-    doc["spec"]["maxReplicas"] = replicas
+    doc["spec"]["maxReplicas"] = int(hpa_cfg["max_replicas"])
     for metric in doc["spec"].get("metrics") or []:
         res = (metric.get("resource") or {})
         if res.get("name") == "cpu":

@@ -57,6 +57,26 @@ class TestDeriveEngineerBaseline(unittest.TestCase):
         self.assertEqual(cfg["cpu_limit_m"], cfg["cpu_request_m"] * 2)
         self.assertEqual(cfg["mem_limit_mib"], cfg["mem_request_mib"] * 2)
 
+    def test_up_demo_uses_observed_hpa_max_not_stale_config(self) -> None:
+        exp = {
+            **SAMPLE_EXP,
+            "workload": {"target_requests_per_second": 240},
+            "config": {
+                **SAMPLE_EXP["config"],
+                "hpa": {"min_replicas": 1, "max_replicas": 1, "target_cpu_util_pct": 60},
+            },
+            "observed": {
+                **SAMPLE_EXP["observed"],
+                "replicas": 5,
+                "replicas_max": 5,
+            },
+        }
+        derived = derive_engineer_config(exp)
+        cfg = derived["config"]
+        # fleet peak 406m, cpu 189m, util 0.6 → 4 pods; UP keeps dep at min=1, HPA max=4
+        self.assertEqual(cfg["deployment_replicas"], 1)
+        self.assertEqual(cfg["hpa"]["max_replicas"], 4)
+
     def test_write_outputs(self) -> None:
         repo = Path(__file__).resolve().parent.parent
         exp_path = repo / "tests" / "_tmp_engineer_exp.json"

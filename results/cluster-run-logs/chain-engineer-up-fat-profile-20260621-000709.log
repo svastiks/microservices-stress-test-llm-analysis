@@ -1,0 +1,228 @@
+[2026-06-21 00:07:09] [chain-engineer-up] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709
+[2026-06-21 00:07:09] [chain-engineer-up] rps=220 k6=60s settle=15s
+[2026-06-21 00:07:09] [chain-engineer-up] === phase 1: fat UP profiling (1 rounds) ===
+[2026-06-21 00:07:09] [static-up-sweep] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709 profile=up_demo rounds=1
+[2026-06-21 00:07:09] [static-up-sweep] baseline deployment=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-deployment.baseline.yaml
+[2026-06-21 00:07:09] [static-up-sweep] baseline hpa=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-hpa.baseline.yaml
+[2026-06-21 00:07:09] [static-up-sweep] === round 1/1 rps=220 STRESS_K6_RPS=220 profile=up_demo (static-baseline) ===
+[2026-06-21 00:07:09] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-21 00:07:09] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-21 00:07:10] [cluster-run] switching context to: monitoring
+[2026-06-21 00:07:10] [cluster-run] context: monitoring
+[2026-06-21 00:07:10] [cluster-run] namespace: svastik
+[2026-06-21 00:07:10] [cluster-run] profiles: up_demo
+[2026-06-21 00:07:10] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-21 00:07:10] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-21 00:07:10] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-21 00:07:10] [cluster-run] build_analyzer_image: false
+[2026-06-21 00:07:10] [cluster-run] stream_job_logs: true
+[2026-06-21 00:07:10] [cluster-run] cleanup_completed_jobs: true
+[2026-06-21 00:07:10] [cluster-run] cleanup_terminal_pods: true
+[2026-06-21 00:07:10] [cluster-run] cleanup_failed_jobs: true
+[2026-06-21 00:07:10] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-21 00:07:10] [cluster-run] up_demo_stabilize_user: true
+[2026-06-21 00:07:10] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-21 00:07:10] [cluster-run] results_pvc_snapshots: false
+[2026-06-21 00:07:10] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-21 00:07:10] [cluster-run] results_stamped_comparison_md: false
+[2026-06-21 00:07:10] [cluster-run] compare_sweep_round: 1
+[2026-06-21 00:07:10] [cluster-run] extra args for analyzer job: --static-baseline
+[2026-06-21 00:07:12] [cluster-run] stack already present; skipping redeploy (set FORCE_DEPLOY_STACK=hard to force helm deploy)
+[2026-06-21 00:07:12] [cluster-run] pre-run: restore managed web baseline (prior runs may leave web NotReady / HPA unknown)
+[2026-06-21 00:07:12] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/cart        1/1     1            1           59d
+deployment.apps/catalogue   1/1     1            1           59d
+deployment.apps/dispatch    1/1     1            1           59d
+deployment.apps/mongodb     1/1     1            1           59d
+deployment.apps/mysql       1/1     1            1           59d
+deployment.apps/payment     1/1     1            1           59d
+deployment.apps/rabbitmq    1/1     1            1           59d
+deployment.apps/ratings     1/1     1            1           59d
+deployment.apps/shipping    1/1     1            1           59d
+deployment.apps/user        1/1     1            1           59d
+deployment.apps/web         5/5     5            5           59d
+
+NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP                           PORT(S)                       AGE
+service/analyzer-mongodb   ClusterIP      10.43.64.186    <none>                                27017/TCP                     58d
+service/cart               ClusterIP      10.43.156.253   <none>                                8080/TCP                      59d
+service/catalogue          ClusterIP      10.43.205.168   <none>                                8080/TCP                      59d
+service/dispatch           ClusterIP      None            <none>                                55555/TCP                     59d
+service/mongodb            ClusterIP      10.43.54.1      <none>                                27017/TCP                     59d
+service/mysql              ClusterIP      10.43.85.29     <none>                                3306/TCP                      59d
+service/payment            ClusterIP      10.43.31.102    <none>                                8080/TCP                      59d
+service/rabbitmq           ClusterIP      10.43.66.27     <none>                                5672/TCP,15672/TCP,4369/TCP   59d
+service/ratings            ClusterIP      10.43.168.84    <none>                                80/TCP                        59d
+service/redis              ClusterIP      10.43.165.234   <none>                                6379/TCP                      59d
+service/shipping           ClusterIP      10.43.204.81    <none>                                8080/TCP                      59d
+service/user               ClusterIP      10.43.191.211   <none>                                8080/TCP                      59d
+service/web                LoadBalancer   10.43.14.190    10.0.0.2,10.0.0.3,10.0.0.4,10.0.0.7   8080:32652/TCP                59d
+
+NAME                                          REFERENCE        TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/web-hpa   Deployment/web   cpu: 31%/60%   1         5         5          59d
+deployment "web" successfully rolled out
+[2026-06-21 00:07:19] [cluster-run] ensure analyzer infra...
+[2026-06-21 00:07:21] [cluster-run] skipping analyzer-mongodb deploy (set DEPLOY_ANALYZER_MONGODB=true to enable)
+[2026-06-21 00:07:22] [cluster-run] reset baseline in cluster before profile=up_demo
+[2026-06-21 00:07:22] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+[2026-06-21 00:07:24] [cluster-run] up_demo: raising user service memory/cpu to avoid OOM during recovery demo
+[2026-06-21 00:07:26] [cluster-run] launch profile=up_demo job=stress-analyzer-up-demo
+[analyzer] context: monitoring
+[analyzer] namespace: svastik
+[analyzer] job: stress-analyzer-up-demo
+[analyzer] profile: up_demo
+[analyzer] script: robotshop_login
+[analyzer] squeeze: until_violation=false max_iterations=8 settle_seconds=15 compare_optimizers=false compare_hpa_vs_llm=false compare_advanced_vs_vanilla=false static_baseline=true final_report_llm=false
+[analyzer] ensuring results pvc...
+[analyzer] using image: docker.io/svastik/microservices-stress-analyzer:latest
+[analyzer] recreating job...
+[analyzer] staging web deployment/hpa via configmap stress-analyzer-web-yaml -> writable /app/run-web-yaml
+job.batch/stress-analyzer-up-demo created
+[analyzer] launched; follow logs with:
+kubectl -n svastik logs -f job/stress-analyzer-up-demo
+[2026-06-21 00:07:30] [cluster-run] waiting for stress-analyzer-up-demo (poll every 60s, no overall timeout)
+[pipeline] run_start profile=up_demo script=robotshop_login mode=None analysis_goal=efficiency prometheus=True
+Error from server (Forbidden): endpoints "web" is forbidden: User "system:serviceaccount:svastik:stress-analyzer" cannot get resource "endpoints" in API group "" in the namespace "svastik"
+[measure-ctx] pre_k6 yaml_repl=5 dep_spec=5 ready=5 updated=5 available=5 hpa_cur=5 hpa_des=5 hpa_max=5 pod_count=5 endpoints=0
+failed to create fsnotify watcher: too many open files[measure-ctx] pod name=web-54997bd9b5-4hwzr phase=Running ready=1/1 ip=10.42.7.169 node=worker2 start=2026-06-21T04:07:09Z
+[measure-ctx] pod name=web-54997bd9b5-4zzm8 phase=Running ready=1/1 ip=10.42.0.235 node=master start=2026-06-21T03:59:37Z
+[measure-ctx] pod name=web-54997bd9b5-hk6zv phase=Running ready=1/1 ip=10.42.7.168 node=worker2 start=2026-06-21T04:07:07Z
+[measure-ctx] pod name=web-54997bd9b5-jd6x8 phase=Running ready=1/1 ip=10.42.6.40 node=worker1 start=2026-06-21T04:07:21Z
+[measure-ctx] pod name=web-54997bd9b5-qsssn phase=Running ready=1/1 ip=10.42.9.228 node=worker4 start=2026-06-21T04:07:23Z
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: /app/benchmarks/load-tests/k6/robotshop_login.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 420 max VUs, 1m30s max duration (incl. graceful stop):
+              * constant_rate: 220.00 iterations/s for 1m0s (maxVUs: 340-420, gracefulStop: 30s)
+
+failed to create fsnotify watcher: too many open files[2026-06-21 00:09:35] [cluster-run] stress-analyzer-up-demo completed
+[2026-06-21 00:09:37] [cluster-run] saved job logs to ./results/cluster-run-logs/stress-analyzer-up-demo.log
+[2026-06-21 00:09:38] [cluster-run] copy results PVC to local /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709 (profile_ok profile=up_demo job=stress-analyzer-up-demo) ...
+tar: removing leading '/' from member names
+[2026-06-21 00:09:43] [cluster-run] PVC sync done (profile_ok profile=up_demo job=stress-analyzer-up-demo, layout=thin, static): /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/run-1 (pvc=run-1)
+[2026-06-21 00:10:15] [cluster-run] cluster-run finished (PVC was synced after each profile job, success or failure)
+[2026-06-21 00:10:17] [static-up-sweep] done
+[2026-06-21 00:10:17] [chain-engineer-up] === phase 2–3: derive + verify ===
+[2026-06-21 00:10:17] [chain-engineer-up] --- rps=220 profile=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/run-1/experiment.json ---
+engineer baseline: 1×165m/32Mi prov_cost=0.7581 → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/run-1/engineer-baseline
+[2026-06-21 00:10:17] [engineer-verify] baseline dir: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/run-1/engineer-baseline
+[2026-06-21 00:10:17] [engineer-verify] deploy: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/run-1/engineer-baseline/engineer-deployment.yaml
+[2026-06-21 00:10:17] [engineer-verify] hpa: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/run-1/engineer-baseline/engineer-hpa.yaml
+[2026-06-21 00:10:17] [engineer-verify] rps=220 profile=up_demo
+[2026-06-21 00:10:17] [engineer-verify] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/verify-rps220-20260621-000709
+[2026-06-21 00:10:17] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-21 00:10:17] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-21 00:10:17] [cluster-run] switching context to: monitoring
+[2026-06-21 00:10:19] [cluster-run] context: monitoring
+[2026-06-21 00:10:19] [cluster-run] namespace: svastik
+[2026-06-21 00:10:19] [cluster-run] profiles: up_demo
+[2026-06-21 00:10:19] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-21 00:10:19] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-21 00:10:19] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-21 00:10:19] [cluster-run] build_analyzer_image: false
+[2026-06-21 00:10:19] [cluster-run] stream_job_logs: true
+[2026-06-21 00:10:19] [cluster-run] cleanup_completed_jobs: true
+[2026-06-21 00:10:19] [cluster-run] cleanup_terminal_pods: true
+[2026-06-21 00:10:19] [cluster-run] cleanup_failed_jobs: true
+[2026-06-21 00:10:19] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-21 00:10:19] [cluster-run] up_demo_stabilize_user: true
+[2026-06-21 00:10:19] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-21 00:10:19] [cluster-run] results_pvc_snapshots: false
+[2026-06-21 00:10:19] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-21 00:10:19] [cluster-run] results_stamped_comparison_md: false
+[2026-06-21 00:10:19] [cluster-run] compare_sweep_round: 1
+[2026-06-21 00:10:19] [cluster-run] extra args for analyzer job: --static-baseline
+[2026-06-21 00:10:20] [cluster-run] stack already present; skipping redeploy (set FORCE_DEPLOY_STACK=hard to force helm deploy)
+[2026-06-21 00:10:20] [cluster-run] pre-run: restore managed web baseline (prior runs may leave web NotReady / HPA unknown)
+[2026-06-21 00:10:20] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/cart        1/1     1            1           59d
+deployment.apps/catalogue   1/1     1            1           59d
+deployment.apps/dispatch    1/1     1            1           59d
+deployment.apps/mongodb     1/1     1            1           59d
+deployment.apps/mysql       1/1     1            1           59d
+deployment.apps/payment     1/1     1            1           59d
+deployment.apps/rabbitmq    1/1     1            1           59d
+deployment.apps/ratings     1/1     1            1           59d
+deployment.apps/shipping    1/1     1            1           59d
+deployment.apps/user        1/1     1            1           59d
+deployment.apps/web         1/1     1            1           59d
+
+NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP                           PORT(S)                       AGE
+service/analyzer-mongodb   ClusterIP      10.43.64.186    <none>                                27017/TCP                     58d
+service/cart               ClusterIP      10.43.156.253   <none>                                8080/TCP                      59d
+service/catalogue          ClusterIP      10.43.205.168   <none>                                8080/TCP                      59d
+service/dispatch           ClusterIP      None            <none>                                55555/TCP                     59d
+service/mongodb            ClusterIP      10.43.54.1      <none>                                27017/TCP                     59d
+service/mysql              ClusterIP      10.43.85.29     <none>                                3306/TCP                      59d
+service/payment            ClusterIP      10.43.31.102    <none>                                8080/TCP                      59d
+service/rabbitmq           ClusterIP      10.43.66.27     <none>                                5672/TCP,15672/TCP,4369/TCP   59d
+service/ratings            ClusterIP      10.43.168.84    <none>                                80/TCP                        59d
+service/redis              ClusterIP      10.43.165.234   <none>                                6379/TCP                      59d
+service/shipping           ClusterIP      10.43.204.81    <none>                                8080/TCP                      59d
+service/user               ClusterIP      10.43.191.211   <none>                                8080/TCP                      59d
+service/web                LoadBalancer   10.43.14.190    10.0.0.2,10.0.0.3,10.0.0.4,10.0.0.7   8080:32652/TCP                59d
+
+NAME                                          REFERENCE        TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/web-hpa   Deployment/web   cpu: 54%/60%   1         5         5          59d
+deployment "web" successfully rolled out
+[2026-06-21 00:10:25] [cluster-run] ensure analyzer infra...
+[2026-06-21 00:10:27] [cluster-run] skipping analyzer-mongodb deploy (set DEPLOY_ANALYZER_MONGODB=true to enable)
+[2026-06-21 00:10:28] [cluster-run] reset baseline in cluster before profile=up_demo
+[2026-06-21 00:10:28] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+[2026-06-21 00:10:30] [cluster-run] up_demo: raising user service memory/cpu to avoid OOM during recovery demo
+[2026-06-21 00:10:32] [cluster-run] launch profile=up_demo job=stress-analyzer-up-demo
+[analyzer] context: monitoring
+[analyzer] namespace: svastik
+[analyzer] job: stress-analyzer-up-demo
+[analyzer] profile: up_demo
+[analyzer] script: robotshop_login
+[analyzer] squeeze: until_violation=false max_iterations=8 settle_seconds=15 compare_optimizers=false compare_hpa_vs_llm=false compare_advanced_vs_vanilla=false static_baseline=true final_report_llm=false
+[analyzer] ensuring results pvc...
+[analyzer] using image: docker.io/svastik/microservices-stress-analyzer:latest
+[analyzer] recreating job...
+[analyzer] staging web deployment/hpa via configmap stress-analyzer-web-yaml -> writable /app/run-web-yaml
+job.batch/stress-analyzer-up-demo created
+[analyzer] launched; follow logs with:
+kubectl -n svastik logs -f job/stress-analyzer-up-demo
+[2026-06-21 00:10:37] [cluster-run] waiting for stress-analyzer-up-demo (poll every 60s, no overall timeout)
+[pipeline] run_start profile=up_demo script=robotshop_login mode=None analysis_goal=efficiency prometheus=True
+failed to create fsnotify watcher: too many open filesfailed to create fsnotify watcher: too many open files[2026-06-21 00:12:42] [cluster-run] stress-analyzer-up-demo completed
+[2026-06-21 00:12:43] [cluster-run] saved job logs to ./results/cluster-run-logs/stress-analyzer-up-demo.log
+[2026-06-21 00:12:44] [cluster-run] copy results PVC to local /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/verify-rps220-20260621-000709 (profile_ok profile=up_demo job=stress-analyzer-up-demo) ...
+tar: removing leading '/' from member names
+[2026-06-21 00:12:50] [cluster-run] PVC sync done (profile_ok profile=up_demo job=stress-analyzer-up-demo, layout=thin, static): /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/verify-rps220-20260621-000709/run-1 (pvc=run-1)
+[2026-06-21 00:13:21] [cluster-run] cluster-run finished (PVC was synced after each profile job, success or failure)
+verify PASS: 1×165m/32Mi measured_prov_cost=0.7581 derived_prov_cost=0.7581
+[2026-06-21 00:13:23] [engineer-verify] verify-run synced → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709/run-1/engineer-baseline/verify-run
+[2026-06-21 00:13:23] [engineer-verify] next: ./scripts/build_engineer_vs_advanced_comparisons.sh
+[2026-06-21 00:13:23] [chain-engineer-up] synced engineer-baseline → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts_latest/FORMULA_VS_ADVANCED_LLM/UP/GOOD_COST_WIN_run-1-rps220-20260609-134951/llm-run/engineer-baseline
+[2026-06-21 00:13:23] [chain-engineer-up] === phase 4: compare + archive ===
+[engineer-vs-advanced] artifact roots: vanilla + formula (advanced-llm-run / llm-run)
+[engineer-vs-advanced] engineer UP sweep: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/static-up-sweep-20260527-125059
+[engineer-vs-advanced] engineer DOWN sweep: <not set>
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/UP/run-rps220/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/UP/run-rps240/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/UP/run-rps260/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= advanced-llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/DOWN/run-rps25/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= advanced-llm-run )
+[engineer-vs-advanced] SKIP DOWN rps=35: no engineer experiment
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/DOWN/run-rps45/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= advanced-llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/DOWN/run-rps55/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= llm-run )
+[engineer-vs-advanced] done -> /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM
+[2026-06-21 00:13:24] [chain-engineer-up] archiving UP rps=220
+archived → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts_latest/ENGINEER_VS_ADVANCED_LLM/UP/GOOD_COST_WIN_run-1-rps220-20260621-041150
+[2026-06-21 00:13:25] [chain-engineer-up] done sweep=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260621-000709 archive=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts_latest/ENGINEER_VS_ADVANCED_LLM/UP/

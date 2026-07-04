@@ -1,0 +1,5 @@
+- Current deployment is under-provisioned due to high cpu_util_request_pct (140.6%) violating the squeeze gate for resource efficiency.
+- SLO requirements are met for p95 latency (379ms vs SLO 500ms) and error rate (0.0%).
+- Focused on CPU and memory increase to optimize cost efficiency while holding replica count steady (2).
+- Proposed changes include a coupled increase in CPU and memory requests/limits by approximately 15% due to existing CPU saturation.
+- Adjusting resource requests while keeping replicas the same can lead to a more cost-effective setup while resolving the CPU utilization issue.

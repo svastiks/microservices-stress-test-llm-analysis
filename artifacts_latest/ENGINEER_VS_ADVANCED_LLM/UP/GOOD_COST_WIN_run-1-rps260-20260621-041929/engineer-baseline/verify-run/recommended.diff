@@ -1,0 +1,30 @@
+--- run-web-yaml/robot-shop-web-deployment.yaml
++++ run-web-yaml/robot-shop-web-deployment.yaml
+@@ -23,9 +23,9 @@
+         - containerPort: 8080
+         resources:
+           limits:
+-            cpu: 360m
+-            memory: 64Mi
++            cpu: 430m
++            memory: 77Mi
+           requests:
+-            cpu: 180m
+-            memory: 32Mi
+-      restartPolicy: Always
++            cpu: 215m
++            memory: 39Mi
++      restartPolicy: Always
+--- run-web-yaml/robot-shop-web-hpa.yaml
++++ run-web-yaml/robot-shop-web-hpa.yaml
+@@ -8,8 +8,8 @@
+     apiVersion: apps/v1
+     kind: Deployment
+     name: web
+-  minReplicas: 1
+-  maxReplicas: 5
++  minReplicas: 3
++  maxReplicas: 6
+   behavior:
+     scaleUp:
+       stabilizationWindowSeconds: 0

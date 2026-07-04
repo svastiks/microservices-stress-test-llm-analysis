@@ -1,0 +1,699 @@
+[2026-06-17 16:32:56] [chain-engineer-up] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256
+[2026-06-17 16:32:56] [chain-engineer-up] rps=240 k6=60s settle=15s
+[2026-06-17 16:32:56] [chain-engineer-up] === phase 1: fat UP profiling (1 rounds) ===
+[2026-06-17 16:32:56] [static-up-sweep] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256 profile=up_demo rounds=1
+[2026-06-17 16:32:56] [static-up-sweep] baseline deployment=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-deployment.baseline.yaml
+[2026-06-17 16:32:56] [static-up-sweep] baseline hpa=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-hpa.baseline.yaml
+[2026-06-17 16:32:56] [static-up-sweep] === round 1/1 rps=240 STRESS_K6_RPS=240 profile=up_demo (static-baseline) ===
+[2026-06-17 16:32:56] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-17 16:32:56] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-17 16:32:56] [cluster-run] switching context to: monitoring
+[2026-06-17 16:32:57] [cluster-run] context: monitoring
+[2026-06-17 16:32:57] [cluster-run] namespace: svastik
+[2026-06-17 16:32:57] [cluster-run] profiles: up_demo
+[2026-06-17 16:32:57] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-17 16:32:57] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-17 16:32:57] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-17 16:32:57] [cluster-run] build_analyzer_image: false
+[2026-06-17 16:32:57] [cluster-run] stream_job_logs: true
+[2026-06-17 16:32:57] [cluster-run] cleanup_completed_jobs: true
+[2026-06-17 16:32:57] [cluster-run] cleanup_terminal_pods: true
+[2026-06-17 16:32:57] [cluster-run] cleanup_failed_jobs: true
+[2026-06-17 16:32:57] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-17 16:32:57] [cluster-run] up_demo_stabilize_user: true
+[2026-06-17 16:32:57] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-17 16:32:57] [cluster-run] results_pvc_snapshots: false
+[2026-06-17 16:32:57] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-17 16:32:57] [cluster-run] results_stamped_comparison_md: false
+[2026-06-17 16:32:57] [cluster-run] compare_sweep_round: 1
+[2026-06-17 16:32:57] [cluster-run] extra args for analyzer job: --static-baseline
+[2026-06-17 16:32:58] [cluster-run] stack already present; skipping redeploy (set FORCE_DEPLOY_STACK=hard to force helm deploy)
+[2026-06-17 16:32:58] [cluster-run] pre-run: restore managed web baseline (prior runs may leave web NotReady / HPA unknown)
+[2026-06-17 16:32:58] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/cart        1/1     1            1           55d
+deployment.apps/catalogue   1/1     1            1           55d
+deployment.apps/dispatch    1/1     1            1           55d
+deployment.apps/mongodb     1/1     1            1           55d
+deployment.apps/mysql       1/1     1            1           55d
+deployment.apps/payment     1/1     1            1           55d
+deployment.apps/rabbitmq    1/1     1            1           55d
+deployment.apps/ratings     1/1     1            1           55d
+deployment.apps/shipping    1/1     1            1           55d
+deployment.apps/user        1/1     1            1           55d
+deployment.apps/web         5/5     5            5           55d
+
+NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP                                    PORT(S)                       AGE
+service/analyzer-mongodb   ClusterIP      10.43.64.186    <none>                                         27017/TCP                     55d
+service/cart               ClusterIP      10.43.156.253   <none>                                         8080/TCP                      55d
+service/catalogue          ClusterIP      10.43.205.168   <none>                                         8080/TCP                      55d
+service/dispatch           ClusterIP      None            <none>                                         55555/TCP                     55d
+service/mongodb            ClusterIP      10.43.54.1      <none>                                         27017/TCP                     55d
+service/mysql              ClusterIP      10.43.85.29     <none>                                         3306/TCP                      55d
+service/payment            ClusterIP      10.43.31.102    <none>                                         8080/TCP                      55d
+service/rabbitmq           ClusterIP      10.43.66.27     <none>                                         5672/TCP,15672/TCP,4369/TCP   55d
+service/ratings            ClusterIP      10.43.168.84    <none>                                         80/TCP                        55d
+service/redis              ClusterIP      10.43.165.234   <none>                                         6379/TCP                      55d
+service/shipping           ClusterIP      10.43.204.81    <none>                                         8080/TCP                      55d
+service/user               ClusterIP      10.43.191.211   <none>                                         8080/TCP                      55d
+service/web                LoadBalancer   10.43.14.190    10.0.0.2,10.0.0.3,10.0.0.4,10.0.0.6,10.0.0.7   8080:32652/TCP                55d
+
+NAME                                          REFERENCE        TARGETS        MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/web-hpa   Deployment/web   cpu: 50%/60%   1         5         5          55d
+deployment "web" successfully rolled out
+[2026-06-17 16:33:12] [cluster-run] ensure analyzer infra...
+[2026-06-17 16:33:14] [cluster-run] skipping analyzer-mongodb deploy (set DEPLOY_ANALYZER_MONGODB=true to enable)
+[2026-06-17 16:33:15] [cluster-run] reset baseline in cluster before profile=up_demo
+[2026-06-17 16:33:15] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+[2026-06-17 16:33:17] [cluster-run] up_demo: raising user service memory/cpu to avoid OOM during recovery demo
+[2026-06-17 16:33:19] [cluster-run] launch profile=up_demo job=stress-analyzer-up-demo
+[analyzer] context: monitoring
+[analyzer] namespace: svastik
+[analyzer] job: stress-analyzer-up-demo
+[analyzer] profile: up_demo
+[analyzer] script: robotshop_login
+[analyzer] squeeze: until_violation=false max_iterations=8 settle_seconds=15 compare_optimizers=false compare_hpa_vs_llm=false compare_advanced_vs_vanilla=false static_baseline=true final_report_llm=false
+[analyzer] ensuring results pvc...
+[analyzer] using image: docker.io/svastik/microservices-stress-analyzer:latest
+[analyzer] recreating job...
+job.batch/stress-analyzer-up-demo created
+[analyzer] launched; follow logs with:
+kubectl -n svastik logs -f job/stress-analyzer-up-demo
+[2026-06-17 16:33:22] [cluster-run] waiting for stress-analyzer-up-demo (poll every 60s, no overall timeout)
+[pipeline] run_start profile=up_demo script=robotshop_login mode=None analysis_goal=efficiency prometheus=True
+Error from server (Forbidden): endpoints "web" is forbidden: User "system:serviceaccount:svastik:stress-analyzer" cannot get resource "endpoints" in API group "" in the namespace "svastik"
+[measure-ctx] pre_k6 yaml_repl=1 dep_spec=5 ready=5 updated=5 available=5 hpa_cur=5 hpa_des=5 hpa_max=5 pod_count=5 endpoints=0
+[measure-ctx] pod name=web-54997bd9b5-c6rnw phase=Running ready=1/1 ip=10.42.6.180 node=worker1 start=2026-06-17T20:33:08Z
+[measure-ctx] pod name=web-54997bd9b5-l8c9w phase=Running ready=1/1 ip=10.42.7.54 node=worker2 start=2026-06-17T20:32:53Z
+[measure-ctx] pod name=web-54997bd9b5-m2p9s phase=Running ready=1/1 ip=10.42.5.52 node=worker3 start=2026-06-17T20:33:38Z
+[measure-ctx] pod name=web-54997bd9b5-m7fpk phase=Running ready=1/1 ip=10.42.0.217 node=master start=2026-06-17T20:25:41Z
+[measure-ctx] pod name=web-54997bd9b5-zthmq phase=Running ready=1/1 ip=10.42.9.167 node=worker4 start=2026-06-17T20:32:58Z
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: /app/benchmarks/load-tests/k6/robotshop_login.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 440 max VUs, 1m30s max duration (incl. graceful stop):
+              * constant_rate: 240.00 iterations/s for 1m0s (maxVUs: 360-440, gracefulStop: 30s)
+
+
+running (0m00.6s), 025/360 VUs, 122 complete and 0 interrupted iterations
+constant_rate   [   1% ] 025/360 VUs  0m00.6s/1m0s  240.00 iters/s
+
+running (0m01.6s), 035/360 VUs, 352 complete and 0 interrupted iterations
+constant_rate   [   3% ] 035/360 VUs  0m01.6s/1m0s  240.00 iters/s
+
+running (0m02.6s), 066/360 VUs, 561 complete and 0 interrupted iterations
+constant_rate   [   4% ] 066/360 VUs  0m02.6s/1m0s  240.00 iters/s
+
+running (0m03.6s), 025/360 VUs, 842 complete and 0 interrupted iterations
+constant_rate   [   6% ] 025/360 VUs  0m03.6s/1m0s  240.00 iters/s
+
+running (0m04.6s), 056/360 VUs, 1051 complete and 0 interrupted iterations
+constant_rate   [   8% ] 056/360 VUs  0m04.6s/1m0s  240.00 iters/s
+
+running (0m05.6s), 041/360 VUs, 1306 complete and 0 interrupted iterations
+constant_rate   [   9% ] 041/360 VUs  0m05.6s/1m0s  240.00 iters/s
+
+running (0m06.6s), 067/360 VUs, 1520 complete and 0 interrupted iterations
+constant_rate   [  11% ] 067/360 VUs  0m06.6s/1m0s  240.00 iters/s
+
+running (0m07.6s), 026/360 VUs, 1801 complete and 0 interrupted iterations
+constant_rate   [  13% ] 026/360 VUs  0m07.6s/1m0s  240.00 iters/s
+
+running (0m08.6s), 030/360 VUs, 2037 complete and 0 interrupted iterations
+constant_rate   [  14% ] 030/360 VUs  0m08.6s/1m0s  240.00 iters/s
+
+running (0m09.6s), 032/360 VUs, 2275 complete and 0 interrupted iterations
+constant_rate   [  16% ] 032/360 VUs  0m09.6s/1m0s  240.00 iters/s
+
+running (0m10.6s), 025/360 VUs, 2522 complete and 0 interrupted iterations
+constant_rate   [  18% ] 025/360 VUs  0m10.6s/1m0s  240.00 iters/s
+
+running (0m11.6s), 081/360 VUs, 2706 complete and 0 interrupted iterations
+constant_rate   [  19% ] 081/360 VUs  0m11.6s/1m0s  240.00 iters/s
+
+running (0m12.6s), 040/360 VUs, 2987 complete and 0 interrupted iterations
+constant_rate   [  21% ] 040/360 VUs  0m12.6s/1m0s  240.00 iters/s
+
+running (0m13.6s), 058/360 VUs, 3209 complete and 0 interrupted iterations
+constant_rate   [  23% ] 058/360 VUs  0m13.6s/1m0s  240.00 iters/s
+
+running (0m14.6s), 025/360 VUs, 3482 complete and 0 interrupted iterations
+constant_rate   [  24% ] 025/360 VUs  0m14.6s/1m0s  240.00 iters/s
+
+running (0m15.6s), 034/360 VUs, 3713 complete and 0 interrupted iterations
+constant_rate   [  26% ] 034/360 VUs  0m15.6s/1m0s  240.00 iters/s
+
+running (0m16.6s), 066/360 VUs, 3921 complete and 0 interrupted iterations
+constant_rate   [  28% ] 066/360 VUs  0m16.6s/1m0s  240.00 iters/s
+
+running (0m17.6s), 055/360 VUs, 4172 complete and 0 interrupted iterations
+constant_rate   [  29% ] 055/360 VUs  0m17.6s/1m0s  240.00 iters/s
+
+running (0m18.6s), 057/360 VUs, 4410 complete and 0 interrupted iterations
+constant_rate   [  31% ] 057/360 VUs  0m18.6s/1m0s  240.00 iters/s
+
+running (0m19.6s), 029/360 VUs, 4678 complete and 0 interrupted iterations
+constant_rate   [  33% ] 029/360 VUs  0m19.6s/1m0s  240.00 iters/s
+
+running (0m20.6s), 056/360 VUs, 4891 complete and 0 interrupted iterations
+constant_rate   [  34% ] 056/360 VUs  0m20.6s/1m0s  240.00 iters/s
+
+running (0m21.6s), 025/360 VUs, 5162 complete and 0 interrupted iterations
+constant_rate   [  36% ] 025/360 VUs  0m21.6s/1m0s  240.00 iters/s
+
+running (0m22.6s), 035/360 VUs, 5392 complete and 0 interrupted iterations
+constant_rate   [  38% ] 035/360 VUs  0m22.6s/1m0s  240.00 iters/s
+
+running (0m23.6s), 030/360 VUs, 5637 complete and 0 interrupted iterations
+constant_rate   [  39% ] 030/360 VUs  0m23.6s/1m0s  240.00 iters/s
+
+running (0m24.6s), 025/360 VUs, 5881 complete and 0 interrupted iterations
+constant_rate   [  41% ] 025/360 VUs  0m24.6s/1m0s  240.00 iters/s
+
+running (0m25.6s), 059/360 VUs, 6088 complete and 0 interrupted iterations
+constant_rate   [  43% ] 059/360 VUs  0m25.6s/1m0s  240.00 iters/s
+
+running (0m26.6s), 057/360 VUs, 6330 complete and 0 interrupted iterations
+constant_rate   [  44% ] 057/360 VUs  0m26.6s/1m0s  240.00 iters/s
+
+running (0m27.6s), 105/360 VUs, 6522 complete and 0 interrupted iterations
+constant_rate   [  46% ] 105/360 VUs  0m27.6s/1m0s  240.00 iters/s
+
+running (0m28.6s), 083/360 VUs, 6784 complete and 0 interrupted iterations
+constant_rate   [  48% ] 083/360 VUs  0m28.6s/1m0s  240.00 iters/s
+
+running (0m29.6s), 043/360 VUs, 7064 complete and 0 interrupted iterations
+constant_rate   [  49% ] 043/360 VUs  0m29.6s/1m0s  240.00 iters/s
+
+running (0m30.6s), 025/360 VUs, 7322 complete and 0 interrupted iterations
+constant_rate   [  51% ] 025/360 VUs  0m30.6s/1m0s  240.00 iters/s
+
+running (0m31.6s), 032/360 VUs, 7555 complete and 0 interrupted iterations
+constant_rate   [  53% ] 032/360 VUs  0m31.6s/1m0s  240.00 iters/s
+
+running (0m32.6s), 066/360 VUs, 7761 complete and 0 interrupted iterations
+constant_rate   [  54% ] 066/360 VUs  0m32.6s/1m0s  240.00 iters/s
+
+running (0m33.6s), 025/360 VUs, 8042 complete and 0 interrupted iterations
+constant_rate   [  56% ] 025/360 VUs  0m33.6s/1m0s  240.00 iters/s
+
+running (0m34.6s), 061/360 VUs, 8246 complete and 0 interrupted iterations
+constant_rate   [  58% ] 061/360 VUs  0m34.6s/1m0s  240.00 iters/s
+
+running (0m35.6s), 067/360 VUs, 8480 complete and 0 interrupted iterations
+constant_rate   [  59% ] 067/360 VUs  0m35.6s/1m0s  240.00 iters/s
+
+running (0m36.6s), 033/360 VUs, 8754 complete and 0 interrupted iterations
+constant_rate   [  61% ] 033/360 VUs  0m36.6s/1m0s  240.00 iters/s
+
+running (0m37.6s), 031/360 VUs, 8996 complete and 0 interrupted iterations
+constant_rate   [  63% ] 031/360 VUs  0m37.6s/1m0s  240.00 iters/s
+
+running (0m38.6s), 025/360 VUs, 9242 complete and 0 interrupted iterations
+constant_rate   [  64% ] 025/360 VUs  0m38.6s/1m0s  240.00 iters/s
+
+running (0m39.6s), 056/360 VUs, 9451 complete and 0 interrupted iterations
+constant_rate   [  66% ] 056/360 VUs  0m39.6s/1m0s  240.00 iters/s
+
+running (0m40.6s), 026/360 VUs, 9721 complete and 0 interrupted iterations
+constant_rate   [  68% ] 026/360 VUs  0m40.6s/1m0s  240.00 iters/s
+
+running (0m41.6s), 075/360 VUs, 9911 complete and 0 interrupted iterations
+constant_rate   [  69% ] 075/360 VUs  0m41.6s/1m0s  240.00 iters/s
+
+running (0m42.6s), 026/360 VUs, 10201 complete and 0 interrupted iterations
+constant_rate   [  71% ] 026/360 VUs  0m42.6s/1m0s  240.00 iters/s
+
+running (0m43.6s), 026/360 VUs, 10441 complete and 0 interrupted iterations
+constant_rate   [  73% ] 026/360 VUs  0m43.6s/1m0s  240.00 iters/s
+
+running (0m44.6s), 031/360 VUs, 10676 complete and 0 interrupted iterations
+constant_rate   [  74% ] 031/360 VUs  0m44.6s/1m0s  240.00 iters/s
+
+running (0m45.6s), 042/360 VUs, 10905 complete and 0 interrupted iterations
+constant_rate   [  76% ] 042/360 VUs  0m45.6s/1m0s  240.00 iters/s
+
+running (0m46.6s), 128/360 VUs, 11059 complete and 0 interrupted iterations
+constant_rate   [  78% ] 128/360 VUs  0m46.6s/1m0s  240.00 iters/s
+
+running (0m47.6s), 042/360 VUs, 11385 complete and 0 interrupted iterations
+constant_rate   [  79% ] 042/360 VUs  0m47.6s/1m0s  240.00 iters/s
+
+running (0m48.6s), 036/360 VUs, 11631 complete and 0 interrupted iterations
+constant_rate   [  81% ] 036/360 VUs  0m48.6s/1m0s  240.00 iters/s
+
+running (0m49.6s), 027/360 VUs, 11880 complete and 0 interrupted iterations
+constant_rate   [  83% ] 027/360 VUs  0m49.6s/1m0s  240.00 iters/s
+
+running (0m50.6s), 025/360 VUs, 12122 complete and 0 interrupted iterations
+constant_rate   [  84% ] 025/360 VUs  0m50.6s/1m0s  240.00 iters/s
+
+running (0m51.6s), 025/360 VUs, 12362 complete and 0 interrupted iterations
+constant_rate   [  86% ] 025/360 VUs  0m51.6s/1m0s  240.00 iters/s
+
+running (0m52.6s), 026/360 VUs, 12601 complete and 0 interrupted iterations
+constant_rate   [  88% ] 026/360 VUs  0m52.6s/1m0s  240.00 iters/s
+
+running (0m53.6s), 058/360 VUs, 12809 complete and 0 interrupted iterations
+constant_rate   [  89% ] 058/360 VUs  0m53.6s/1m0s  240.00 iters/s
+
+running (0m54.6s), 025/360 VUs, 13082 complete and 0 interrupted iterations
+constant_rate   [  91% ] 025/360 VUs  0m54.6s/1m0s  240.00 iters/s
+
+running (0m55.6s), 052/360 VUs, 13295 complete and 0 interrupted iterations
+constant_rate   [  93% ] 052/360 VUs  0m55.6s/1m0s  240.00 iters/s
+
+running (0m56.6s), 057/360 VUs, 13530 complete and 0 interrupted iterations
+constant_rate   [  94% ] 057/360 VUs  0m56.6s/1m0s  240.00 iters/s
+
+running (0m57.6s), 064/360 VUs, 13763 complete and 0 interrupted iterations
+constant_rate   [  96% ] 064/360 VUs  0m57.6s/1m0s  240.00 iters/s
+
+running (0m58.6s), 052/360 VUs, 14015 complete and 0 interrupted iterations
+constant_rate   [  98% ] 052/360 VUs  0m58.6s/1m0s  240.00 iters/s
+
+running (0m59.6s), 028/360 VUs, 14279 complete and 0 interrupted iterations
+constant_rate   [  99% ] 028/360 VUs  0m59.6s/1m0s  240.00 iters/s
+
+     ✓ status is 200
+     ✓ has user name
+
+     checks.........................: 100.00% 28802 out of 28802
+     data_received..................: 6.1 MB  102 kB/s
+     data_sent......................: 3.4 MB  56 kB/s
+     http_req_blocked...............: avg=33.54µs  min=3.35µs   med=6.59µs  max=19.81ms  p(90)=9.8µs    p(95)=14.95µs 
+     http_req_connecting............: avg=23.54µs  min=0s       med=0s      max=19.65ms  p(90)=0s       p(95)=0s      
+   ✓ http_req_duration..............: avg=90.58ms  min=1.27ms   med=57.53ms max=565.98ms p(90)=225.67ms p(95)=274.16ms
+       { expected_response:true }...: avg=90.58ms  min=1.27ms   med=57.53ms max=565.98ms p(90)=225.67ms p(95)=274.16ms
+   ✓ http_req_failed................: 0.00%   0 out of 14401
+     http_req_receiving.............: avg=67.1µs   min=15.04µs  med=58.36µs max=5.46ms   p(90)=102.81µs p(95)=122.2µs 
+     http_req_sending...............: avg=35.44µs  min=11.19µs  med=31.98µs max=493.3µs  p(90)=51.2µs   p(95)=63.08µs 
+     http_req_tls_handshaking.......: avg=0s       min=0s       med=0s      max=0s       p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=90.48ms  min=1.19ms   med=57.43ms max=565.83ms p(90)=225.56ms p(95)=274.08ms
+     http_reqs......................: 14401   239.581401/s
+     iteration_duration.............: avg=191.37ms min=101.58ms med=158.2ms max=666.4ms  p(90)=326.95ms p(95)=374.69ms
+     iterations.....................: 14401   239.581401/s
+     vus............................: 28      min=24             max=128
+     vus_max........................: 360     min=360            max=360
+
+
+running (1m00.1s), 000/360 VUs, 14401 complete and 0 interrupted iterations
+constant_rate ✓ [ 100% ] 000/360 VUs  1m0s  240.00 iters/s
+[pipeline] k6_done exit=0 http_req_failed=0 checks=1 p95_ms=274.163935 http_reqs=14401
+[pipeline] analysis_start
+[analysis] run_analysis_start run_dir=/app/results/static-baseline/run-1 deployment_yaml=/app/infra/k8s/spark/robot-shop-web-deployment.yaml hpa_yaml=/app/infra/k8s/spark/robot-shop-web-hpa.yaml shared_canonical=False
+[analysis] prometheus_collect_start namespace=svastik deployment=web url=http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090
+[prom] collect_start namespace=svastik deployment=web window=(1781728413.611,1781728474.340) step=5s
+[prom] collect_warn prom_pod_count=4 yaml_replicas=5 prom_replicas_mean=5.0 MISMATCH
+[prom] collect_done cpu_util_request_pct=59.7 burn_m=385.3 cpu_util_request_pct_peak=78.7 mem_util_pct=12.3 cpu_series_matched=True mem_series_matched=True cpu_attempts=1 mem_attempts=1 cpu_mode=per_pod_series_sum mem_mode=per_pod_series_sum cpu_query_used='rate(container_cpu_usage_seconds_total{namespace="svastik",pod=~"web-.+",container!="",container!="POD"}[1m])' samples=13/12 step=5s rate=1m per_pod_sum_m=385.3 aggregate_delta_m=0.0 trustworthy=True
+[prom] collect_per_pod pod=web-54997bd9b5-zthmq container=web mean_m=112.2 peak_m=139.1 samples=13
+[prom] collect_per_pod pod=web-54997bd9b5-l8c9w container=web mean_m=105.0 peak_m=127.6 samples=13
+[prom] collect_per_pod pod=web-54997bd9b5-m2p9s container=web mean_m=84.9 peak_m=129.6 samples=9
+[prom] collect_per_pod pod=web-54997bd9b5-c6rnw container=web mean_m=83.2 peak_m=111.5 samples=13
+[analysis] prometheus_collect_done burn_m=385.3 cpu_pct_req=59.7 prom_pods=4 repl_mismatch=True cpu_util_pct=29.9 mem_util_pct=12.3 cpu_series_matched=True mem_series_matched=True utilization_trustworthy=True
+[analysis] experiment_written scaling_hint=DOWN failure_reason=
+[analysis] yaml_live_sync sync.deployment_replicas: 1 -> 5 (observed); sync.hpa_maxReplicas: 1 -> 5 (observed_max)
+[analysis] formula_optimizer_step mode=squeeze analysis_goal=efficiency scaling_hint=DOWN
+[analysis] formula_optimizer_done failure_archetype=NONE has_deployment_yaml_new=False has_hpa_yaml_new=False
+[analysis] outputs_written run_dir=/app/results/static-baseline/run-1 diff_nonempty=False report_chars=261
+Run output: /app/results/static-baseline/run-1
+  k6-run-summary.json, experiment.json, analysis.json, report.md, recommended.diff
+  Failure archetype: NONE
+[pipeline] analysis_done run_dir=/app/results/static-baseline/run-1
+[pipeline] experiment_status=PASS failure_reason= burn_m=385.3 cpu_pct_req=59.7 repl=5 prom_pods=4 repl_mismatch=True cpu_util_pct=29.9 mem_util_pct=12.3 utilization_trustworthy=True per_pod=['web-54997bd9b5-zthmq:112.2', 'web-54997bd9b5-l8c9w:105.0', 'web-54997bd9b5-m2p9s:84.9', 'web-54997bd9b5-c6rnw:83.2']
+[2026-06-17 16:35:27] [cluster-run] stress-analyzer-up-demo completed
+[2026-06-17 16:35:28] [cluster-run] saved job logs to ./results/cluster-run-logs/stress-analyzer-up-demo.log
+[2026-06-17 16:35:29] [cluster-run] copy results PVC to local /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256 (profile_ok profile=up_demo job=stress-analyzer-up-demo) ...
+tar: removing leading '/' from member names
+[2026-06-17 16:35:35] [cluster-run] PVC sync done (profile_ok profile=up_demo job=stress-analyzer-up-demo, layout=thin, static): /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/run-1 (pvc=run-1)
+[2026-06-17 16:36:06] [cluster-run] cluster-run finished (PVC was synced after each profile job, success or failure)
+[2026-06-17 16:36:07] [static-up-sweep] done
+[2026-06-17 16:36:07] [chain-engineer-up] === phase 2–3: derive + verify ===
+[2026-06-17 16:36:07] [chain-engineer-up] --- rps=240 profile=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/run-1/experiment.json ---
+engineer baseline: 1×181m/32Mi prov_cost=0.166 → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/run-1/engineer-baseline
+[2026-06-17 16:36:15] [engineer-verify] baseline dir: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/run-1/engineer-baseline
+[2026-06-17 16:36:15] [engineer-verify] deploy: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/run-1/engineer-baseline/engineer-deployment.yaml
+[2026-06-17 16:36:15] [engineer-verify] hpa: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/run-1/engineer-baseline/engineer-hpa.yaml
+[2026-06-17 16:36:15] [engineer-verify] rps=240 profile=up_demo
+[2026-06-17 16:36:15] [engineer-verify] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/verify-rps240-20260617-163256
+[2026-06-17 16:36:15] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-17 16:36:15] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-17 16:36:15] [cluster-run] switching context to: monitoring
+[2026-06-17 16:36:16] [cluster-run] context: monitoring
+[2026-06-17 16:36:16] [cluster-run] namespace: svastik
+[2026-06-17 16:36:16] [cluster-run] profiles: up_demo
+[2026-06-17 16:36:16] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-17 16:36:16] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-17 16:36:16] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-17 16:36:16] [cluster-run] build_analyzer_image: false
+[2026-06-17 16:36:16] [cluster-run] stream_job_logs: true
+[2026-06-17 16:36:16] [cluster-run] cleanup_completed_jobs: true
+[2026-06-17 16:36:16] [cluster-run] cleanup_terminal_pods: true
+[2026-06-17 16:36:16] [cluster-run] cleanup_failed_jobs: true
+[2026-06-17 16:36:16] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-17 16:36:16] [cluster-run] up_demo_stabilize_user: true
+[2026-06-17 16:36:16] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-17 16:36:16] [cluster-run] results_pvc_snapshots: false
+[2026-06-17 16:36:16] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-17 16:36:16] [cluster-run] results_stamped_comparison_md: false
+[2026-06-17 16:36:16] [cluster-run] compare_sweep_round: 1
+[2026-06-17 16:36:16] [cluster-run] extra args for analyzer job: --static-baseline
+[2026-06-17 16:36:17] [cluster-run] stack already present; skipping redeploy (set FORCE_DEPLOY_STACK=hard to force helm deploy)
+[2026-06-17 16:36:17] [cluster-run] pre-run: restore managed web baseline (prior runs may leave web NotReady / HPA unknown)
+[2026-06-17 16:36:17] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/cart        1/1     1            1           55d
+deployment.apps/catalogue   1/1     1            1           55d
+deployment.apps/dispatch    1/1     1            1           55d
+deployment.apps/mongodb     1/1     1            1           55d
+deployment.apps/mysql       1/1     1            1           55d
+deployment.apps/payment     1/1     1            1           55d
+deployment.apps/rabbitmq    1/1     1            1           55d
+deployment.apps/ratings     1/1     1            1           55d
+deployment.apps/shipping    1/1     1            1           55d
+deployment.apps/user        1/1     1            1           55d
+deployment.apps/web         1/1     1            1           55d
+
+NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP                                    PORT(S)                       AGE
+service/analyzer-mongodb   ClusterIP      10.43.64.186    <none>                                         27017/TCP                     55d
+service/cart               ClusterIP      10.43.156.253   <none>                                         8080/TCP                      55d
+service/catalogue          ClusterIP      10.43.205.168   <none>                                         8080/TCP                      55d
+service/dispatch           ClusterIP      None            <none>                                         55555/TCP                     55d
+service/mongodb            ClusterIP      10.43.54.1      <none>                                         27017/TCP                     55d
+service/mysql              ClusterIP      10.43.85.29     <none>                                         3306/TCP                      55d
+service/payment            ClusterIP      10.43.31.102    <none>                                         8080/TCP                      55d
+service/rabbitmq           ClusterIP      10.43.66.27     <none>                                         5672/TCP,15672/TCP,4369/TCP   55d
+service/ratings            ClusterIP      10.43.168.84    <none>                                         80/TCP                        55d
+service/redis              ClusterIP      10.43.165.234   <none>                                         6379/TCP                      55d
+service/shipping           ClusterIP      10.43.204.81    <none>                                         8080/TCP                      55d
+service/user               ClusterIP      10.43.191.211   <none>                                         8080/TCP                      55d
+service/web                LoadBalancer   10.43.14.190    10.0.0.2,10.0.0.3,10.0.0.4,10.0.0.6,10.0.0.7   8080:32652/TCP                55d
+
+NAME                                          REFERENCE        TARGETS              MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/web-hpa   Deployment/web   cpu: <unknown>/60%   1         1         1          55d
+deployment "web" successfully rolled out
+[2026-06-17 16:36:22] [cluster-run] ensure analyzer infra...
+[2026-06-17 16:36:24] [cluster-run] skipping analyzer-mongodb deploy (set DEPLOY_ANALYZER_MONGODB=true to enable)
+[2026-06-17 16:36:25] [cluster-run] reset baseline in cluster before profile=up_demo
+[2026-06-17 16:36:25] [cluster-run] apply immutable managed baseline (web deployment + hpa)
+[2026-06-17 16:36:27] [cluster-run] up_demo: raising user service memory/cpu to avoid OOM during recovery demo
+[2026-06-17 16:36:28] [cluster-run] launch profile=up_demo job=stress-analyzer-up-demo
+[analyzer] context: monitoring
+[analyzer] namespace: svastik
+[analyzer] job: stress-analyzer-up-demo
+[analyzer] profile: up_demo
+[analyzer] script: robotshop_login
+[analyzer] squeeze: until_violation=false max_iterations=8 settle_seconds=15 compare_optimizers=false compare_hpa_vs_llm=false compare_advanced_vs_vanilla=false static_baseline=true final_report_llm=false
+[analyzer] ensuring results pvc...
+[analyzer] using image: docker.io/svastik/microservices-stress-analyzer:latest
+[analyzer] recreating job...
+job.batch/stress-analyzer-up-demo created
+[analyzer] launched; follow logs with:
+kubectl -n svastik logs -f job/stress-analyzer-up-demo
+[2026-06-17 16:36:32] [cluster-run] waiting for stress-analyzer-up-demo (poll every 60s, no overall timeout)
+[pipeline] run_start profile=up_demo script=robotshop_login mode=None analysis_goal=efficiency prometheus=True
+Error from server (Forbidden): endpoints "web" is forbidden: User "system:serviceaccount:svastik:stress-analyzer" cannot get resource "endpoints" in API group "" in the namespace "svastik"
+[measure-ctx] pre_k6 yaml_repl=1 dep_spec=1 ready=1 updated=1 available=1 hpa_cur=1 hpa_des=5 hpa_max=1 pod_count=1 endpoints=0
+[measure-ctx] pod name=web-7dcbdc969c-8prsz phase=Running ready=1/1 ip=10.42.7.55 node=worker2 start=2026-06-17T20:36:12Z
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: /app/benchmarks/load-tests/k6/robotshop_login.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 440 max VUs, 1m30s max duration (incl. graceful stop):
+              * constant_rate: 240.00 iterations/s for 1m0s (maxVUs: 360-440, gracefulStop: 30s)
+
+
+running (0m00.7s), 054/360 VUs, 105 complete and 0 interrupted iterations
+constant_rate   [   1% ] 054/360 VUs  0m00.7s/1m0s  240.00 iters/s
+
+running (0m01.7s), 048/360 VUs, 350 complete and 0 interrupted iterations
+constant_rate   [   3% ] 048/360 VUs  0m01.7s/1m0s  240.00 iters/s
+
+running (0m02.7s), 058/360 VUs, 580 complete and 0 interrupted iterations
+constant_rate   [   4% ] 058/360 VUs  0m02.7s/1m0s  240.00 iters/s
+
+running (0m03.7s), 087/360 VUs, 792 complete and 0 interrupted iterations
+constant_rate   [   6% ] 087/360 VUs  0m03.7s/1m0s  240.00 iters/s
+
+running (0m04.7s), 025/360 VUs, 1094 complete and 0 interrupted iterations
+constant_rate   [   8% ] 025/360 VUs  0m04.7s/1m0s  240.00 iters/s
+
+running (0m05.7s), 031/360 VUs, 1327 complete and 0 interrupted iterations
+constant_rate   [   9% ] 031/360 VUs  0m05.7s/1m0s  240.00 iters/s
+
+running (0m06.7s), 030/360 VUs, 1569 complete and 0 interrupted iterations
+constant_rate   [  11% ] 030/360 VUs  0m06.7s/1m0s  240.00 iters/s
+
+running (0m07.7s), 025/360 VUs, 1814 complete and 0 interrupted iterations
+constant_rate   [  13% ] 025/360 VUs  0m07.7s/1m0s  240.00 iters/s
+
+running (0m08.7s), 025/360 VUs, 2054 complete and 0 interrupted iterations
+constant_rate   [  14% ] 025/360 VUs  0m08.7s/1m0s  240.00 iters/s
+
+running (0m09.7s), 040/360 VUs, 2279 complete and 0 interrupted iterations
+constant_rate   [  16% ] 040/360 VUs  0m09.7s/1m0s  240.00 iters/s
+
+running (0m10.7s), 061/360 VUs, 2498 complete and 0 interrupted iterations
+constant_rate   [  18% ] 061/360 VUs  0m10.7s/1m0s  240.00 iters/s
+
+running (0m11.7s), 024/360 VUs, 2774 complete and 0 interrupted iterations
+constant_rate   [  19% ] 024/360 VUs  0m11.7s/1m0s  240.00 iters/s
+
+running (0m12.7s), 044/360 VUs, 2995 complete and 0 interrupted iterations
+constant_rate   [  21% ] 044/360 VUs  0m12.7s/1m0s  240.00 iters/s
+
+running (0m13.7s), 037/360 VUs, 3242 complete and 0 interrupted iterations
+constant_rate   [  23% ] 037/360 VUs  0m13.7s/1m0s  240.00 iters/s
+
+running (0m14.7s), 024/360 VUs, 3494 complete and 0 interrupted iterations
+constant_rate   [  24% ] 024/360 VUs  0m14.7s/1m0s  240.00 iters/s
+
+running (0m15.7s), 025/360 VUs, 3734 complete and 0 interrupted iterations
+constant_rate   [  26% ] 025/360 VUs  0m15.7s/1m0s  240.00 iters/s
+
+running (0m16.7s), 027/360 VUs, 3972 complete and 0 interrupted iterations
+constant_rate   [  28% ] 027/360 VUs  0m16.7s/1m0s  240.00 iters/s
+
+running (0m17.7s), 061/360 VUs, 4177 complete and 0 interrupted iterations
+constant_rate   [  29% ] 061/360 VUs  0m17.7s/1m0s  240.00 iters/s
+
+running (0m18.7s), 028/360 VUs, 4450 complete and 0 interrupted iterations
+constant_rate   [  31% ] 028/360 VUs  0m18.7s/1m0s  240.00 iters/s
+
+running (0m19.7s), 061/360 VUs, 4658 complete and 0 interrupted iterations
+constant_rate   [  33% ] 061/360 VUs  0m19.7s/1m0s  240.00 iters/s
+
+running (0m20.7s), 027/360 VUs, 4932 complete and 0 interrupted iterations
+constant_rate   [  34% ] 027/360 VUs  0m20.7s/1m0s  240.00 iters/s
+
+running (0m21.7s), 025/360 VUs, 5174 complete and 0 interrupted iterations
+constant_rate   [  36% ] 025/360 VUs  0m21.7s/1m0s  240.00 iters/s
+
+running (0m22.7s), 025/360 VUs, 5414 complete and 0 interrupted iterations
+constant_rate   [  38% ] 025/360 VUs  0m22.7s/1m0s  240.00 iters/s
+
+running (0m23.7s), 026/360 VUs, 5653 complete and 0 interrupted iterations
+constant_rate   [  39% ] 026/360 VUs  0m23.7s/1m0s  240.00 iters/s
+
+running (0m24.7s), 038/360 VUs, 5881 complete and 0 interrupted iterations
+constant_rate   [  41% ] 038/360 VUs  0m24.7s/1m0s  240.00 iters/s
+
+running (0m25.7s), 028/360 VUs, 6131 complete and 0 interrupted iterations
+constant_rate   [  43% ] 028/360 VUs  0m25.7s/1m0s  240.00 iters/s
+
+running (0m26.7s), 077/360 VUs, 6322 complete and 0 interrupted iterations
+constant_rate   [  44% ] 077/360 VUs  0m26.7s/1m0s  240.00 iters/s
+
+running (0m27.7s), 025/360 VUs, 6614 complete and 0 interrupted iterations
+constant_rate   [  46% ] 025/360 VUs  0m27.7s/1m0s  240.00 iters/s
+
+running (0m28.7s), 032/360 VUs, 6846 complete and 0 interrupted iterations
+constant_rate   [  48% ] 032/360 VUs  0m28.7s/1m0s  240.00 iters/s
+
+running (0m29.7s), 038/360 VUs, 7081 complete and 0 interrupted iterations
+constant_rate   [  49% ] 038/360 VUs  0m29.7s/1m0s  240.00 iters/s
+
+running (0m30.7s), 025/360 VUs, 7334 complete and 0 interrupted iterations
+constant_rate   [  51% ] 025/360 VUs  0m30.7s/1m0s  240.00 iters/s
+
+running (0m31.7s), 062/360 VUs, 7537 complete and 0 interrupted iterations
+constant_rate   [  53% ] 062/360 VUs  0m31.7s/1m0s  240.00 iters/s
+
+running (0m32.7s), 028/360 VUs, 7811 complete and 0 interrupted iterations
+constant_rate   [  54% ] 028/360 VUs  0m32.7s/1m0s  240.00 iters/s
+
+running (0m33.7s), 073/360 VUs, 8006 complete and 0 interrupted iterations
+constant_rate   [  56% ] 073/360 VUs  0m33.7s/1m0s  240.00 iters/s
+
+running (0m34.7s), 061/360 VUs, 8257 complete and 0 interrupted iterations
+constant_rate   [  58% ] 061/360 VUs  0m34.7s/1m0s  240.00 iters/s
+
+running (0m35.7s), 079/360 VUs, 8480 complete and 0 interrupted iterations
+constant_rate   [  59% ] 079/360 VUs  0m35.7s/1m0s  240.00 iters/s
+
+running (0m36.7s), 159/360 VUs, 8640 complete and 0 interrupted iterations
+constant_rate   [  61% ] 159/360 VUs  0m36.7s/1m0s  240.00 iters/s
+
+running (0m37.7s), 185/360 VUs, 8853 complete and 0 interrupted iterations
+constant_rate   [  63% ] 185/360 VUs  0m37.7s/1m0s  240.00 iters/s
+
+running (0m38.7s), 155/360 VUs, 9124 complete and 0 interrupted iterations
+constant_rate   [  64% ] 155/360 VUs  0m38.7s/1m0s  240.00 iters/s
+
+running (0m39.7s), 179/360 VUs, 9339 complete and 0 interrupted iterations
+constant_rate   [  66% ] 179/360 VUs  0m39.7s/1m0s  240.00 iters/s
+
+running (0m40.7s), 092/360 VUs, 9667 complete and 0 interrupted iterations
+constant_rate   [  68% ] 092/360 VUs  0m40.7s/1m0s  240.00 iters/s
+
+running (0m41.7s), 070/360 VUs, 9929 complete and 0 interrupted iterations
+constant_rate   [  69% ] 070/360 VUs  0m41.7s/1m0s  240.00 iters/s
+
+running (0m42.7s), 032/360 VUs, 10207 complete and 0 interrupted iterations
+constant_rate   [  71% ] 032/360 VUs  0m42.7s/1m0s  240.00 iters/s
+
+running (0m43.7s), 085/360 VUs, 10394 complete and 0 interrupted iterations
+constant_rate   [  73% ] 085/360 VUs  0m43.7s/1m0s  240.00 iters/s
+
+running (0m44.7s), 031/360 VUs, 10688 complete and 0 interrupted iterations
+constant_rate   [  74% ] 031/360 VUs  0m44.7s/1m0s  240.00 iters/s
+
+running (0m45.7s), 029/360 VUs, 10929 complete and 0 interrupted iterations
+constant_rate   [  76% ] 029/360 VUs  0m45.7s/1m0s  240.00 iters/s
+
+running (0m46.7s), 026/360 VUs, 11173 complete and 0 interrupted iterations
+constant_rate   [  78% ] 026/360 VUs  0m46.7s/1m0s  240.00 iters/s
+
+running (0m47.7s), 028/360 VUs, 11410 complete and 0 interrupted iterations
+constant_rate   [  79% ] 029/360 VUs  0m47.7s/1m0s  240.00 iters/s
+
+running (0m48.7s), 037/360 VUs, 11642 complete and 0 interrupted iterations
+constant_rate   [  81% ] 037/360 VUs  0m48.7s/1m0s  240.00 iters/s
+
+running (0m49.7s), 032/360 VUs, 11886 complete and 0 interrupted iterations
+constant_rate   [  83% ] 032/360 VUs  0m49.7s/1m0s  240.00 iters/s
+
+running (0m50.7s), 089/360 VUs, 12070 complete and 0 interrupted iterations
+constant_rate   [  84% ] 089/360 VUs  0m50.7s/1m0s  240.00 iters/s
+
+running (0m51.7s), 074/360 VUs, 12325 complete and 0 interrupted iterations
+constant_rate   [  86% ] 074/360 VUs  0m51.7s/1m0s  240.00 iters/s
+
+running (0m52.7s), 025/360 VUs, 12614 complete and 0 interrupted iterations
+constant_rate   [  88% ] 025/360 VUs  0m52.7s/1m0s  240.00 iters/s
+
+running (0m53.7s), 025/360 VUs, 12854 complete and 0 interrupted iterations
+constant_rate   [  89% ] 025/360 VUs  0m53.7s/1m0s  240.00 iters/s
+
+running (0m54.7s), 024/360 VUs, 13094 complete and 0 interrupted iterations
+constant_rate   [  91% ] 024/360 VUs  0m54.7s/1m0s  240.00 iters/s
+
+running (0m55.7s), 025/360 VUs, 13334 complete and 0 interrupted iterations
+constant_rate   [  93% ] 025/360 VUs  0m55.7s/1m0s  240.00 iters/s
+
+running (0m56.7s), 029/360 VUs, 13569 complete and 0 interrupted iterations
+constant_rate   [  94% ] 029/360 VUs  0m56.7s/1m0s  240.00 iters/s
+
+running (0m57.7s), 063/360 VUs, 13776 complete and 0 interrupted iterations
+constant_rate   [  96% ] 063/360 VUs  0m57.7s/1m0s  240.00 iters/s
+
+running (0m58.7s), 028/360 VUs, 14051 complete and 0 interrupted iterations
+constant_rate   [  98% ] 028/360 VUs  0m58.7s/1m0s  240.00 iters/s
+
+running (0m59.7s), 026/360 VUs, 14293 complete and 0 interrupted iterations
+constant_rate   [  99% ] 026/360 VUs  0m59.7s/1m0s  240.00 iters/s
+
+     ✓ status is 200
+     ✓ has user name
+
+     checks.........................: 100.00% 28802 out of 28802
+     data_received..................: 6.1 MB  102 kB/s
+     data_sent......................: 3.4 MB  56 kB/s
+     http_req_blocked...............: avg=32.71µs  min=3.23µs   med=6.33µs  max=56.18ms  p(90)=9.54µs   p(95)=13.64µs 
+     http_req_connecting............: avg=19.39µs  min=0s       med=0s      max=11.77ms  p(90)=0s       p(95)=0s      
+   ✗ http_req_duration..............: avg=98.77ms  min=1.87ms   med=28.28ms max=860.73ms p(90)=254.44ms p(95)=506.29ms
+       { expected_response:true }...: avg=98.77ms  min=1.87ms   med=28.28ms max=860.73ms p(90)=254.44ms p(95)=506.29ms
+   ✓ http_req_failed................: 0.00%   0 out of 14401
+     http_req_receiving.............: avg=71.06µs  min=15.98µs  med=56.71µs max=76.26ms  p(90)=101.8µs  p(95)=122.61µs
+     http_req_sending...............: avg=34.68µs  min=10.75µs  med=30.32µs max=4.18ms   p(90)=49.57µs  p(95)=60.58µs 
+     http_req_tls_handshaking.......: avg=0s       min=0s       med=0s      max=0s       p(90)=0s       p(95)=0s      
+     http_req_waiting...............: avg=98.66ms  min=1.81ms   med=28.18ms max=860.61ms p(90)=254.36ms p(95)=506.23ms
+     http_reqs......................: 14401   239.533175/s
+     iteration_duration.............: avg=199.54ms min=102.13ms med=129.2ms max=961.09ms p(90)=355.16ms p(95)=606.92ms
+     iterations.....................: 14401   239.533175/s
+     vus............................: 26      min=25             max=185
+     vus_max........................: 360     min=360            max=360
+
+
+running (1m00.1s), 000/360 VUs, 14401 complete and 0 interrupted iterations
+constant_rate ✓ [ 100% ] 000/360 VUs  1m0s  240.00 iters/s
+time="2026-06-17T20:37:43Z" level=error msg="thresholds on metrics 'http_req_duration' have been crossed"
+[pipeline] k6_done exit=99 http_req_failed=0 checks=1 p95_ms=506.293732 http_reqs=14401
+[pipeline] analysis_start
+[analysis] run_analysis_start run_dir=/app/results/engineer-derived-verify/run-1 deployment_yaml=/app/infra/k8s/spark/robot-shop-web-deployment.yaml hpa_yaml=/app/infra/k8s/spark/robot-shop-web-hpa.yaml shared_canonical=False
+[analysis] prometheus_collect_start namespace=svastik deployment=web url=http://my-kube-prometheus-stack-prometheus.monitoring.svc:9090
+[prom] collect_start namespace=svastik deployment=web window=(1781728603.242,1781728663.918) step=5s
+[prom] collect_warn prom_pod_count=5 yaml_replicas=1 prom_replicas_mean=1.31 MISMATCH
+[prom] collect_done cpu_util_request_pct=315.5 burn_m=407.1 cpu_util_request_pct_peak=79.2 mem_util_pct=36.1 cpu_series_matched=True mem_series_matched=True cpu_attempts=1 mem_attempts=1 cpu_mode=per_pod_series_sum mem_mode=per_pod_series_sum cpu_query_used='rate(container_cpu_usage_seconds_total{namespace="svastik",pod=~"web-.+",container!="",container!="POD"}[1m])' samples=13/12 step=5s rate=1m per_pod_sum_m=407.0 aggregate_delta_m=0.1 trustworthy=True
+[prom] collect_per_pod pod=web-7dcbdc969c-8prsz container=web mean_m=152.5 peak_m=210.9 samples=13
+[prom] collect_per_pod pod=web-54997bd9b5-m2p9s container=web mean_m=106.6 peak_m=140.3 samples=10
+[prom] collect_per_pod pod=web-54997bd9b5-zthmq container=web mean_m=55.5 peak_m=59.5 samples=2
+[prom] collect_per_pod pod=web-54997bd9b5-c6rnw container=web mean_m=49.8 peak_m=57.4 samples=3
+[prom] collect_per_pod pod=web-54997bd9b5-l8c9w container=web mean_m=42.6 peak_m=42.6 samples=1
+[analysis] prometheus_collect_done burn_m=407.1 cpu_pct_req=315.5 prom_pods=5 repl_mismatch=True cpu_util_pct=157.8 mem_util_pct=36.1 cpu_series_matched=True mem_series_matched=True utilization_trustworthy=True
+[analysis] experiment_written scaling_hint=UP failure_reason=p95_slo_violation
+[analysis] yaml_live_sync sync.deployment_replicas: 1 -> 5 (observed); sync.hpa_maxReplicas: 1 -> 5 (observed_max)
+[analysis] formula_optimizer_step mode=squeeze analysis_goal=efficiency scaling_hint=UP
+[analysis] formula_optimizer_done failure_archetype=NONE has_deployment_yaml_new=True has_hpa_yaml_new=True
+[analysis] outputs_written run_dir=/app/results/engineer-derived-verify/run-1 diff_nonempty=True report_chars=255
+Run output: /app/results/engineer-derived-verify/run-1
+  k6-run-summary.json, experiment.json, analysis.json, report.md, recommended.diff
+  Failure archetype: NONE
+[pipeline] analysis_done run_dir=/app/results/engineer-derived-verify/run-1
+[pipeline] experiment_status=FAIL failure_reason=p95_slo_violation burn_m=407.1 cpu_pct_req=315.5 repl=5 prom_pods=5 repl_mismatch=True cpu_util_pct=157.8 mem_util_pct=36.1 utilization_trustworthy=True per_pod=['web-7dcbdc969c-8prsz:152.5', 'web-54997bd9b5-m2p9s:106.6', 'web-54997bd9b5-zthmq:55.5', 'web-54997bd9b5-c6rnw:49.8', 'web-54997bd9b5-l8c9w:42.6']
+[2026-06-17 16:38:36] [cluster-run] stress-analyzer-up-demo completed
+[2026-06-17 16:38:38] [cluster-run] saved job logs to ./results/cluster-run-logs/stress-analyzer-up-demo.log
+[2026-06-17 16:38:38] [cluster-run] copy results PVC to local /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/verify-rps240-20260617-163256 (profile_ok profile=up_demo job=stress-analyzer-up-demo) ...
+tar: removing leading '/' from member names
+[2026-06-17 16:38:44] [cluster-run] PVC sync done (profile_ok profile=up_demo job=stress-analyzer-up-demo, layout=thin, static): /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/verify-rps240-20260617-163256/run-1 (pvc=run-1)
+[2026-06-17 16:39:15] [cluster-run] cluster-run finished (PVC was synced after each profile job, success or failure)
+verify FAIL: 1×129m/57Mi measured_prov_cost=0.6083 derived_prov_cost=0.166
+[2026-06-17 16:39:17] [engineer-verify] verify-run synced → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256/run-1/engineer-baseline/verify-run
+[2026-06-17 16:39:17] [engineer-verify] next: ./scripts/build_engineer_vs_advanced_comparisons.sh
+[2026-06-17 16:39:17] [chain-engineer-up] synced engineer-baseline → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts_latest/FORMULA_VS_ADVANCED_LLM/UP/GOOD_COST_WIN_run-1-rps240-20260609-192356/llm-run/engineer-baseline
+[2026-06-17 16:39:17] [chain-engineer-up] === phase 4: compare + archive ===
+[engineer-vs-advanced] artifact roots: vanilla + formula (advanced-llm-run / llm-run)
+[engineer-vs-advanced] engineer UP sweep: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/static-up-sweep-20260527-125059
+[engineer-vs-advanced] engineer DOWN sweep: <not set>
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/UP/run-rps220/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/UP/run-rps240/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/UP/run-rps260/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= advanced-llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/DOWN/run-rps25/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= advanced-llm-run )
+[engineer-vs-advanced] SKIP DOWN rps=35: no engineer experiment
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/DOWN/run-rps45/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= advanced-llm-run )
+wrote /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM/DOWN/run-rps55/comparison.md ( verified: Autopilot-derived YAML + cluster k6 , advanced= llm-run )
+[engineer-vs-advanced] done -> /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts/ENGINEER_VS_ADVANCED_LLM
+[2026-06-17 16:39:18] [chain-engineer-up] archiving UP rps=240
+archived → /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts_latest/ENGINEER_VS_ADVANCED_LLM/UP/GOOD_COST_WIN_run-1-rps240-20260617-203744
+[2026-06-17 16:39:18] [chain-engineer-up] done sweep=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-163256 archive=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/artifacts_latest/ENGINEER_VS_ADVANCED_LLM/UP/

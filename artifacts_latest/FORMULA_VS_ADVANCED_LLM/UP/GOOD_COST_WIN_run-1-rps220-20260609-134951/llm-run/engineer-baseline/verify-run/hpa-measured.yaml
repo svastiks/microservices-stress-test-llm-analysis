@@ -9,7 +9,7 @@ spec:
     kind: Deployment
     name: web
   minReplicas: 1
-  maxReplicas: 1
+  maxReplicas: 5
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 0

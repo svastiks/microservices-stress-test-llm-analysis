@@ -1,0 +1,391 @@
+[2026-06-17 16:40:34] [chain-engineer-up] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-164034
+[2026-06-17 16:40:34] [chain-engineer-up] rps=220,240,260 k6=60s settle=15s
+[2026-06-17 16:40:34] [chain-engineer-up] === phase 1: fat UP profiling (3 rounds) ===
+[2026-06-17 16:40:34] [static-up-sweep] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260617-164034 profile=up_demo rounds=3
+[2026-06-17 16:40:34] [static-up-sweep] baseline deployment=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-deployment.baseline.yaml
+[2026-06-17 16:40:34] [static-up-sweep] baseline hpa=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-hpa.baseline.yaml
+[2026-06-17 16:40:34] [static-up-sweep] === round 1/3 rps=220 STRESS_K6_RPS=220 profile=up_demo (static-baseline) ===
+[2026-06-17 16:40:34] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-17 16:40:34] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-17 16:40:35] [cluster-run] switching context to: monitoring
+[2026-06-17 16:40:36] [cluster-run] context: monitoring
+[2026-06-17 16:40:36] [cluster-run] namespace: svastik
+[2026-06-17 16:40:36] [cluster-run] profiles: up_demo
+[2026-06-17 16:40:36] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-17 16:40:36] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-17 16:40:36] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-17 16:40:36] [cluster-run] build_analyzer_image: true
+[2026-06-17 16:40:36] [cluster-run] stream_job_logs: true
+[2026-06-17 16:40:36] [cluster-run] cleanup_completed_jobs: true
+[2026-06-17 16:40:36] [cluster-run] cleanup_terminal_pods: true
+[2026-06-17 16:40:36] [cluster-run] cleanup_failed_jobs: true
+[2026-06-17 16:40:36] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-17 16:40:36] [cluster-run] up_demo_stabilize_user: true
+[2026-06-17 16:40:36] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-17 16:40:36] [cluster-run] results_pvc_snapshots: false
+[2026-06-17 16:40:36] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-17 16:40:36] [cluster-run] results_stamped_comparison_md: false
+[2026-06-17 16:40:36] [cluster-run] compare_sweep_round: 1
+[2026-06-17 16:40:36] [cluster-run] extra args for analyzer job: --static-baseline
+[2026-06-17 16:40:36] [cluster-run] building and pushing analyzer image: docker.io/svastik/microservices-stress-analyzer:latest
+#0 building with "multiarch-builder" instance using docker-container driver
+
+#1 [internal] booting buildkit
+#1 pulling image moby/buildkit:buildx-stable-1
+#1 pulling image moby/buildkit:buildx-stable-1 0.6s done
+#1 creating container buildx_buildkit_multiarch-builder0
+#1 creating container buildx_buildkit_multiarch-builder0 1.3s done
+#1 DONE 1.9s
+
+#2 [internal] load build definition from Dockerfile.analyzer
+#2 transferring dockerfile: 1.29kB done
+#2 DONE 0.0s
+
+#3 [linux/arm64 internal] load metadata for docker.io/library/python:3.12-slim-bookworm
+#3 ...
+
+#4 [auth] library/python:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [auth] grafana/k6:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#6 [linux/amd64 internal] load metadata for docker.io/grafana/k6:0.55.0
+#6 ...
+
+#7 [linux/amd64 internal] load metadata for docker.io/library/python:3.12-slim-bookworm
+#7 DONE 0.7s
+
+#8 [linux/arm64 internal] load metadata for docker.io/grafana/k6:0.55.0
+#8 DONE 0.7s
+
+#3 [linux/arm64 internal] load metadata for docker.io/library/python:3.12-slim-bookworm
+#3 DONE 0.7s
+
+#9 [internal] load .dockerignore
+#9 transferring context: 244B done
+#9 DONE 0.0s
+
+#6 [linux/amd64 internal] load metadata for docker.io/grafana/k6:0.55.0
+#6 DONE 0.9s
+
+#10 [linux/arm64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf
+#10 resolve docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf 0.0s done
+#10 DONE 0.1s
+
+#11 [linux/arm64 k6bin 1/1] FROM docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2
+#11 resolve docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2 0.0s done
+#11 sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 32B / 32B 0.1s done
+#11 sha256:cf04c63912e16506c4413937c7f4579018e4bb25c272d989789cfba77b12f951 0B / 4.09MB 0.2s
+#11 sha256:cf04c63912e16506c4413937c7f4579018e4bb25c272d989789cfba77b12f951 1.05MB / 4.09MB 0.3s
+#11 sha256:b5277e5c35d15910e0a4a20ea829bf75cf4870dccbb740a98e3ce5fd5e756a96 933B / 933B 0.1s done
+#11 sha256:9682df9678cc0bcd56345166ef72c28f8ed6012e4952f77373b3f55e44cdf68f 1.59MB / 29.03MB 0.2s
+#11 sha256:cf04c63912e16506c4413937c7f4579018e4bb25c272d989789cfba77b12f951 4.09MB / 4.09MB 0.4s done
+#11 sha256:9682df9678cc0bcd56345166ef72c28f8ed6012e4952f77373b3f55e44cdf68f 14.68MB / 29.03MB 0.3s
+#11 extracting sha256:cf04c63912e16506c4413937c7f4579018e4bb25c272d989789cfba77b12f951
+#11 extracting sha256:cf04c63912e16506c4413937c7f4579018e4bb25c272d989789cfba77b12f951 0.1s done
+#11 extracting sha256:b5277e5c35d15910e0a4a20ea829bf75cf4870dccbb740a98e3ce5fd5e756a96 done
+#11 sha256:9682df9678cc0bcd56345166ef72c28f8ed6012e4952f77373b3f55e44cdf68f 29.03MB / 29.03MB 0.5s done
+#11 extracting sha256:9682df9678cc0bcd56345166ef72c28f8ed6012e4952f77373b3f55e44cdf68f
+#11 extracting sha256:9682df9678cc0bcd56345166ef72c28f8ed6012e4952f77373b3f55e44cdf68f 0.6s done
+#11 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 done
+#11 DONE 1.4s
+
+#12 [linux/amd64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf
+#12 resolve docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf 0.0s done
+#12 sha256:2a87a541a2a8931e5cc0ded379c16bf8ce0df34b014f945d4905cd790b5d7aaf 250B / 250B 0.0s done
+#12 sha256:70a4cf5323f3737e8219711d88392f78b1f738fc3a5924f411fc0c343edc0669 3.52MB / 3.52MB 0.3s done
+#12 sha256:ca2c428672002b98ac5aa13d0ed5c4d7fe4ff1eeae90872e44a0b443c89088f2 13.67MB / 13.67MB 0.3s done
+#12 sha256:b9136609bef0128191aa157637b98dd7b98e52154ca60c18258d65957a01c6d0 28.24MB / 28.24MB 0.5s done
+#12 extracting sha256:b9136609bef0128191aa157637b98dd7b98e52154ca60c18258d65957a01c6d0
+#12 extracting sha256:b9136609bef0128191aa157637b98dd7b98e52154ca60c18258d65957a01c6d0 1.0s done
+#12 extracting sha256:70a4cf5323f3737e8219711d88392f78b1f738fc3a5924f411fc0c343edc0669
+#12 extracting sha256:70a4cf5323f3737e8219711d88392f78b1f738fc3a5924f411fc0c343edc0669 0.1s done
+#12 extracting sha256:ca2c428672002b98ac5aa13d0ed5c4d7fe4ff1eeae90872e44a0b443c89088f2
+#12 extracting sha256:ca2c428672002b98ac5aa13d0ed5c4d7fe4ff1eeae90872e44a0b443c89088f2 0.4s done
+#12 DONE 2.1s
+
+#13 [linux/amd64 k6bin 1/1] FROM docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2
+#13 resolve docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2 0.0s done
+#13 sha256:fbd3b2fcfaef6bb1a2019235decb8e3795b137b66216908d189bab247233f502 30.71MB / 30.71MB 0.9s done
+#13 sha256:43c4264eed91be63b206e17d93e75256a6097070ce643c5e8f0379998b44f170 3.62MB / 3.62MB 0.1s done
+#13 extracting sha256:43c4264eed91be63b206e17d93e75256a6097070ce643c5e8f0379998b44f170 0.1s done
+#13 sha256:4f4136512d34107fe0fa61dbb8b24adc7a70498240c715a6a4482a59c940d46e 933B / 933B 0.2s done
+#13 extracting sha256:4f4136512d34107fe0fa61dbb8b24adc7a70498240c715a6a4482a59c940d46e done
+#13 extracting sha256:fbd3b2fcfaef6bb1a2019235decb8e3795b137b66216908d189bab247233f502
+#13 ...
+
+#12 [linux/amd64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf
+#12 extracting sha256:2a87a541a2a8931e5cc0ded379c16bf8ce0df34b014f945d4905cd790b5d7aaf done
+#12 DONE 2.1s
+
+#10 [linux/arm64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf
+#10 sha256:09355c72fd7291318fd3fb571987225301681bd0daa95ce29164b0debf021737 250B / 250B 0.1s done
+#10 sha256:67c635dcb557d9079eed487073482e4d26cafd64876a0163b352d31d4845110a 3.35MB / 3.35MB 0.2s done
+#10 sha256:946f2656c94ddb9234ee895512da289a6bc74633eaef83ee4b9abef5a93c2a7b 13.60MB / 13.60MB 0.3s done
+#10 sha256:402614bd39aaec1e4bdcf25aa67f88588fc8d93997a2551c4e130e6ed2b06c7a 28.12MB / 28.12MB 0.7s done
+#10 extracting sha256:402614bd39aaec1e4bdcf25aa67f88588fc8d93997a2551c4e130e6ed2b06c7a
+#10 ...
+
+#14 [linux/amd64 stage-1  2/10] WORKDIR /app
+#14 DONE 0.9s
+
+#13 [linux/amd64 k6bin 1/1] FROM docker.io/grafana/k6:0.55.0@sha256:b24f418fc99a26dd57904c952c03bfaf79462be18508acc45aafa07ff68e7df2
+#13 extracting sha256:fbd3b2fcfaef6bb1a2019235decb8e3795b137b66216908d189bab247233f502 1.3s done
+#13 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 0.0s done
+#13 DONE 3.0s
+
+#10 [linux/arm64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf
+#10 extracting sha256:402614bd39aaec1e4bdcf25aa67f88588fc8d93997a2551c4e130e6ed2b06c7a 1.8s done
+#10 extracting sha256:67c635dcb557d9079eed487073482e4d26cafd64876a0163b352d31d4845110a 0.1s done
+#10 extracting sha256:946f2656c94ddb9234ee895512da289a6bc74633eaef83ee4b9abef5a93c2a7b
+#10 extracting sha256:946f2656c94ddb9234ee895512da289a6bc74633eaef83ee4b9abef5a93c2a7b 0.2s done
+#10 DONE 3.3s
+
+#15 [linux/amd64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#15 ...
+
+#10 [linux/arm64 stage-1  1/10] FROM docker.io/library/python:3.12-slim-bookworm@sha256:76d4b7b6305788c6b4c6a19d6a22a3921bf802e9af4d5e1e5bd771208dba74bf
+#10 extracting sha256:09355c72fd7291318fd3fb571987225301681bd0daa95ce29164b0debf021737 done
+#10 DONE 3.3s
+
+#15 [linux/amd64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#15 0.368 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#15 ...
+
+#16 [linux/arm64 stage-1  2/10] WORKDIR /app
+#16 DONE 0.1s
+
+#15 [linux/amd64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#15 0.414 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#15 0.414 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+#15 0.867 Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8790 kB]
+#15 1.225 Get:5 http://deb.debian.org/debian bookworm-updates/main amd64 Packages [6924 B]
+#15 ...
+
+#17 [internal] load build context
+#17 transferring context: 947.71kB 4.5s done
+#17 DONE 4.6s
+
+#15 [linux/amd64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#15 1.756 Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [312 kB]
+#15 2.027 Fetched 9363 kB in 2s (5281 kB/s)
+#15 2.027 Reading package lists...
+#15 2.553 Reading package lists...
+#15 3.039 Building dependency tree...
+#15 3.125 Reading state information...
+#15 3.221 ca-certificates is already the newest version (20230311+deb12u1).
+#15 3.221 The following additional packages will be installed:
+#15 3.222   libbrotli1 libcurl4 libldap-2.5-0 libnghttp2-14 libpsl5 librtmp1 libsasl2-2
+#15 3.222   libsasl2-modules-db libssh2-1
+#15 3.223 Recommended packages:
+#15 3.223   libldap-common publicsuffix libsasl2-modules
+#15 3.293 The following NEW packages will be installed:
+#15 3.293   curl libbrotli1 libcurl4 libldap-2.5-0 libnghttp2-14 libpsl5 librtmp1
+#15 3.294   libsasl2-2 libsasl2-modules-db libssh2-1
+#15 3.382 0 upgraded, 10 newly installed, 0 to remove and 0 not upgraded.
+#15 3.382 Need to get 1616 kB of archives.
+#15 3.382 After this operation, 3817 kB of additional disk space will be used.
+#15 3.382 Get:1 http://deb.debian.org/debian bookworm/main amd64 libbrotli1 amd64 1.0.9-2+b6 [275 kB]
+#15 3.440 Get:2 http://deb.debian.org/debian bookworm/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg-10 [20.3 kB]
+#15 3.440 Get:3 http://deb.debian.org/debian bookworm/main amd64 libsasl2-2 amd64 2.1.28+dfsg-10 [59.7 kB]
+#15 3.440 Get:4 http://deb.debian.org/debian bookworm/main amd64 libldap-2.5-0 amd64 2.5.13+dfsg-5 [183 kB]
+#15 3.444 Get:5 http://deb.debian.org/debian-security bookworm-security/main amd64 libnghttp2-14 amd64 1.52.0-1+deb12u3 [72.4 kB]
+#15 3.460 Get:6 http://deb.debian.org/debian bookworm/main amd64 libpsl5 amd64 0.21.2-1 [58.7 kB]
+#15 3.461 Get:7 http://deb.debian.org/debian bookworm/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2+b2 [60.8 kB]
+#15 3.461 Get:8 http://deb.debian.org/debian bookworm/main amd64 libssh2-1 amd64 1.10.0-3+b1 [179 kB]
+#15 3.465 Get:9 http://deb.debian.org/debian bookworm/main amd64 libcurl4 amd64 7.88.1-10+deb12u14 [392 kB]
+#15 3.474 Get:10 http://deb.debian.org/debian bookworm/main amd64 curl amd64 7.88.1-10+deb12u14 [316 kB]
+#15 3.748 debconf: delaying package configuration, since apt-utils is not installed
+#15 3.804 Fetched 1616 kB in 0s (9396 kB/s)
+#15 3.880 Selecting previously unselected package libbrotli1:amd64.
+#15 3.880 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6695 files and directories currently installed.)
+#15 3.883 Preparing to unpack .../0-libbrotli1_1.0.9-2+b6_amd64.deb ...
+#15 3.887 Unpacking libbrotli1:amd64 (1.0.9-2+b6) ...
+#15 3.985 Selecting previously unselected package libsasl2-modules-db:amd64.
+#15 3.985 Preparing to unpack .../1-libsasl2-modules-db_2.1.28+dfsg-10_amd64.deb ...
+#15 3.986 Unpacking libsasl2-modules-db:amd64 (2.1.28+dfsg-10) ...
+#15 4.069 Selecting previously unselected package libsasl2-2:amd64.
+#15 4.070 Preparing to unpack .../2-libsasl2-2_2.1.28+dfsg-10_amd64.deb ...
+#15 4.071 Unpacking libsasl2-2:amd64 (2.1.28+dfsg-10) ...
+#15 4.206 Selecting previously unselected package libldap-2.5-0:amd64.
+#15 ...
+
+#18 [linux/arm64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#18 0.088 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#18 0.124 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#18 0.139 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+#18 0.186 Get:4 http://deb.debian.org/debian bookworm/main arm64 Packages [8690 kB]
+#18 0.289 Get:5 http://deb.debian.org/debian bookworm-updates/main arm64 Packages [6936 B]
+#18 0.301 Get:6 http://deb.debian.org/debian-security bookworm-security/main arm64 Packages [308 kB]
+#18 0.898 Fetched 9259 kB in 1s (11.1 MB/s)
+#18 0.898 Reading package lists...
+#18 1.357 Reading package lists...
+#18 1.629 Building dependency tree...
+#18 1.698 Reading state information...
+#18 1.773 ca-certificates is already the newest version (20230311+deb12u1).
+#18 1.773 The following additional packages will be installed:
+#18 1.773   libbrotli1 libcurl4 libldap-2.5-0 libnghttp2-14 libpsl5 librtmp1 libsasl2-2
+#18 1.773   libsasl2-modules-db libssh2-1
+#18 1.773 Recommended packages:
+#18 1.773   libldap-common publicsuffix libsasl2-modules
+#18 1.817 The following NEW packages will be installed:
+#18 1.817   curl libbrotli1 libcurl4 libldap-2.5-0 libnghttp2-14 libpsl5 librtmp1
+#18 1.817   libsasl2-2 libsasl2-modules-db libssh2-1
+#18 1.906 0 upgraded, 10 newly installed, 0 to remove and 0 not upgraded.
+#18 1.906 Need to get 1554 kB of archives.
+#18 1.906 After this operation, 4029 kB of additional disk space will be used.
+#18 1.906 Get:1 http://deb.debian.org/debian bookworm/main arm64 libbrotli1 arm64 1.0.9-2+b6 [269 kB]
+#18 2.034 Get:2 http://deb.debian.org/debian bookworm/main arm64 libsasl2-modules-db arm64 2.1.28+dfsg-10 [20.8 kB]
+#18 2.035 Get:3 http://deb.debian.org/debian bookworm/main arm64 libsasl2-2 arm64 2.1.28+dfsg-10 [58.0 kB]
+#18 2.039 Get:4 http://deb.debian.org/debian bookworm/main arm64 libldap-2.5-0 arm64 2.5.13+dfsg-5 [171 kB]
+#18 2.049 Get:5 http://deb.debian.org/debian-security bookworm-security/main arm64 libnghttp2-14 arm64 1.52.0-1+deb12u3 [69.0 kB]
+#18 2.069 Get:6 http://deb.debian.org/debian bookworm/main arm64 libpsl5 arm64 0.21.2-1 [58.6 kB]
+#18 2.070 Get:7 http://deb.debian.org/debian bookworm/main arm64 librtmp1 arm64 2.4+20151223.gitfa8646d.1-2+b2 [59.4 kB]
+#18 2.076 Get:8 http://deb.debian.org/debian bookworm/main arm64 libssh2-1 arm64 1.10.0-3+b1 [172 kB]
+#18 2.083 Get:9 http://deb.debian.org/debian bookworm/main arm64 libcurl4 arm64 7.88.1-10+deb12u14 [367 kB]
+#18 2.106 Get:10 http://deb.debian.org/debian bookworm/main arm64 curl arm64 7.88.1-10+deb12u14 [309 kB]
+#18 2.203 debconf: delaying package configuration, since apt-utils is not installed
+#18 2.234 Fetched 1554 kB in 0s (5290 kB/s)
+#18 2.262 Selecting previously unselected package libbrotli1:arm64.
+#18 2.262 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6689 files and directories currently installed.)
+#18 2.267 Preparing to unpack .../0-libbrotli1_1.0.9-2+b6_arm64.deb ...
+#18 2.271 Unpacking libbrotli1:arm64 (1.0.9-2+b6) ...
+#18 2.293 Selecting previously unselected package libsasl2-modules-db:arm64.
+#18 2.293 Preparing to unpack .../1-libsasl2-modules-db_2.1.28+dfsg-10_arm64.deb ...
+#18 2.295 Unpacking libsasl2-modules-db:arm64 (2.1.28+dfsg-10) ...
+#18 2.306 Selecting previously unselected package libsasl2-2:arm64.
+#18 2.306 Preparing to unpack .../2-libsasl2-2_2.1.28+dfsg-10_arm64.deb ...
+#18 2.308 Unpacking libsasl2-2:arm64 (2.1.28+dfsg-10) ...
+#18 2.322 Selecting previously unselected package libldap-2.5-0:arm64.
+#18 2.323 Preparing to unpack .../3-libldap-2.5-0_2.5.13+dfsg-5_arm64.deb ...
+#18 2.324 Unpacking libldap-2.5-0:arm64 (2.5.13+dfsg-5) ...
+#18 2.343 Selecting previously unselected package libnghttp2-14:arm64.
+#18 2.345 Preparing to unpack .../4-libnghttp2-14_1.52.0-1+deb12u3_arm64.deb ...
+#18 2.346 Unpacking libnghttp2-14:arm64 (1.52.0-1+deb12u3) ...
+#18 2.373 Selecting previously unselected package libpsl5:arm64.
+#18 2.374 Preparing to unpack .../5-libpsl5_0.21.2-1_arm64.deb ...
+#18 2.379 Unpacking libpsl5:arm64 (0.21.2-1) ...
+#18 2.390 Selecting previously unselected package librtmp1:arm64.
+#18 2.391 Preparing to unpack .../6-librtmp1_2.4+20151223.gitfa8646d.1-2+b2_arm64.deb ...
+#18 2.391 Unpacking librtmp1:arm64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#18 2.407 Selecting previously unselected package libssh2-1:arm64.
+#18 2.408 Preparing to unpack .../7-libssh2-1_1.10.0-3+b1_arm64.deb ...
+#18 2.409 Unpacking libssh2-1:arm64 (1.10.0-3+b1) ...
+#18 2.442 Selecting previously unselected package libcurl4:arm64.
+#18 2.444 Preparing to unpack .../8-libcurl4_7.88.1-10+deb12u14_arm64.deb ...
+#18 2.446 Unpacking libcurl4:arm64 (7.88.1-10+deb12u14) ...
+#18 2.472 Selecting previously unselected package curl.
+#18 2.472 Preparing to unpack .../9-curl_7.88.1-10+deb12u14_arm64.deb ...
+#18 2.473 Unpacking curl (7.88.1-10+deb12u14) ...
+#18 2.495 Setting up libpsl5:arm64 (0.21.2-1) ...
+#18 2.499 Setting up libbrotli1:arm64 (1.0.9-2+b6) ...
+#18 2.503 Setting up libnghttp2-14:arm64 (1.52.0-1+deb12u3) ...
+#18 2.505 Setting up libsasl2-modules-db:arm64 (2.1.28+dfsg-10) ...
+#18 2.509 Setting up librtmp1:arm64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#18 2.512 Setting up libsasl2-2:arm64 (2.1.28+dfsg-10) ...
+#18 2.515 Setting up libssh2-1:arm64 (1.10.0-3+b1) ...
+#18 2.518 Setting up libldap-2.5-0:arm64 (2.5.13+dfsg-5) ...
+#18 2.522 Setting up libcurl4:arm64 (7.88.1-10+deb12u14) ...
+#18 2.527 Setting up curl (7.88.1-10+deb12u14) ...
+#18 2.529 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#18 DONE 3.8s
+
+#19 [linux/arm64 stage-1  4/10] COPY --from=k6bin /usr/bin/k6 /usr/local/bin/k6
+#19 DONE 0.1s
+
+#15 [linux/amd64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#15 4.207 Preparing to unpack .../3-libldap-2.5-0_2.5.13+dfsg-5_amd64.deb ...
+#15 4.211 Unpacking libldap-2.5-0:amd64 (2.5.13+dfsg-5) ...
+#15 ...
+
+#20 [linux/arm64 stage-1  5/10] COPY requirements.txt .
+#20 DONE 0.0s
+
+#15 [linux/amd64 stage-1  3/10] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates curl     && ARCH="$(dpkg --print-architecture)"     && curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl" -o /usr/local/bin/kubectl     && chmod +x /usr/local/bin/kubectl     && rm -rf /var/lib/apt/lists/*
+#15 4.358 Selecting previously unselected package libnghttp2-14:amd64.
+#15 4.358 Preparing to unpack .../4-libnghttp2-14_1.52.0-1+deb12u3_amd64.deb ...
+#15 4.365 Unpacking libnghttp2-14:amd64 (1.52.0-1+deb12u3) ...
+#15 4.471 Selecting previously unselected package libpsl5:amd64.
+#15 4.472 Preparing to unpack .../5-libpsl5_0.21.2-1_amd64.deb ...
+#15 4.474 Unpacking libpsl5:amd64 (0.21.2-1) ...
+#15 4.556 Selecting previously unselected package librtmp1:amd64.
+#15 4.556 Preparing to unpack .../6-librtmp1_2.4+20151223.gitfa8646d.1-2+b2_amd64.deb ...
+#15 4.558 Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#15 4.640 Selecting previously unselected package libssh2-1:amd64.
+#15 4.641 Preparing to unpack .../7-libssh2-1_1.10.0-3+b1_amd64.deb ...
+#15 4.643 Unpacking libssh2-1:amd64 (1.10.0-3+b1) ...
+#15 4.729 Selecting previously unselected package libcurl4:amd64.
+#15 4.729 Preparing to unpack .../8-libcurl4_7.88.1-10+deb12u14_amd64.deb ...
+#15 4.730 Unpacking libcurl4:amd64 (7.88.1-10+deb12u14) ...
+#15 4.825 Selecting previously unselected package curl.
+#15 4.826 Preparing to unpack .../9-curl_7.88.1-10+deb12u14_amd64.deb ...
+#15 4.827 Unpacking curl (7.88.1-10+deb12u14) ...
+#15 4.908 Setting up libpsl5:amd64 (0.21.2-1) ...
+#15 4.915 Setting up libbrotli1:amd64 (1.0.9-2+b6) ...
+#15 4.918 Setting up libnghttp2-14:amd64 (1.52.0-1+deb12u3) ...
+#15 4.923 Setting up libsasl2-modules-db:amd64 (2.1.28+dfsg-10) ...
+#15 4.933 Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#15 4.936 Setting up libsasl2-2:amd64 (2.1.28+dfsg-10) ...
+#15 4.941 Setting up libssh2-1:amd64 (1.10.0-3+b1) ...
+#15 4.943 Setting up libldap-2.5-0:amd64 (2.5.13+dfsg-5) ...
+#15 4.946 Setting up libcurl4:amd64 (7.88.1-10+deb12u14) ...
+#15 4.948 Setting up curl (7.88.1-10+deb12u14) ...
+#15 4.954 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#15 DONE 6.1s
+
+#21 [linux/arm64 stage-1  6/10] RUN pip install --no-cache-dir -r requirements.txt
+#21 0.923 Collecting openai>=1.0.0 (from -r requirements.txt (line 1))
+#21 1.068   Downloading openai-2.43.0-py3-none-any.whl.metadata (32 kB)
+#21 1.145 Collecting PyYAML>=6.0 (from -r requirements.txt (line 2))
+#21 1.183   Downloading pyyaml-6.0.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (2.4 kB)
+#21 1.244 Collecting requests>=2.28.0 (from -r requirements.txt (line 3))
+#21 1.283   Downloading requests-2.34.2-py3-none-any.whl.metadata (4.8 kB)
+#21 1.332 Collecting python-dotenv>=1.0.0 (from -r requirements.txt (line 4))
+#21 1.369   Downloading python_dotenv-1.2.2-py3-none-any.whl.metadata (27 kB)
+#21 1.692 Collecting pymongo>=4.9.0 (from -r requirements.txt (line 5))
+#21 1.730   Downloading pymongo-4.17.0-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (10 kB)
+#21 1.776 Collecting anyio<5,>=3.5.0 (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 ...
+
+#22 [linux/amd64 stage-1  4/10] COPY --from=k6bin /usr/bin/k6 /usr/local/bin/k6
+#22 DONE 0.1s
+
+#23 [linux/amd64 stage-1  5/10] COPY requirements.txt .
+#23 DONE 0.0s
+
+#21 [linux/arm64 stage-1  6/10] RUN pip install --no-cache-dir -r requirements.txt
+#21 1.811   Downloading anyio-4.14.0-py3-none-any.whl.metadata (4.6 kB)
+#21 1.848 Collecting distro<2,>=1.7.0 (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 1.883   Downloading distro-1.9.0-py3-none-any.whl.metadata (6.8 kB)
+#21 1.927 Collecting httpx<1,>=0.23.0 (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 1.964   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+#21 2.049 Collecting jiter<1,>=0.10.0 (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 2.085   Downloading jiter-0.15.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl.metadata (5.2 kB)
+#21 2.186 Collecting pydantic<3,>=1.9.0 (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 2.219   Downloading pydantic-2.13.4-py3-none-any.whl.metadata (109 kB)
+#21 2.297 Collecting sniffio (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 2.332   Downloading sniffio-1.3.1-py3-none-any.whl.metadata (3.9 kB)
+#21 2.383 Collecting tqdm>4 (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 2.417   Downloading tqdm-4.68.3-py3-none-any.whl.metadata (57 kB)
+#21 2.465 Collecting typing-extensions<5,>=4.11 (from openai>=1.0.0->-r requirements.txt (line 1))
+#21 2.498   Downloading typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+#21 2.588 Collecting charset_normalizer<4,>=2 (from requests>=2.28.0->-r requirements.txt (line 3))
+#21 2.622   Downloading charset_normalizer-3.4.7-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl.metadata (40 kB)
+#21 2.665 Collecting idna<4,>=2.5 (from requests>=2.28.0->-r requirements.txt (line 3))
+#21 2.698   Downloading idna-3.18-py3-none-any.whl.metadata (6.1 kB)
+#21 2.742 Collecting urllib3<3,>=1.26 (from requests>=2.28.0->-r requirements.txt (line 3))
+#21 2.776   Downloading urllib3-2.7.0-py3-none-any.whl.metadata (6.9 kB)
+#21 2.820 Collecting certifi>=2023.5.7 (from requests>=2.28.0->-r requirements.txt (line 3))
+#21 2.855   Downloading certifi-2026.6.17-py3-none-any.whl.metadata (2.5 kB)
+#21 2.897 Collecting dnspython<3.0.0,>=2.6.1 (from pymongo>=4.9.0->-r requirements.txt (line 5))
+#21 2.930   Downloading dnspython-2.8.0-py3-none-any.whl.metadata (5.7 kB)
+#21 2.979 Collecting httpcore==1.* (from httpx<1,>=0.23.0->openai>=1.0.0->-r requirements.txt (line 1))
+#21 3.014   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+#21 3.055 Collecting h11>=0.16 (from httpcore==1.*->httpx<1,>=0.23.0->openai>=1.0.0->-r requirements.txt (line 1))
+#21 3.091   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+#21 3.137 Collecting annotated-types>=0.6.0 (from pydantic<3,>=1.9.0->openai>=1.0.0->-r requirements.txt (line 1))
+#21 3.171   Downloading annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)

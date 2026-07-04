@@ -753,6 +753,8 @@ for profile in "${PROFILE_LIST[@]}"; do
   ANALYZER_IMAGE="${ANALYZER_IMAGE}" \
   ANALYZER_IMAGE_PULL_POLICY="${ANALYZER_IMAGE_PULL_POLICY}" \
   JOB_NAME="${job_name}" \
+  DEPLOYMENT_YAML="${DEPLOYMENT_YAML}" \
+  HPA_YAML="${HPA_YAML}" \
   ./scripts/run_analyzer_job.sh ${EXTRA_ARGS+"${EXTRA_ARGS[@]}"}
 
   log_pid=""

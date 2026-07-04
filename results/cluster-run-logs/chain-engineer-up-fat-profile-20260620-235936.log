@@ -1,0 +1,35 @@
+[2026-06-20 23:59:36] [chain-engineer-up] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260620-235936
+[2026-06-20 23:59:36] [chain-engineer-up] rps=240 k6=60s settle=15s
+[2026-06-20 23:59:36] [chain-engineer-up] === phase 1: fat UP profiling (1 rounds) ===
+[2026-06-20 23:59:36] [static-up-sweep] sweep root: /Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/results-from-cluster/engineer-up-fat-profile-20260620-235936 profile=up_demo rounds=1
+[2026-06-20 23:59:36] [static-up-sweep] baseline deployment=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-deployment.baseline.yaml
+[2026-06-20 23:59:36] [static-up-sweep] baseline hpa=/Users/svastik/Documents/Svastik/github/microservices-stress-test-llm-analysis/infra/k8s/spark/robot-shop-web-hpa.baseline.yaml
+[2026-06-20 23:59:36] [static-up-sweep] === round 1/1 rps=240 STRESS_K6_RPS=240 profile=up_demo (static-baseline) ===
+[2026-06-20 23:59:36] [cluster-run] kubeconfig: /Users/svastik/Documents/Research/hetzner-svastik-monitoring.yaml
+[2026-06-20 23:59:36] [cluster-run] available contexts:
+CURRENT   NAME         CLUSTER   AUTHINFO                   NAMESPACE
+*         monitoring   spark     svastik-monitoring-admin   monitoring
+          svastik      spark     svastik-monitoring-admin   svastik
+[2026-06-20 23:59:36] [cluster-run] switching context to: monitoring
+[2026-06-20 23:59:38] [cluster-run] context: monitoring
+[2026-06-20 23:59:38] [cluster-run] namespace: svastik
+[2026-06-20 23:59:38] [cluster-run] profiles: up_demo
+[2026-06-20 23:59:38] [cluster-run] log_dir: ./results/cluster-run-logs
+[2026-06-20 23:59:38] [cluster-run] analyzer_image: docker.io/svastik/microservices-stress-analyzer:latest
+[2026-06-20 23:59:38] [cluster-run] analyzer_image_pull_policy: Always
+[2026-06-20 23:59:38] [cluster-run] build_analyzer_image: false
+[2026-06-20 23:59:38] [cluster-run] stream_job_logs: true
+[2026-06-20 23:59:38] [cluster-run] cleanup_completed_jobs: true
+[2026-06-20 23:59:38] [cluster-run] cleanup_terminal_pods: true
+[2026-06-20 23:59:38] [cluster-run] cleanup_failed_jobs: true
+[2026-06-20 23:59:38] [cluster-run] deploy_analyzer_mongodb: false
+[2026-06-20 23:59:38] [cluster-run] up_demo_stabilize_user: true
+[2026-06-20 23:59:38] [cluster-run] results_pvc_sync_layout: thin
+[2026-06-20 23:59:38] [cluster-run] results_pvc_snapshots: false
+[2026-06-20 23:59:38] [cluster-run] results_pvc_copy_comparison_to_root: false
+[2026-06-20 23:59:38] [cluster-run] results_stamped_comparison_md: false
+[2026-06-20 23:59:38] [cluster-run] compare_sweep_round: 1
+[2026-06-20 23:59:38] [cluster-run] extra args for analyzer job: --static-baseline
+[2026-06-20 23:59:39] [cluster-run] stack already present; skipping redeploy (set FORCE_DEPLOY_STACK=hard to force helm deploy)
+[2026-06-20 23:59:39] [cluster-run] pre-run: restore managed web baseline (prior runs may leave web NotReady / HPA unknown)
+[2026-06-20 23:59:39] [cluster-run] apply immutable managed baseline (web deployment + hpa)

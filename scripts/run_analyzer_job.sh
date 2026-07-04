@@ -60,6 +60,16 @@ fi
 SUT_BASE_URL="${SUT_BASE_URL:-http://web.${NAMESPACE}.svc.cluster.local:8080}"
 PROFILE="${PROFILE:-low}"
 ANALYZER_SCRIPT="${ANALYZER_SCRIPT:-robotshop_login}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEPLOYMENT_YAML="${DEPLOYMENT_YAML:-${ROOT}/infra/k8s/spark/robot-shop-web-deployment.yaml}"
+HPA_YAML="${HPA_YAML:-${ROOT}/infra/k8s/spark/robot-shop-web-hpa.yaml}"
+if [[ "${DEPLOYMENT_YAML}" != /* ]]; then
+  DEPLOYMENT_YAML="${ROOT}/${DEPLOYMENT_YAML}"
+fi
+if [[ "${HPA_YAML}" != /* ]]; then
+  HPA_YAML="${ROOT}/${HPA_YAML}"
+fi
+WEB_YAML_CM="${WEB_YAML_CM:-stress-analyzer-web-yaml}"
 
 echo "[analyzer] context: $(kubectl config current-context)"
 echo "[analyzer] namespace: ${NAMESPACE}"
@@ -475,6 +485,72 @@ fi
 
 echo "[analyzer] recreating job..."
 kubectl -n "${NAMESPACE}" delete job "${JOB_NAME}" --ignore-not-found >/dev/null
+
+if [[ -f "${DEPLOYMENT_YAML}" && -f "${HPA_YAML}" ]]; then
+  echo "[analyzer] staging web deployment/hpa via configmap ${WEB_YAML_CM} -> writable /app/run-web-yaml"
+  kubectl -n "${NAMESPACE}" create configmap "${WEB_YAML_CM}" \
+    --from-file=robot-shop-web-deployment.yaml="${DEPLOYMENT_YAML}" \
+    --from-file=robot-shop-web-hpa.yaml="${HPA_YAML}" \
+    --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  python3 - <<PY
+import yaml
+from pathlib import Path
+
+manifest = Path("${MANIFEST}")
+doc = yaml.safe_load(manifest.read_text())
+spec = doc["spec"]["template"]["spec"]
+runner = spec["containers"][0]
+runner_image = runner.get("image") or "busybox:latest"
+
+volumes = [v for v in spec.get("volumes") or [] if v.get("name") not in ("web-yaml", "run-web-yaml")]
+volumes.extend(
+    [
+        {"name": "web-yaml", "configMap": {"name": "${WEB_YAML_CM}"}},
+        {"name": "run-web-yaml", "emptyDir": {}},
+    ]
+)
+spec["volumes"] = volumes
+
+spec["initContainers"] = [
+    {
+        "name": "stage-web-yaml",
+        "image": runner_image,
+        "command": [
+            "sh",
+            "-c",
+            "cp /engineer-cm/robot-shop-web-deployment.yaml /run-web-yaml/ && "
+            "cp /engineer-cm/robot-shop-web-hpa.yaml /run-web-yaml/",
+        ],
+        "volumeMounts": [
+            {"name": "web-yaml", "mountPath": "/engineer-cm", "readOnly": True},
+            {"name": "run-web-yaml", "mountPath": "/run-web-yaml"},
+        ],
+    }
+]
+
+mounts = [
+    m
+    for m in runner.get("volumeMounts") or []
+    if m.get("name") not in ("web-yaml", "run-web-yaml")
+]
+mounts.append({"name": "run-web-yaml", "mountPath": "/app/run-web-yaml"})
+runner["volumeMounts"] = mounts
+
+dep = "/app/run-web-yaml/robot-shop-web-deployment.yaml"
+hpa = "/app/run-web-yaml/robot-shop-web-hpa.yaml"
+old_dep = "infra/k8s/spark/robot-shop-web-deployment.yaml"
+old_hpa = "infra/k8s/spark/robot-shop-web-hpa.yaml"
+cmd = runner.get("command") or []
+runner["command"] = [
+    dep if arg == old_dep else hpa if arg == old_hpa else arg for arg in cmd
+]
+
+manifest.write_text(yaml.safe_dump(doc, default_flow_style=False, sort_keys=False))
+PY
+else
+  echo "[analyzer] WARN: web yaml missing (${DEPLOYMENT_YAML} / ${HPA_YAML}); analyzer may use image-baked manifests" >&2
+fi
+
 kubectl apply -f "${MANIFEST}"
 
 echo "[analyzer] launched; follow logs with:"
